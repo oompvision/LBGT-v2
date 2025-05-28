@@ -26,26 +26,39 @@ export default function HomePage() {
       <Header />
 
       <main className="flex-1">
-        {/* Hero Section with Golf Course Background */}
+        {/* Hero Section with Video Background */}
         <div className="relative min-h-screen">
           <div className="absolute inset-0">
-            <Image
-              src="/images/new-hero-golf-course.jpg"
-              alt="Beautiful golf course with sand bunkers and water view"
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-black/30"></div>
+            {/* Video Background */}
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+              poster="/images/new-hero-golf-course.jpg" // Fallback image while video loads
+            >
+              <source src="/videos/middlebay-hero.mp4" type="video/mp4" />
+              {/* Fallback for browsers that don't support video */}
+              <Image
+                src="/images/new-hero-golf-course.jpg"
+                alt="Beautiful golf course with sand bunkers and water view"
+                fill
+                className="object-cover"
+                priority
+              />
+            </video>
+            {/* Overlay for better text readability */}
+            <div className="absolute inset-0 bg-black/40"></div>
           </div>
 
           <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
             {/* Main Title - Reduced Size */}
             <div className="text-center mb-8">
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 drop-shadow-lg">
                 Welcome to The Long Beach Golf Tour
               </h1>
-              <p className="text-lg md:text-xl text-white/90">Est. 2021</p>
+              <p className="text-lg md:text-xl text-white/90 drop-shadow-md">Est. 2021</p>
             </div>
 
             {/* Action Buttons */}
@@ -55,7 +68,7 @@ export default function HomePage() {
                   <Link href="/reservations">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px]"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
                     >
                       Reserve Tee Time
                     </Button>
@@ -63,7 +76,7 @@ export default function HomePage() {
                   <Link href="/scores/submit">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px]"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
                     >
                       Submit Scorecard
                     </Button>
@@ -71,7 +84,7 @@ export default function HomePage() {
                   <Link href="/dashboard">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px]"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
                     >
                       Dashboard
                     </Button>
@@ -82,7 +95,7 @@ export default function HomePage() {
                   <Link href="/signin">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px]"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
                     >
                       Sign In
                     </Button>
@@ -91,7 +104,7 @@ export default function HomePage() {
                     <Button
                       size="lg"
                       variant="outline"
-                      className="border-white text-white hover:bg-white hover:text-lbgt-dark px-8 py-4 text-lg font-semibold min-w-[180px]"
+                      className="border-white text-white hover:bg-white hover:text-lbgt-dark px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg backdrop-blur-sm"
                     >
                       Apply to Join
                     </Button>
