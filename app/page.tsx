@@ -6,13 +6,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
 import Script from "next/script"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { MessageBox } from "@/components/message-box"
 
 export default function HomePage() {
   const { user, isLoading } = useAuth()
+  const [videoError, setVideoError] = useState(false)
 
   useEffect(() => {
     // Process Instagram embeds after component mounts
@@ -29,17 +30,24 @@ export default function HomePage() {
         {/* Hero Section with Video Background */}
         <div className="relative min-h-screen">
           <div className="absolute inset-0">
-            {/* Video Background */}
-            <video
-              autoPlay
-              muted
-              loop
-              playsInline
-              className="w-full h-full object-cover"
-              poster="/images/new-hero-golf-course.jpg" // Fallback image while video loads
-            >
-              <source src="/videos/middlebay-hero.mp4" type="video/mp4" />
-              {/* Fallback for browsers that don't support video */}
+            {!videoError ? (
+              /* Video Background */
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="w-full h-full object-cover"
+                poster="/images/new-hero-golf-course.jpg"
+                onError={() => setVideoError(true)}
+                preload="auto"
+              >
+                <source src="/videos/middlebay-hero.mp4" type="video/mp4" />
+                {/* Fallback for browsers that don't support video */}
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              /* Fallback Image */
               <Image
                 src="/images/new-hero-golf-course.jpg"
                 alt="Beautiful golf course with sand bunkers and water view"
@@ -47,7 +55,7 @@ export default function HomePage() {
                 className="object-cover"
                 priority
               />
-            </video>
+            )}
             {/* Overlay for better text readability */}
             <div className="absolute inset-0 bg-black/40"></div>
           </div>

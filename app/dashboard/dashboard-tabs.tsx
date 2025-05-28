@@ -7,14 +7,14 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { formatTime } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { CalendarIcon, Clock, Info, Trash2 } from "lucide-react"
+import { CalendarIcon, Clock, Trash2, Info } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useMobile } from "@/hooks/use-mobile"
@@ -47,6 +47,22 @@ interface DashboardTabsProps {
   upcomingFriday: string
 }
 
+// Helper function to format time strings like "14:30" to "2:30 PM"
+const formatTimeString = (timeString: string) => {
+  try {
+    const [hours, minutes] = timeString.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const minute = Number.parseInt(minutes, 10)
+
+    const period = hour >= 12 ? "PM" : "AM"
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+
+    return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
+  } catch (error) {
+    return timeString // Return original if parsing fails
+  }
+}
+
 export function DashboardTabs({
   user,
   userReservations,
@@ -61,15 +77,11 @@ export function DashboardTabs({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [userDailyReservations, setUserDailyReservations] = useState<Record<string, number>>({})
+
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
   const isMobile = useMobile()
-
-  useEffect(() => {
-    console.log("Tee times count:", teeTimes.length)
-    console.log("Upcoming Friday:", upcomingFriday)
-  }, [teeTimes, upcomingFriday])
 
   // Calculate available slots for each tee time
   const teeTimesWithAvailability = teeTimes.map((teeTime) => {
@@ -104,11 +116,7 @@ export function DashboardTabs({
   const handleSlotsChange = (value: string) => {
     const slotsCount = Number.parseInt(value, 10)
     setSlots(slotsCount)
-
-    // Reset player names array to match the new slots count
     setPlayerNames(Array(Math.max(0, slotsCount - 1)).fill(""))
-
-    // Reset play for money array to match the new slots count (including main player)
     setPlayForMoney(Array(Math.max(1, slotsCount)).fill(false))
   }
 
@@ -139,51 +147,6 @@ export function DashboardTabs({
     setIsSubmitting(true)
 
     try {
-      // Check if user already has a reservation for this tee time
-      const { data: existingReservation } = await supabase
-        .from("reservations")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("tee_time_id", selectedTeeTime)
-        .single()
-
-      if (existingReservation) {
-        toast({
-          title: "Reservation exists",
-          description: "You already have a reservation for this tee time",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        return
-      }
-
-      // Get the date for the selected tee time
-      const selectedTeeTimeObj = teeTimes.find((tt) => tt.id === selectedTeeTime)
-      if (!selectedTeeTimeObj) {
-        toast({
-          title: "Error",
-          description: "Selected tee time not found",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        return
-      }
-
-      // Check if user already has 4 reservations for this date
-      const date = selectedTeeTimeObj.date
-      const userReservationsForDate = userDailyReservations[date] || 0
-
-      if (userReservationsForDate >= 4) {
-        toast({
-          title: "Maximum reservations reached",
-          description: "You can only book up to 4 tee times on a single day",
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        return
-      }
-
-      // Create the reservation
       const { error } = await supabase.from("reservations").insert([
         {
           tee_time_id: selectedTeeTime,
@@ -203,7 +166,6 @@ export function DashboardTabs({
         description: "Your tee time has been booked",
       })
 
-      // Reset form and refresh page
       setSelectedTeeTime("")
       setSlots(1)
       setPlayerNames([])
@@ -247,53 +209,42 @@ export function DashboardTabs({
     }
   }
 
-  // Helper function to format dates consistently and dynamically
   const formatDateDisplay = (dateString: string) => {
     try {
       const date = parseISO(dateString)
       return format(date, "MMMM d, yyyy")
     } catch (error) {
-      console.error("Error formatting date:", error)
-      return dateString // Return the original string if parsing fails
+      return dateString
     }
   }
 
-  // Get the display date dynamically from the actual tee times or upcomingFriday
   const getDisplayDate = () => {
-    // First, try to get the date from the first available tee time
     if (teeTimes.length > 0) {
-      const firstTeeTime = teeTimes[0]
-      return formatDateDisplay(firstTeeTime.date)
+      return formatDateDisplay(teeTimes[0].date)
     }
-
-    // If no tee times, use the upcomingFriday prop
     if (upcomingFriday) {
       return formatDateDisplay(upcomingFriday)
     }
-
-    // Fallback to May 30, 2025
     return "May 30, 2025"
   }
 
-  const displayDate = getDisplayDate()
-
-  // Get the day of the week for the display date
   const getDayOfWeek = () => {
     try {
       if (teeTimes.length > 0) {
         const date = parseISO(teeTimes[0].date)
-        return format(date, "EEEE") // Returns "Friday", "Saturday", etc.
+        return format(date, "EEEE")
       }
       if (upcomingFriday) {
         const date = parseISO(upcomingFriday)
         return format(date, "EEEE")
       }
-      return "Friday" // Default fallback
+      return "Friday"
     } catch (error) {
-      return "Friday" // Default fallback
+      return "Friday"
     }
   }
 
+  const displayDate = getDisplayDate()
   const dayOfWeek = getDayOfWeek()
 
   return (
@@ -327,7 +278,6 @@ export function DashboardTabs({
                         {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
                       </p>
 
-                      {/* Main player (booker) */}
                       <div className="mt-1 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{user.name || "You"}</span>
@@ -339,11 +289,10 @@ export function DashboardTabs({
                         </div>
                       </div>
 
-                      {/* Additional players */}
                       {reservation.player_names && reservation.player_names.length > 0 && (
                         <div className="mt-2 text-sm text-muted-foreground">
                           <p>Additional players:</p>
-                          <ul className="list-inside">
+                          <ul className="list-inside list-disc">
                             {reservation.player_names.map((name, i) => (
                               <li key={i} className="flex items-center gap-2">
                                 <span>{name}</span>
@@ -427,7 +376,7 @@ export function DashboardTabs({
                       <SelectContent>
                         {availableTeeTimes.map((teeTime) => (
                           <SelectItem key={teeTime.id} value={teeTime.id}>
-                            {formatTime(teeTime.time)} - {teeTime.availableSlots} slots available
+                            {formatTimeString(teeTime.time)} - {teeTime.availableSlots} slots available
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -442,29 +391,24 @@ export function DashboardTabs({
                           <SelectValue placeholder="Select number of players" />
                         </SelectTrigger>
                         <SelectContent>
-                          {selectedTeeTime && (
-                            <>
-                              {Array.from(
-                                {
-                                  length: Math.min(
-                                    4,
-                                    teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)?.availableSlots || 0,
-                                  ),
-                                },
-                                (_, i) => (
-                                  <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                    {i + 1} {i === 0 ? "player" : "players"}
-                                  </SelectItem>
-                                ),
-                              )}
-                            </>
+                          {Array.from(
+                            {
+                              length: Math.min(
+                                4,
+                                teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)?.availableSlots || 0,
+                              ),
+                            },
+                            (_, i) => (
+                              <SelectItem key={i + 1} value={(i + 1).toString()}>
+                                {i + 1} {i === 0 ? "player" : "players"}
+                              </SelectItem>
+                            ),
                           )}
                         </SelectContent>
                       </Select>
                     </div>
                   )}
 
-                  {/* Main player (booker) play for money option */}
                   {selectedTeeTime && (
                     <div className="space-y-2 pt-2 border-t">
                       <div className="flex items-center space-x-2">
@@ -496,7 +440,7 @@ export function DashboardTabs({
                               checked={playForMoney[i + 1] || false}
                               onCheckedChange={(checked) => handlePlayForMoneyChange(i + 1, checked === true)}
                             />
-                            <Label htmlFor={`player${i}Money`} className="text-sm text-muted-foreground">
+                            <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm text-muted-foreground">
                               This player wants to play for money
                             </Label>
                           </div>
