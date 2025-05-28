@@ -16,12 +16,6 @@ export default function HomePage() {
   const [videoError, setVideoError] = useState(false)
 
   useEffect(() => {
-    if (videoError) {
-      console.log("Video error state is true, showing fallback image")
-    }
-  }, [videoError])
-
-  useEffect(() => {
     // Process Instagram embeds after component mounts
     if (typeof window !== "undefined" && (window as any).instgrm) {
       ;(window as any).instgrm.Embeds.process()
@@ -37,7 +31,7 @@ export default function HomePage() {
         <div className="relative min-h-screen">
           <div className="absolute inset-0">
             {!videoError ? (
-              /* Video Background */
+              /* Video Background - Using direct blob URL */
               <video
                 autoPlay
                 muted
@@ -47,15 +41,16 @@ export default function HomePage() {
                 poster="/images/new-hero-golf-course.jpg"
                 onError={(e) => {
                   console.error("Video error:", e)
-                  console.error("Video error details:", e.target.error)
                   setVideoError(true)
                 }}
                 onLoadStart={() => console.log("Video load started")}
                 onCanPlay={() => console.log("Video can play")}
-                onLoadedData={() => console.log("Video loaded data")}
                 preload="metadata"
               >
-                <source src="/videos/middlebay-hero.mp4" type="video/mp4" />
+                <source
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/middlebay%202%20%281%29-iUgCCVQ68sZlJrMSRpPQFZcFH1wXpW.mp4"
+                  type="video/mp4"
+                />
                 {/* Fallback for browsers that don't support video */}
                 Your browser does not support the video tag.
               </video>
