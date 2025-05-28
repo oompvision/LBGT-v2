@@ -16,6 +16,12 @@ export default function HomePage() {
   const [videoError, setVideoError] = useState(false)
 
   useEffect(() => {
+    if (videoError) {
+      console.log("Video error state is true, showing fallback image")
+    }
+  }, [videoError])
+
+  useEffect(() => {
     // Process Instagram embeds after component mounts
     if (typeof window !== "undefined" && (window as any).instgrm) {
       ;(window as any).instgrm.Embeds.process()
@@ -39,8 +45,15 @@ export default function HomePage() {
                 playsInline
                 className="w-full h-full object-cover"
                 poster="/images/new-hero-golf-course.jpg"
-                onError={() => setVideoError(true)}
-                preload="auto"
+                onError={(e) => {
+                  console.error("Video error:", e)
+                  console.error("Video error details:", e.target.error)
+                  setVideoError(true)
+                }}
+                onLoadStart={() => console.log("Video load started")}
+                onCanPlay={() => console.log("Video can play")}
+                onLoadedData={() => console.log("Video loaded data")}
+                preload="metadata"
               >
                 <source src="/videos/middlebay-hero.mp4" type="video/mp4" />
                 {/* Fallback for browsers that don't support video */}
