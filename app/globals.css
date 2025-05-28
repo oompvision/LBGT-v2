@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 15% 92%;
+    --foreground: 120 25% 25%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 120 25% 25%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 25% 25%;
+
+    --primary: 120 25% 35%;
+    --primary-foreground: 45 15% 92%;
+
+    --secondary: 45 15% 85%;
+    --secondary-foreground: 120 25% 25%;
+
+    --muted: 45 15% 88%;
+    --muted-foreground: 120 25% 45%;
+
+    --accent: 45 15% 85%;
+    --accent-foreground: 120 25% 25%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 45 15% 80%;
+    --input: 45 15% 80%;
+    --ring: 120 25% 35%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 120 25% 15%;
+    --foreground: 45 15% 92%;
+
+    --card: 120 25% 20%;
+    --card-foreground: 45 15% 92%;
+
+    --popover: 120 25% 20%;
+    --popover-foreground: 45 15% 92%;
+
+    --primary: 45 15% 70%;
+    --primary-foreground: 120 25% 20%;
+
+    --secondary: 120 25% 30%;
+    --secondary-foreground: 45 15% 92%;
+
+    --muted: 120 25% 25%;
+    --muted-foreground: 45 15% 75%;
+
+    --accent: 120 25% 30%;
+    --accent-foreground: 45 15% 92%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 45 15% 92%;
+
+    --border: 120 25% 30%;
+    --input: 120 25% 30%;
+    --ring: 45 15% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom LBGT theme colors */
+.text-lbgt-dark {
+  color: hsl(120, 25%, 25%);
+}
+
+.text-lbgt-medium {
+  color: hsl(120, 25%, 45%);
+}
+
+.text-lbgt-muted {
+  color: hsl(120, 25%, 55%);
+}
+
+.bg-lbgt-lightest {
+  background-color: hsl(45, 15%, 92%);
+}
+
+.bg-lbgt-light {
+  background-color: hsl(45, 15%, 88%);
+}
+
+.bg-lbgt-green {
+  background-color: hsl(120, 25%, 35%);
+}
+
+.bg-lbgt-green-dark {
+  background-color: hsl(120, 25%, 30%);
+}
+
+.border-lbgt-green {
+  border-color: hsl(120, 25%, 35%);
+}
+
+.hover\:bg-lbgt-green-dark:hover {
+  background-color: hsl(120, 25%, 30%);
+}
