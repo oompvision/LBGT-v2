@@ -9,9 +9,11 @@ import { AlertCircle, AlertTriangle } from "lucide-react"
 import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 
-// Force dynamic rendering
+// Force dynamic rendering and disable all caching
 export const dynamic = "force-dynamic"
 export const revalidate = 0
+export const fetchCache = "force-no-store"
+export const runtime = "nodejs"
 
 async function getAdminData() {
   try {
@@ -57,38 +59,37 @@ async function getAdminData() {
       return { redirect: "/dashboard" }
     }
 
-    // Get data with error handling - reduce the amount of data fetched
-    const [roundsResult, reservationsResult, teeTimesResult, usersResult] = await Promise.allSettled([
-      getAllRoundsWithDetails(),
-      getAllReservationsWithDetails(),
-      getAllTeeTimes(),
-      getAllUsersForAdmin(),
-    ])
+    // Get data with error handling - fetch each one individually
+    const roundsResult = await getAllRoundsWithDetails().catch((error) => {
+      console.error("Error fetching rounds:", error)
+      return { success: false, error: error.message, rounds: [] }
+    })
 
-    // Extract data and errors
-    const rounds = roundsResult.status === "fulfilled" ? roundsResult.value.rounds || [] : []
-    const roundsError = roundsResult.status === "rejected" ? roundsResult.reason : null
-    const roundsSuccess = roundsResult.status === "fulfilled" ? roundsResult.value.success : false
+    const reservationsResult = await getAllReservationsWithDetails().catch((error) => {
+      console.error("Error fetching reservations:", error)
+      return { success: false, error: error.message, reservations: [] }
+    })
 
-    const reservations = reservationsResult.status === "fulfilled" ? reservationsResult.value.reservations || [] : []
-    const reservationsError = reservationsResult.status === "rejected" ? reservationsResult.reason : null
+    const teeTimesResult = await getAllTeeTimes().catch((error) => {
+      console.error("Error fetching tee times:", error)
+      return { success: false, error: error.message, teeTimes: [] }
+    })
 
-    const teeTimes = teeTimesResult.status === "fulfilled" ? teeTimesResult.value.teeTimes || [] : []
-    const teeTimesError = teeTimesResult.status === "rejected" ? teeTimesResult.reason : null
-
-    const users = usersResult.status === "fulfilled" ? usersResult.value.users || [] : []
-    const usersError = usersResult.status === "rejected" ? usersResult.reason : null
+    const usersResult = await getAllUsersForAdmin().catch((error) => {
+      console.error("Error fetching users:", error)
+      return { success: false, error: error.message, users: [] }
+    })
 
     return {
-      rounds,
-      roundsError,
-      roundsSuccess,
-      reservations,
-      reservationsError,
-      teeTimes,
-      teeTimesError,
-      users,
-      usersError,
+      rounds: roundsResult.rounds || [],
+      roundsError: roundsResult.success === false ? roundsResult.error : null,
+      roundsSuccess: roundsResult.success !== false,
+      reservations: reservationsResult.reservations || [],
+      reservationsError: reservationsResult.success === false ? reservationsResult.error : null,
+      teeTimes: teeTimesResult.teeTimes || [],
+      teeTimesError: teeTimesResult.success === false ? teeTimesResult.error : null,
+      users: usersResult.users || [],
+      usersError: usersResult.success === false ? usersResult.error : null,
     }
   } catch (error: any) {
     console.error("Error in getAdminData:", error)
@@ -140,13 +141,7 @@ async function AdminContent() {
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading rounds</AlertTitle>
-          <AlertDescription>
-            {typeof roundsError === "string"
-              ? roundsError
-              : roundsError instanceof Error
-                ? roundsError.message
-                : "Failed to load rounds data"}
-          </AlertDescription>
+          <AlertDescription>{roundsError}</AlertDescription>
         </Alert>
       )}
 
@@ -154,13 +149,7 @@ async function AdminContent() {
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading reservations</AlertTitle>
-          <AlertDescription>
-            {typeof reservationsError === "string"
-              ? reservationsError
-              : reservationsError instanceof Error
-                ? reservationsError.message
-                : "Failed to load reservations data"}
-          </AlertDescription>
+          <AlertDescription>{reservationsError}</AlertDescription>
         </Alert>
       )}
 
@@ -168,13 +157,7 @@ async function AdminContent() {
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading tee times</AlertTitle>
-          <AlertDescription>
-            {typeof teeTimesError === "string"
-              ? teeTimesError
-              : teeTimesError instanceof Error
-                ? teeTimesError.message
-                : "Failed to load tee times data"}
-          </AlertDescription>
+          <AlertDescription>{teeTimesError}</AlertDescription>
         </Alert>
       )}
 
@@ -182,13 +165,7 @@ async function AdminContent() {
         <Alert variant="destructive" className="mt-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error loading users</AlertTitle>
-          <AlertDescription>
-            {typeof usersError === "string"
-              ? usersError
-              : usersError instanceof Error
-                ? usersError.message
-                : "Failed to load users data"}
-          </AlertDescription>
+          <AlertDescription>{usersError}</AlertDescription>
         </Alert>
       )}
 
