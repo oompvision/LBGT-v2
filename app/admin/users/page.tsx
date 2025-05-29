@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 import { redirect } from "next/navigation"
-import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { AdminTabs } from "@/app/admin/admin-tabs"
 import { UserManagement } from "./user-management"
@@ -47,7 +46,6 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
       <main className="flex-1 py-8">
         <div className="container">
           <div className="mb-8">

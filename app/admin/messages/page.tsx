@@ -2,7 +2,6 @@ export const dynamic = "force-dynamic"
 
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { AdminTabs } from "../admin-tabs"
 import { MessageManager } from "./message-manager"
@@ -49,7 +48,6 @@ export default async function AdminMessagesPage() {
 
     return (
       <div className="flex min-h-screen flex-col">
-        <Header />
         <main className="flex-1 py-8">
           <div className="container">
             <div className="mb-8">
@@ -71,7 +69,6 @@ export default async function AdminMessagesPage() {
     // Fallback UI in case of errors
     return (
       <div className="flex min-h-screen flex-col">
-        <Header />
         <main className="flex-1 py-8">
           <div className="container">
             <div className="mb-8">

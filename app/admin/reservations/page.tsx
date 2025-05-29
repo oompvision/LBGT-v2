@@ -1,11 +1,32 @@
 import { AdminTabs } from "../admin-tabs"
 import { createClient } from "@/lib/supabase/server"
-import { formatDate, formatTime } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Prevent prerendering and force dynamic rendering
 export const dynamic = "force-dynamic"
 export const revalidate = 0
+
+// Helper function to format time from time string
+function formatTimeFromString(timeString: string): string {
+  if (!timeString) return "Unknown Time"
+
+  try {
+    // If it's already in HH:MM format, parse it directly
+    const [hours, minutes] = timeString.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const minute = Number.parseInt(minutes, 10)
+
+    if (isNaN(hour) || isNaN(minute)) return "Unknown Time"
+
+    const period = hour >= 12 ? "PM" : "AM"
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+
+    return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
+  } catch (error) {
+    return "Unknown Time"
+  }
+}
 
 export default async function AdminReservationsPage() {
   let reservations = null
@@ -94,7 +115,7 @@ export default async function AdminReservationsPage() {
                         <div className="flex justify-between">
                           <div>
                             <CardTitle className="text-base">
-                              {reservation.tee_times?.time ? formatTime(reservation.tee_times.time) : "Unknown Time"}
+                              {formatTimeFromString(reservation.tee_times?.time)}
                             </CardTitle>
                             <CardDescription>Reserved by {reservation.users?.name || "Unknown User"}</CardDescription>
                           </div>
