@@ -28,32 +28,31 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section with Video Background */}
-        <div className="relative min-h-screen overflow-hidden">
-          <div className="absolute inset-0 bg-black">
+        <div className="relative h-screen w-full overflow-hidden bg-black">
+          <div className="absolute inset-0 w-full h-full">
             {!videoError ? (
               /* Video Background - Using direct blob URL */
-              <div className="absolute inset-0 w-full h-full">
-                <video
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  className="absolute top-1/2 left-1/2 min-w-[100%] min-h-[100%] w-auto h-auto transform -translate-x-1/2 -translate-y-1/2 object-cover"
-                  poster="/images/new-hero-golf-course.jpg"
-                  onError={(e) => {
-                    console.error("Video error:", e)
-                    setVideoError(true)
-                  }}
-                  preload="metadata"
-                >
-                  <source
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/middlebay%202%20%281%29-iUgCCVQ68sZlJrMSRpPQFZcFH1wXpW.mp4"
-                    type="video/mp4"
-                  />
-                  {/* Fallback for browsers that don't support video */}
-                  Your browser does not support the video tag.
-                </video>
-              </div>
+              <video
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="absolute w-full h-full object-cover"
+                poster="/images/new-hero-golf-course.jpg"
+                onError={(e) => {
+                  console.error("Video error:", e)
+                  setVideoError(true)
+                }}
+                preload="metadata"
+                style={{ objectFit: "cover", objectPosition: "center" }}
+              >
+                <source
+                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/middlebay%202%20%281%29-iUgCCVQ68sZlJrMSRpPQFZcFH1wXpW.mp4"
+                  type="video/mp4"
+                />
+                {/* Fallback for browsers that don't support video */}
+                Your browser does not support the video tag.
+              </video>
             ) : (
               /* Fallback Image */
               <Image
@@ -68,7 +67,7 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-black/40"></div>
           </div>
 
-          <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-4">
+          <div className="relative z-10 flex flex-col items-center justify-center h-full px-4">
             {/* Main Title - Reduced Size */}
             <div className="text-center mb-8">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 drop-shadow-lg">

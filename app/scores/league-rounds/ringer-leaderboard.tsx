@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Trophy } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 // Updated course data with correct par values
 const courseData = {
@@ -14,6 +16,50 @@ const courseData = {
 }
 
 export function RingerLeaderboard({ rounds }) {
+  const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
+  const supabase = createClient()
+
+  // Fetch user handicaps directly from users table
+  useEffect(() => {
+    const fetchUserHandicaps = async () => {
+      try {
+        // Get all unique user IDs from the rounds data
+        const userIds = new Set()
+        rounds.forEach((round) => {
+          if (Array.isArray(round.scores)) {
+            round.scores.forEach((score) => {
+              if (score.user_id) {
+                userIds.add(score.user_id)
+              }
+            })
+          }
+        })
+
+        if (userIds.size === 0) return
+
+        const { data, error } = await supabase.from("users").select("id, strokes_given").in("id", Array.from(userIds))
+
+        if (error) {
+          console.error("Error fetching user handicaps:", error)
+          return
+        }
+
+        const handicaps: Record<string, number> = {}
+        data.forEach((user) => {
+          handicaps[user.id] = user.strokes_given || 0
+        })
+
+        setUsersWithHandicap(handicaps)
+      } catch (err) {
+        console.error("Error in fetchUserHandicaps:", err)
+      }
+    }
+
+    if (rounds && rounds.length > 0) {
+      fetchUserHandicaps()
+    }
+  }, [supabase, rounds])
+
   // Process all scores from all rounds to create ringer scores
   const playerRingerScores = {}
 
@@ -30,8 +76,12 @@ export function RingerLeaderboard({ rounds }) {
           name: playerName,
           holes: Array(18).fill(null), // Best net score for each hole
           roundsPlayed: 0,
+          strokesGiven: usersWithHandicap[userId] || 0,
         }
       }
+
+      // Update strokes given from our fetched data
+      playerRingerScores[userId].strokesGiven = usersWithHandicap[userId] || 0
 
       // Update rounds played
       playerRingerScores[userId].roundsPlayed += 1
@@ -97,6 +147,7 @@ export function RingerLeaderboard({ rounds }) {
       holesPlayed,
       toPar,
       roundsPlayed: data.roundsPlayed,
+      strokesGiven: usersWithHandicap[userId] || 0,
     }
   })
 
@@ -128,7 +179,7 @@ export function RingerLeaderboard({ rounds }) {
                 <th className="px-4 py-2 text-center font-medium">Rounds</th>
                 <th className="px-4 py-2 text-center font-medium">Holes</th>
                 <th className="px-4 py-2 text-center font-medium">Net Score</th>
-                <th className="px-4 py-2 text-center font-medium">To Par</th>
+                <th className="px-4 py-2 text-center font-medium">Strokes</th>
                 {courseData.holes.map((hole) => (
                   <th key={hole} className="px-2 py-2 text-center font-medium">
                     {hole}
@@ -161,7 +212,7 @@ export function RingerLeaderboard({ rounds }) {
                   <td className="px-4 py-2 text-center">{player.roundsPlayed}</td>
                   <td className="px-4 py-2 text-center">{player.holesPlayed}/18</td>
                   <td className="px-4 py-2 text-center">{player.totalRingerScore}</td>
-                  <td className="px-4 py-2 text-center">{player.toPar > 0 ? `+${player.toPar}` : player.toPar}</td>
+                  <td className="px-4 py-2 text-center">{player.strokesGiven}</td>
                   {player.holes.map((score, holeIndex) => {
                     // Calculate if the score is under, over, or at par
                     const par = courseData.pars[holeIndex]
