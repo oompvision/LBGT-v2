@@ -19,14 +19,14 @@ export function MobileMenu() {
           <Menu className="h-6 w-6 text-lbgt-dark" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-80">
+      <SheetContent side="right" className="w-80 bg-white">
         <div className="flex flex-col space-y-4 mt-8">
           {user ? (
             <>
               <Link
                 href="/dashboard"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="Go to dashboard"
               >
                 Dashboard
@@ -34,7 +34,7 @@ export function MobileMenu() {
               <Link
                 href="/scores/submit"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="Submit your score"
               >
                 Submit Score
@@ -42,7 +42,7 @@ export function MobileMenu() {
               <Link
                 href="/scores/my-rounds"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View your rounds"
               >
                 My Rounds
@@ -50,7 +50,7 @@ export function MobileMenu() {
               <Link
                 href="/scores/league-rounds"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View tour leaderboard"
               >
                 Tour Leaderboard
@@ -58,7 +58,7 @@ export function MobileMenu() {
               <Link
                 href="/reservations"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View reservations"
               >
                 Reservations
@@ -66,7 +66,7 @@ export function MobileMenu() {
               <Link
                 href="/schedule"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View schedule"
               >
                 Schedule
@@ -74,7 +74,7 @@ export function MobileMenu() {
               <Link
                 href="/profile"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View profile"
               >
                 Profile
@@ -82,7 +82,7 @@ export function MobileMenu() {
               <Link
                 href="/admin"
                 onClick={() => setOpen(false)}
-                className="text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="Admin panel"
               >
                 Admin
@@ -103,7 +103,7 @@ export function MobileMenu() {
               <Link href="/signin" onClick={() => setOpen(false)}>
                 <Button
                   variant="ghost"
-                  className="w-full text-gray-700 hover:text-lbgt-dark focus:text-lbgt-dark transition-colors duration-200 font-medium"
+                  className="w-full text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium"
                   aria-label="Sign in to your account"
                 >
                   Sign In
