@@ -28,7 +28,7 @@ export default function HomePage() {
 
       <main className="flex-1">
         {/* Hero Section with Video Background */}
-        <div className="relative min-h-screen">
+        <div className="relative min-h-screen overflow-hidden">
           <div className="absolute inset-0">
             {!videoError ? (
               /* Video Background - Using direct blob URL */
@@ -37,7 +37,7 @@ export default function HomePage() {
                 muted
                 loop
                 playsInline
-                className="w-full h-full object-cover"
+                className="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto transform -translate-x-1/2 -translate-y-1/2 object-cover"
                 poster="/images/new-hero-golf-course.jpg"
                 onError={(e) => {
                   console.error("Video error:", e)

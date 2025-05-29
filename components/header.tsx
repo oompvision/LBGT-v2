@@ -17,6 +17,10 @@ export function Header() {
     setOpenDropdown(isOpen ? dropdownName : null)
   }
 
+  const closeAllDropdowns = () => {
+    setOpenDropdown(null)
+  }
+
   return (
     <header className="bg-lbgt-lightest shadow-sm border-b border-lbgt-light">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -70,12 +74,12 @@ export function Header() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="w-full" onClick={() => setOpenDropdown(null)}>
+                      <Link href="/dashboard" className="w-full" onClick={closeAllDropdowns}>
                         Reserve Tee Time
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/reservations" className="w-full" onClick={() => setOpenDropdown(null)}>
+                      <Link href="/reservations" className="w-full" onClick={closeAllDropdowns}>
                         My Reservations
                       </Link>
                     </DropdownMenuItem>
@@ -98,12 +102,12 @@ export function Header() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem asChild>
-                      <Link href="/scores/submit" className="w-full" onClick={() => setOpenDropdown(null)}>
+                      <Link href="/scores/submit" className="w-full" onClick={closeAllDropdowns}>
                         Submit Scorecard
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/scores/my-rounds" className="w-full" onClick={() => setOpenDropdown(null)}>
+                      <Link href="/scores/my-rounds" className="w-full" onClick={closeAllDropdowns}>
                         My Scores
                       </Link>
                     </DropdownMenuItem>
@@ -134,14 +138,14 @@ export function Header() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuItem asChild>
-                      <Link href="/profile" className="w-full" onClick={() => setOpenDropdown(null)}>
+                      <Link href="/profile" className="w-full" onClick={closeAllDropdowns}>
                         My Profile
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
                         signOut()
-                        setOpenDropdown(null)
+                        closeAllDropdowns()
                       }}
                     >
                       Sign Out
