@@ -160,7 +160,7 @@ export function LeagueStats({ rounds }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>League Leaderboard</CardTitle>
+        <CardTitle>Tour Leaderboard</CardTitle>
         <CardDescription>Player statistics across all rounds</CardDescription>
       </CardHeader>
       <CardContent>
@@ -185,7 +185,7 @@ export function LeagueStats({ rounds }) {
 
             <div className="overflow-x-auto">
               <div className="rounded-md border min-w-full">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="px-2 sm:px-4 py-2 text-left font-medium">Rank</th>
@@ -243,7 +243,7 @@ export function LeagueStats({ rounds }) {
 
             <div className="overflow-x-auto">
               <div className="rounded-md border min-w-full">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="px-2 sm:px-4 py-2 text-left font-medium">Rank</th>
