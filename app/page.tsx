@@ -29,31 +29,31 @@ export default function HomePage() {
       <main className="flex-1">
         {/* Hero Section with Video Background */}
         <div className="relative min-h-screen overflow-hidden">
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-black">
             {!videoError ? (
               /* Video Background - Using direct blob URL */
-              <video
-                autoPlay
-                muted
-                loop
-                playsInline
-                className="absolute top-1/2 left-1/2 min-w-full min-h-full w-auto h-auto transform -translate-x-1/2 -translate-y-1/2 object-cover"
-                poster="/images/new-hero-golf-course.jpg"
-                onError={(e) => {
-                  console.error("Video error:", e)
-                  setVideoError(true)
-                }}
-                onLoadStart={() => console.log("Video load started")}
-                onCanPlay={() => console.log("Video can play")}
-                preload="metadata"
-              >
-                <source
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/middlebay%202%20%281%29-iUgCCVQ68sZlJrMSRpPQFZcFH1wXpW.mp4"
-                  type="video/mp4"
-                />
-                {/* Fallback for browsers that don't support video */}
-                Your browser does not support the video tag.
-              </video>
+              <div className="absolute inset-0 w-full h-full">
+                <video
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="absolute top-1/2 left-1/2 min-w-[100%] min-h-[100%] w-auto h-auto transform -translate-x-1/2 -translate-y-1/2 object-cover"
+                  poster="/images/new-hero-golf-course.jpg"
+                  onError={(e) => {
+                    console.error("Video error:", e)
+                    setVideoError(true)
+                  }}
+                  preload="metadata"
+                >
+                  <source
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/middlebay%202%20%281%29-iUgCCVQ68sZlJrMSRpPQFZcFH1wXpW.mp4"
+                    type="video/mp4"
+                  />
+                  {/* Fallback for browsers that don't support video */}
+                  Your browser does not support the video tag.
+                </video>
+              </div>
             ) : (
               /* Fallback Image */
               <Image
@@ -84,7 +84,7 @@ export default function HomePage() {
                   <Link href="/reservations">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
                     >
                       Reserve Tee Time
                     </Button>
@@ -92,7 +92,7 @@ export default function HomePage() {
                   <Link href="/scores/submit">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
                     >
                       Submit Scorecard
                     </Button>
@@ -100,7 +100,7 @@ export default function HomePage() {
                   <Link href="/dashboard">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
                     >
                       Dashboard
                     </Button>
@@ -111,7 +111,7 @@ export default function HomePage() {
                   <Link href="/signin">
                     <Button
                       size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg"
+                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
                     >
                       Sign In
                     </Button>
@@ -120,7 +120,7 @@ export default function HomePage() {
                     <Button
                       size="lg"
                       variant="outline"
-                      className="border-white text-white hover:bg-white hover:text-lbgt-dark px-8 py-4 text-lg font-semibold min-w-[180px] shadow-lg backdrop-blur-sm"
+                      className="border-white text-white hover:bg-white hover:text-lbgt-dark px-8 py-4 text-lg font-semibold w-[180px] shadow-lg backdrop-blur-sm"
                     >
                       Apply to Join
                     </Button>

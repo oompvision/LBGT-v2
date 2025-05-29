@@ -4,21 +4,20 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
 import { MobileMenu } from "./mobile-menu"
 import { useAuth } from "./auth-provider"
 
 export function Header() {
   const { user, isLoading, signOut } = useAuth()
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
 
-  const handleDropdownChange = (dropdownName: string, isOpen: boolean) => {
-    setOpenDropdown(isOpen ? dropdownName : null)
-  }
-
-  const closeAllDropdowns = () => {
-    setOpenDropdown(null)
+  const toggleDropdown = (name: string) => {
+    if (activeDropdown === name) {
+      setActiveDropdown(null)
+    } else {
+      setActiveDropdown(name)
+    }
   }
 
   return (
@@ -58,61 +57,77 @@ export function Header() {
                   Home
                 </Link>
 
-                <DropdownMenu
-                  open={openDropdown === "reservations"}
-                  onOpenChange={(isOpen) => handleDropdownChange("reservations", isOpen)}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2"
-                      aria-label="Reservations menu"
-                    >
-                      <span>Reservations</span>
-                      <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem asChild>
-                      <Link href="/dashboard" className="w-full" onClick={closeAllDropdowns}>
-                        Reserve Tee Time
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/reservations" className="w-full" onClick={closeAllDropdowns}>
-                        My Reservations
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Custom Dropdown for Reservations */}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                      activeDropdown === "reservations" ? "bg-lbgt-light" : ""
+                    }`}
+                    aria-label="Reservations menu"
+                    onClick={() => toggleDropdown("reservations")}
+                  >
+                    <span>Reservations</span>
+                    <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
+                  </Button>
 
-                <DropdownMenu
-                  open={openDropdown === "scores"}
-                  onOpenChange={(isOpen) => handleDropdownChange("scores", isOpen)}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2"
-                      aria-label="Scores menu"
-                    >
-                      <span>Scores</span>
-                      <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem asChild>
-                      <Link href="/scores/submit" className="w-full" onClick={closeAllDropdowns}>
-                        Submit Scorecard
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/scores/my-rounds" className="w-full" onClick={closeAllDropdowns}>
-                        My Scores
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  {activeDropdown === "reservations" && (
+                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="py-1" role="menu" aria-orientation="vertical">
+                        <Link
+                          href="/dashboard"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          Reserve Tee Time
+                        </Link>
+                        <Link
+                          href="/reservations"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          My Reservations
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Dropdown for Scores */}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                      activeDropdown === "scores" ? "bg-lbgt-light" : ""
+                    }`}
+                    aria-label="Scores menu"
+                    onClick={() => toggleDropdown("scores")}
+                  >
+                    <span>Scores</span>
+                    <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
+                  </Button>
+
+                  {activeDropdown === "scores" && (
+                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="py-1" role="menu" aria-orientation="vertical">
+                        <Link
+                          href="/scores/submit"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          Submit Scorecard
+                        </Link>
+                        <Link
+                          href="/scores/my-rounds"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          My Scores
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <Link
                   href="/scores/league-rounds"
@@ -122,36 +137,43 @@ export function Header() {
                   Tour Leaderboard
                 </Link>
 
-                <DropdownMenu
-                  open={openDropdown === "profile"}
-                  onOpenChange={(isOpen) => handleDropdownChange("profile", isOpen)}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2"
-                      aria-label="Profile menu"
-                    >
-                      <span>Profile</span>
-                      <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="w-full" onClick={closeAllDropdowns}>
-                        My Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => {
-                        signOut()
-                        closeAllDropdowns()
-                      }}
-                    >
-                      Sign Out
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {/* Custom Dropdown for Profile */}
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                      activeDropdown === "profile" ? "bg-lbgt-light" : ""
+                    }`}
+                    aria-label="Profile menu"
+                    onClick={() => toggleDropdown("profile")}
+                  >
+                    <span>Profile</span>
+                    <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
+                  </Button>
+
+                  {activeDropdown === "profile" && (
+                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                      <div className="py-1" role="menu" aria-orientation="vertical">
+                        <Link
+                          href="/profile"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          My Profile
+                        </Link>
+                        <button
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => {
+                            signOut()
+                            setActiveDropdown(null)
+                          }}
+                        >
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <Link
                   href="/admin"
