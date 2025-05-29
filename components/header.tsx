@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown } from "lucide-react"
 import { MobileMenu } from "./mobile-menu"
@@ -11,6 +11,7 @@ import { useAuth } from "./auth-provider"
 export function Header() {
   const { user, isLoading, signOut } = useAuth()
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
   const toggleDropdown = (name: string) => {
     if (activeDropdown === name) {
@@ -19,6 +20,23 @@ export function Header() {
       setActiveDropdown(name)
     }
   }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (activeDropdown && dropdownRefs.current[activeDropdown]) {
+        const dropdownElement = dropdownRefs.current[activeDropdown]
+        if (dropdownElement && !dropdownElement.contains(event.target as Node)) {
+          setActiveDropdown(null)
+        }
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [activeDropdown])
 
   return (
     <header className="bg-lbgt-lightest shadow-sm border-b border-lbgt-light">
@@ -58,10 +76,9 @@ export function Header() {
                 </Link>
 
                 {/* Custom Dropdown for Reservations */}
-                <div className="relative">
-                  <Button
-                    variant="ghost"
-                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                <div className="relative" ref={(el) => (dropdownRefs.current.reservations = el)}>
+                  <button
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "reservations" ? "bg-lbgt-light" : ""
                     }`}
                     aria-label="Reservations menu"
@@ -69,10 +86,10 @@ export function Header() {
                   >
                     <span>Reservations</span>
                     <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                  </Button>
+                  </button>
 
                   {activeDropdown === "reservations" && (
-                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                    <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
                       <div className="py-1" role="menu" aria-orientation="vertical">
                         <Link
                           href="/dashboard"
@@ -94,10 +111,9 @@ export function Header() {
                 </div>
 
                 {/* Custom Dropdown for Scores */}
-                <div className="relative">
-                  <Button
-                    variant="ghost"
-                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                <div className="relative" ref={(el) => (dropdownRefs.current.scores = el)}>
+                  <button
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "scores" ? "bg-lbgt-light" : ""
                     }`}
                     aria-label="Scores menu"
@@ -105,10 +121,10 @@ export function Header() {
                   >
                     <span>Scores</span>
                     <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                  </Button>
+                  </button>
 
                   {activeDropdown === "scores" && (
-                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                    <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
                       <div className="py-1" role="menu" aria-orientation="vertical">
                         <Link
                           href="/scores/submit"
@@ -138,10 +154,9 @@ export function Header() {
                 </Link>
 
                 {/* Custom Dropdown for Profile */}
-                <div className="relative">
-                  <Button
-                    variant="ghost"
-                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 h-auto p-2 ${
+                <div className="relative" ref={(el) => (dropdownRefs.current.profile = el)}>
+                  <button
+                    className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "profile" ? "bg-lbgt-light" : ""
                     }`}
                     aria-label="Profile menu"
@@ -149,10 +164,10 @@ export function Header() {
                   >
                     <span>Profile</span>
                     <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
-                  </Button>
+                  </button>
 
                   {activeDropdown === "profile" && (
-                    <div className="absolute z-10 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
+                    <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
                       <div className="py-1" role="menu" aria-orientation="vertical">
                         <Link
                           href="/profile"
