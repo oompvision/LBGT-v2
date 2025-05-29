@@ -17,8 +17,6 @@ import {
   editPlayerScore,
   getAllReservationsWithDetails,
   getAllRoundsWithDetails,
-  getAllTeeTimes,
-  getAllUsersForAdmin,
 } from "@/app/actions/admin-management"
 import { Loader2, Pencil, Trash2, User, Users } from "lucide-react"
 import {
@@ -38,12 +36,24 @@ import { ScoreEditor } from "./score-editor"
 // Constants for date validation
 const FIRST_VALID_DATE = new Date(2025, 4, 23) // May 23, 2025
 
-export function AdminDashboardTabs() {
-  const [users, setUsers] = useState<any[]>([])
-  const [teeTimes, setTeeTimes] = useState<any[]>([])
-  const [rounds, setRounds] = useState<any[]>([])
-  const [reservations, setReservations] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+interface AdminDashboardTabsProps {
+  rounds: any[]
+  reservations: any[]
+  teeTimes: any[]
+  users: any[]
+}
+
+export function AdminDashboardTabs({
+  rounds: initialRounds,
+  reservations: initialReservations,
+  teeTimes: initialTeeTimes,
+  users: initialUsers,
+}: AdminDashboardTabsProps) {
+  const [users, setUsers] = useState<any[]>(initialUsers)
+  const [teeTimes, setTeeTimes] = useState<any[]>(initialTeeTimes)
+  const [rounds, setRounds] = useState<any[]>(initialRounds)
+  const [reservations, setReservations] = useState<any[]>(initialReservations)
+  const [loading, setLoading] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
   const [selectedUser, setSelectedUser] = useState("")
   const [selectedUserName, setSelectedUserName] = useState("")
@@ -56,89 +66,13 @@ export function AdminDashboardTabs() {
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
   const [selectedScore, setSelectedScore] = useState<any>(null)
 
+  // Update state when props change
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true)
-      try {
-        const [usersResponse, teeTimesResponse, roundsResponse, reservationsResponse] = await Promise.all([
-          getAllUsersForAdmin(),
-          getAllTeeTimes(),
-          getAllRoundsWithDetails(),
-          getAllReservationsWithDetails(),
-        ])
-
-        if (usersResponse.success) {
-          setUsers(usersResponse.users)
-        }
-
-        if (teeTimesResponse.success) {
-          // Ensure all tee times have the correct date (May 23, 2025 or later)
-          const validatedTeeTimes = teeTimesResponse.teeTimes.map((teeTime: any) => {
-            if (teeTime.date) {
-              // Ensure the date is at least May 23, 2025
-              const parsedDate = parseISO(teeTime.date)
-              if (!isValid(parsedDate) || parsedDate < FIRST_VALID_DATE) {
-                console.warn(`Correcting invalid tee time date: ${teeTime.date} to 2025-05-23`)
-                return { ...teeTime, date: "2025-05-23" }
-              }
-            }
-            return teeTime
-          })
-
-          setTeeTimes(validatedTeeTimes)
-        }
-
-        if (roundsResponse.success) {
-          // Ensure all rounds have the correct date
-          const validatedRounds = roundsResponse.rounds.map((round: any) => {
-            if (round.date) {
-              const parsedDate = parseISO(round.date)
-              if (!isValid(parsedDate) || parsedDate < FIRST_VALID_DATE) {
-                console.warn(`Correcting invalid round date: ${round.date} to 2025-05-23`)
-                return { ...round, date: "2025-05-23" }
-              }
-            }
-            return round
-          })
-
-          setRounds(validatedRounds)
-        }
-
-        if (reservationsResponse.success) {
-          // Ensure all reservations have the correct date
-          const validatedReservations = reservationsResponse.reservations.map((reservation: any) => {
-            if (reservation.tee_times && reservation.tee_times.date) {
-              const parsedDate = parseISO(reservation.tee_times.date)
-              if (!isValid(parsedDate) || parsedDate < FIRST_VALID_DATE) {
-                console.warn(`Correcting invalid reservation date: ${reservation.tee_times.date} to 2025-05-23`)
-                return {
-                  ...reservation,
-                  tee_times: {
-                    ...reservation.tee_times,
-                    date: "2025-05-23",
-                  },
-                }
-              }
-            }
-            return reservation
-          })
-
-          setReservations(validatedReservations)
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load data. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
+    setUsers(initialUsers)
+    setTeeTimes(initialTeeTimes)
+    setRounds(initialRounds)
+    setReservations(initialReservations)
+  }, [initialUsers, initialTeeTimes, initialRounds, initialReservations])
 
   // Helper function to ensure a date is valid and at least May 23, 2025
   const ensureValidDate = (dateString: string): string => {
