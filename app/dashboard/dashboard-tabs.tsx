@@ -77,6 +77,7 @@ export function DashboardTabs({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [userDailyReservations, setUserDailyReservations] = useState<Record<string, number>>({})
+  const [activeTab, setActiveTab] = useState("reservations")
 
   const router = useRouter()
   const { toast } = useToast()
@@ -248,7 +249,7 @@ export function DashboardTabs({
   const dayOfWeek = getDayOfWeek()
 
   return (
-    <Tabs defaultValue="book">
+    <Tabs value={activeTab} onValueChange={setActiveTab}>
       <TabsList className={`grid w-full ${isMobile ? "max-w-none" : "max-w-md"} grid-cols-2`}>
         <TabsTrigger value="reservations">My Reservations</TabsTrigger>
         <TabsTrigger value="book">Book Tee Time</TabsTrigger>
@@ -336,7 +337,7 @@ export function DashboardTabs({
                 <CardDescription>You haven&apos;t made any tee time reservations yet.</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button variant="outline" onClick={() => document.querySelector('[data-value="book"]')?.click()}>
+                <Button variant="outline" onClick={() => setActiveTab("book")}>
                   Book a Tee Time
                 </Button>
               </CardFooter>

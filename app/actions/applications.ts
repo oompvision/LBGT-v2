@@ -4,13 +4,13 @@ import { createClient } from "@/lib/supabase/server"
 import { cookies } from "next/headers"
 
 export type ApplicationFormData = {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   phone: string
-  hometown: string
   handicap: string
-  referralSource: string
-  notes?: string
+  referral: string
+  comments?: string
 }
 
 export async function submitApplication(formData: ApplicationFormData) {
@@ -20,13 +20,13 @@ export async function submitApplication(formData: ApplicationFormData) {
 
     // Use the SQL function we created to bypass RLS
     const { data, error } = await supabase.rpc("submit_application", {
-      p_name: formData.name,
+      p_name: `${formData.firstName} ${formData.lastName}`,
       p_email: formData.email,
       p_phone: formData.phone,
-      p_hometown: formData.hometown,
+      p_hometown: "Not provided", // This field is required by the function but not in our form
       p_handicap: formData.handicap,
-      p_referral_source: formData.referralSource,
-      p_notes: formData.notes || null,
+      p_referral_source: formData.referral,
+      p_notes: formData.comments || null,
     })
 
     if (error) {
