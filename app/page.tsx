@@ -14,6 +14,7 @@ import { MessageBox } from "@/components/message-box"
 export default function HomePage() {
   const { user, isLoading } = useAuth()
   const [videoError, setVideoError] = useState(false)
+  const [videoLoaded, setVideoLoaded] = useState(false)
 
   useEffect(() => {
     // Process Instagram embeds after component mounts
@@ -37,13 +38,13 @@ export default function HomePage() {
                 muted
                 loop
                 playsInline
-                className="absolute w-full h-full object-cover"
-                poster="/images/new-hero-golf-course.jpg"
+                className={`absolute w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? "opacity-100" : "opacity-0"}`}
+                onLoadedData={() => setVideoLoaded(true)}
                 onError={(e) => {
                   console.error("Video error:", e)
                   setVideoError(true)
                 }}
-                preload="metadata"
+                preload="auto"
                 style={{ objectFit: "cover", objectPosition: "center" }}
               >
                 <source
@@ -62,6 +63,11 @@ export default function HomePage() {
                 className="object-cover"
                 priority
               />
+            )}
+            {!videoLoaded && !videoError && (
+              <div className="absolute inset-0 bg-black flex items-center justify-center">
+                <div className="text-white text-lg">Loading...</div>
+              </div>
             )}
             {/* Overlay for better text readability */}
             <div className="absolute inset-0 bg-black/40"></div>

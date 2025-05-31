@@ -218,7 +218,7 @@ export async function getAllReservationsWithDetails() {
     return { success: true, reservations: correctedReservations }
   } catch (error: any) {
     console.error("Error in getAllReservationsWithDetails:", error)
-    return { success: false, error: error.message || "An unexpected error occurred", reservations: [] }
+    return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }
 
@@ -248,7 +248,7 @@ export async function getAllTeeTimes() {
     return { success: true, teeTimes: correctedTeeTimes }
   } catch (error: any) {
     console.error("Error in getAllTeeTimes:", error)
-    return { success: false, error: error.message || "An unexpected error occurred", teeTimes: [] }
+    return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }
 
@@ -265,7 +265,7 @@ export async function getAllUsersForAdmin() {
     return { success: true, users: users || [] }
   } catch (error: any) {
     console.error("Error in getAllUsersForAdmin:", error)
-    return { success: false, error: error.message || "An unexpected error occurred", users: [] }
+    return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }
 
@@ -588,9 +588,6 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
 // Function to upload profile picture for any user (admin only)
 export async function adminUploadProfilePicture(userId: string, formData: FormData) {
   try {
-    // Use admin client to bypass RLS
-    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-
     const file = formData.get("profilePicture") as File
     if (!file || file.size === 0) {
       return { success: false, error: "Please select a file to upload" }
@@ -606,9 +603,12 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
       return { success: false, error: "File size must be less than 5MB" }
     }
 
-    // Create unique filename
+    // Create unique filename with timestamp to avoid conflicts
     const fileExt = file.name.split(".").pop()
-    const fileName = `profile-${userId}.${fileExt}`
+    const timestamp = Date.now()
+    const fileName = `profile-${userId}-${timestamp}.${fileExt}`
+
+    console.log(`Uploading profile picture for user ${userId} with filename ${fileName}`)
 
     // Upload to Supabase Storage using admin client
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
@@ -626,7 +626,27 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
     // Get public URL
     const { data: urlData } = supabaseAdmin.storage.from("profile-pictures").getPublicUrl(fileName)
 
-    // Update user profile with new picture URL
+    // Remove old profile picture if it exists
+    try {
+      const { data: userData } = await supabaseAdmin
+        .from("users")
+        .select("profile_picture_url")
+        .eq("id", userId)
+        .single()
+
+      if (userData?.profile_picture_url) {
+        const oldFileName = userData.profile_picture_url.split("/").pop()
+        if (oldFileName && oldFileName !== fileName) {
+          console.log(`Removing old profile picture: ${oldFileName}`)
+          await supabaseAdmin.storage.from("profile-pictures").remove([oldFileName])
+        }
+      }
+    } catch (error) {
+      console.error("Error removing old profile picture:", error)
+      // Continue even if old picture removal fails
+    }
+
+    // Update user profile with new picture URL using admin client
     const { error: updateError } = await supabaseAdmin
       .from("users")
       .update({
@@ -639,10 +659,13 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
       return { success: false, error: "Failed to update profile" }
     }
 
+    console.log(`Successfully updated profile picture for user ${userId}`)
+
     // Revalidate relevant paths
     revalidatePath("/admin/users")
     revalidatePath(`/players/${userId}/stats`)
     revalidatePath("/scores/league-rounds")
+    revalidatePath("/profile")
 
     return { success: true, url: urlData.publicUrl }
   } catch (error: any) {
