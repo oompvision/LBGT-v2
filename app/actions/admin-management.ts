@@ -585,6 +585,123 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
   }
 }
 
+// Function to upload profile picture for any user (admin only)
+export async function adminUploadProfilePicture(userId: string, formData: FormData) {
+  try {
+    // Use admin client to bypass RLS
+    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+    const file = formData.get("profilePicture") as File
+    if (!file || file.size === 0) {
+      return { success: false, error: "Please select a file to upload" }
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      return { success: false, error: "Please upload an image file" }
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: "File size must be less than 5MB" }
+    }
+
+    // Create unique filename
+    const fileExt = file.name.split(".").pop()
+    const fileName = `profile-${userId}.${fileExt}`
+
+    // Upload to Supabase Storage using admin client
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+      .from("profile-pictures")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: true,
+      })
+
+    if (uploadError) {
+      console.error("Error uploading file:", uploadError)
+      return { success: false, error: uploadError.message || "Failed to upload image" }
+    }
+
+    // Get public URL
+    const { data: urlData } = supabaseAdmin.storage.from("profile-pictures").getPublicUrl(fileName)
+
+    // Update user profile with new picture URL
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        profile_picture_url: urlData.publicUrl,
+      })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating user profile:", updateError)
+      return { success: false, error: "Failed to update profile" }
+    }
+
+    // Revalidate relevant paths
+    revalidatePath("/admin/users")
+    revalidatePath(`/players/${userId}/stats`)
+    revalidatePath("/scores/league-rounds")
+
+    return { success: true, url: urlData.publicUrl }
+  } catch (error: any) {
+    console.error("Error in adminUploadProfilePicture:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
+// Function to remove profile picture for any user (admin only)
+export async function adminRemoveProfilePicture(userId: string) {
+  try {
+    // Use admin client to bypass RLS
+    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+
+    // Get current user data to find existing picture
+    const { data: userData, error: userError } = await supabaseAdmin
+      .from("users")
+      .select("profile_picture_url")
+      .eq("id", userId)
+      .single()
+
+    if (userError) {
+      console.error("Error fetching user data:", userError)
+      return { success: false, error: "Failed to fetch user data" }
+    }
+
+    // Remove from storage if exists
+    if (userData.profile_picture_url) {
+      const fileName = userData.profile_picture_url.split("/").pop()
+      if (fileName) {
+        await supabaseAdmin.storage.from("profile-pictures").remove([fileName])
+      }
+    }
+
+    // Update user profile to remove picture URL
+    const { error: updateError } = await supabaseAdmin
+      .from("users")
+      .update({
+        profile_picture_url: null,
+      })
+      .eq("id", userId)
+
+    if (updateError) {
+      console.error("Error updating user profile:", updateError)
+      return { success: false, error: "Failed to update profile" }
+    }
+
+    // Revalidate relevant paths
+    revalidatePath("/admin/users")
+    revalidatePath(`/players/${userId}/stats`)
+    revalidatePath("/scores/league-rounds")
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in adminRemoveProfilePicture:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
 // Function to delete a user using our updated SQL function
 export async function deleteUser(userId: string) {
   try {

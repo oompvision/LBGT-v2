@@ -17,8 +17,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Loader2, Search, Trash2, User, AlertTriangle } from "lucide-react"
-import { updateUser, updateStrokesGivenDirectly, deleteUser } from "@/app/actions/admin-management"
+import { Edit, Loader2, Search, Trash2, User, AlertTriangle, Camera, X } from "lucide-react"
+import {
+  updateUser,
+  updateStrokesGivenDirectly,
+  deleteUser,
+  adminUploadProfilePicture,
+  adminRemoveProfilePicture,
+} from "@/app/actions/admin-management"
 
 interface UserManagementProps {
   users: any[]
@@ -41,6 +47,9 @@ export function UserManagement({ users }: UserManagementProps) {
   })
   const router = useRouter()
   const { toast } = useToast()
+  const [isUploadingPicture, setIsUploadingPicture] = useState<string | null>(null)
+  const [selectedPictureUser, setSelectedPictureUser] = useState<any>(null)
+  const [isPictureDialogOpen, setIsPictureDialogOpen] = useState(false)
 
   // Filter users based on search term
   const filteredUsers = users.filter((user) => {
@@ -148,6 +157,65 @@ export function UserManagement({ users }: UserManagementProps) {
     }
   }
 
+  const handleProfilePictureUpload = async (userId: string, formData: FormData) => {
+    setIsUploadingPicture(userId)
+
+    try {
+      const result = await adminUploadProfilePicture(userId, formData)
+
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully",
+      })
+
+      setIsPictureDialogOpen(false)
+      router.refresh()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to upload profile picture",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingPicture(null)
+    }
+  }
+
+  const handleRemoveProfilePicture = async (userId: string) => {
+    if (!confirm("Are you sure you want to remove this user's profile picture?")) {
+      return
+    }
+
+    setIsUploadingPicture(userId)
+
+    try {
+      const result = await adminRemoveProfilePicture(userId)
+
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+
+      toast({
+        title: "Success",
+        description: "Profile picture removed successfully",
+      })
+
+      router.refresh()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove profile picture",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingPicture(null)
+    }
+  }
+
   return (
     <>
       <div className="mb-6 flex flex-col sm:flex-row justify-between gap-4">
@@ -175,15 +243,45 @@ export function UserManagement({ users }: UserManagementProps) {
             <Card key={user.id}>
               <CardHeader className="pb-2">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-base">{user.name || "Unnamed User"}</CardTitle>
-                      {user.is_admin && <Badge>Admin</Badge>}
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      {user.profile_picture_url ? (
+                        <img
+                          src={user.profile_picture_url || "/placeholder.svg"}
+                          alt={`${user.name}'s profile`}
+                          className="h-12 w-12 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
                     </div>
-                    <CardDescription>{user.email || "No email"}</CardDescription>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-base">{user.name || "Unnamed User"}</CardTitle>
+                        {user.is_admin && <Badge>Admin</Badge>}
+                      </div>
+                      <CardDescription>{user.email || "No email"}</CardDescription>
+                    </div>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedPictureUser(user)
+                        setIsPictureDialogOpen(true)
+                      }}
+                      disabled={isUploadingPicture === user.id}
+                    >
+                      {isUploadingPicture === user.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="mr-2 h-4 w-4" />
+                      )}
+                      Picture
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleEditUser(user)}>
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
@@ -302,6 +400,84 @@ export function UserManagement({ users }: UserManagementProps) {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Profile Picture Management Dialog */}
+      <Dialog
+        open={isPictureDialogOpen}
+        onOpenChange={(open) => {
+          if (!isUploadingPicture) {
+            setIsPictureDialogOpen(open)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Profile Picture</DialogTitle>
+            <DialogDescription>Upload or remove profile picture for {selectedPictureUser?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedPictureUser?.profile_picture_url && (
+              <div className="flex flex-col items-center gap-4">
+                <img
+                  src={selectedPictureUser.profile_picture_url || "/placeholder.svg"}
+                  alt="Current profile picture"
+                  className="h-24 w-24 rounded-full object-cover"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => handleRemoveProfilePicture(selectedPictureUser.id)}
+                  disabled={!!isUploadingPicture}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Remove Picture
+                </Button>
+              </div>
+            )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.currentTarget)
+                handleProfilePictureUpload(selectedPictureUser.id, formData)
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="profilePicture">Upload New Picture</Label>
+                <Input
+                  id="profilePicture"
+                  name="profilePicture"
+                  type="file"
+                  accept="image/*"
+                  disabled={!!isUploadingPicture}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maximum file size: 5MB. Supported formats: JPG, PNG, GIF
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPictureDialogOpen(false)}
+                  disabled={!!isUploadingPicture}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={!!isUploadingPicture}>
+                  {isUploadingPicture ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    "Upload Picture"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>

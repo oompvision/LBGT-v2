@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarIcon, User } from "lucide-react"
 import { format } from "date-fns"
 import Link from "next/link"
+import Image from "next/image"
 
 // Course data
 const courseData = {
@@ -25,10 +26,10 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
   const supabase = createClient()
   const playerId = params.id
 
-  // Get player info
+  // Get player info including profile picture
   const { data: player, error: playerError } = await supabase
     .from("users")
-    .select("id, name, strokes_given")
+    .select("id, name, strokes_given, profile_picture_url")
     .eq("id", playerId)
     .single()
 
@@ -262,8 +263,25 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       <main className="flex-1 py-8">
         <div className="container">
           <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">{player.name}'s Stats</h1>
-            <p className="text-muted-foreground">Player statistics and round history</p>
+            <div className="flex items-center gap-4 mb-4">
+              {player.profile_picture_url ? (
+                <Image
+                  src={player.profile_picture_url || "/placeholder.svg"}
+                  alt={`${player.name}'s profile picture`}
+                  width={80}
+                  height={80}
+                  className="rounded-full object-cover border-2 border-border"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                  <User className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">{player.name}'s Stats</h1>
+                <p className="text-muted-foreground">Player statistics and round history</p>
+              </div>
+            </div>
           </div>
 
           {/* Player Rank Card */}

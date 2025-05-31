@@ -237,7 +237,11 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
       <div className="relative overflow-x-auto">
         <div className="mb-6 overflow-x-auto">
-          <img src="/images/scorecard.png" alt="Golf Course Scorecard" className="w-full max-w-[900px]" />
+          <img
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/courseId%3D146332%26facilityId%3D9687%26view%3Dwide%26img%3D1%26renew%3D0%26t%3D1747506793-JHI1YeuyRUCwkhK12BkRks55Qh1U65.png"
+            alt="Golf Course Scorecard"
+            className="w-full max-w-[900px]"
+          />
         </div>
 
         <Card>

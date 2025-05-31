@@ -9,6 +9,7 @@ export type Database = {
           strokes_given: number | null
           is_admin: boolean
           created_at: string
+          profile_picture_url: string | null
         }
         Insert: {
           id: string
@@ -17,6 +18,7 @@ export type Database = {
           strokes_given?: number | null
           is_admin?: boolean
           created_at?: string
+          profile_picture_url?: string | null
         }
         Update: {
           id?: string
@@ -25,6 +27,7 @@ export type Database = {
           strokes_given?: number | null
           is_admin?: boolean
           created_at?: string
+          profile_picture_url?: string | null
         }
       }
       tee_times: {
