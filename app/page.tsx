@@ -80,7 +80,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               {user ? (
                 <>
-                  <Link href="/reservations">
+                  <Link href="/dashboard?tab=book">
                     <Button
                       size="lg"
                       className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"

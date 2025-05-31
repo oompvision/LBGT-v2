@@ -1,6 +1,5 @@
 import { AdminTabs } from "../admin-tabs"
 import { createClient } from "@/lib/supabase/server"
-import { formatDate } from "@/lib/utils"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 // Prevent prerendering and force dynamic rendering
@@ -25,6 +24,26 @@ function formatTimeFromString(timeString: string): string {
     return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
   } catch (error) {
     return "Unknown Time"
+  }
+}
+
+// Helper function to format date safely
+function formatDateSafely(dateString: string): string {
+  if (!dateString) return "Unknown Date"
+
+  try {
+    // Parse the date string and format it
+    const date = new Date(dateString + "T00:00:00") // Add time to avoid timezone issues
+    if (isNaN(date.getTime())) return "Invalid Date"
+
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  } catch (error) {
+    return "Invalid Date"
   }
 }
 
@@ -107,7 +126,7 @@ export default async function AdminReservationsPage() {
           <div className="space-y-6">
             {sortedDates.map((date) => (
               <div key={date}>
-                <h3 className="text-xl font-semibold mb-3">{formatDate(new Date(date))}</h3>
+                <h3 className="text-xl font-semibold mb-3">{formatDateSafely(date)}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {reservationsByDate[date].map((reservation) => (
                     <Card key={reservation.id}>

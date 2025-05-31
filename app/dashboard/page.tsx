@@ -8,6 +8,7 @@ import { DashboardTabs } from "./dashboard-tabs"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { getUpcomingFridayForSeason } from "@/lib/utils"
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth()
@@ -75,16 +76,16 @@ export default function DashboardPage() {
         const { data: userReservationsResult, error: reservationsError } = await supabase
           .from("reservations")
           .select(`
+          id,
+          tee_time_id,
+          slots,
+          player_names,
+          tee_times (
             id,
-            tee_time_id,
-            slots,
-            player_names,
-            tee_times (
-              id,
-              date,
-              time
-            )
-          `)
+            date,
+            time
+          )
+        `)
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
 
@@ -99,16 +100,16 @@ export default function DashboardPage() {
         setUserReservations([])
       }
 
-      // Get the upcoming Friday date (for 2025 season)
-      const upcomingFridayDate = "2025-05-30" // Fixed date for now
-      setUpcomingFriday(upcomingFridayDate)
+      // Get the upcoming Friday date using the updated logic (now returns a string)
+      const fridayDateString = getUpcomingFridayForSeason()
+      setUpcomingFriday(fridayDateString)
 
       // Get tee times for the upcoming Friday with error handling
       try {
         const { data: allTeeTimesResult, error: teeTimesError } = await supabase
           .from("tee_times")
           .select("*")
-          .eq("date", upcomingFridayDate)
+          .eq("date", fridayDateString)
           .order("time")
 
         if (teeTimesError) {

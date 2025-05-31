@@ -3,12 +3,52 @@ export const dynamic = "force-dynamic"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"
-import { formatDate, formatTime } from "@/lib/utils"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CalendarIcon, Clock, Plus } from "lucide-react"
+
+// Helper function to format time from time string
+function formatTimeFromString(timeString: string): string {
+  if (!timeString) return "Unknown Time"
+
+  try {
+    // If it's already in HH:MM format, parse it directly
+    const [hours, minutes] = timeString.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const minute = Number.parseInt(minutes, 10)
+
+    if (isNaN(hour) || isNaN(minute)) return "Unknown Time"
+
+    const period = hour >= 12 ? "PM" : "AM"
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+
+    return `${displayHour}:${minute.toString().padStart(2, "0")} ${period}`
+  } catch (error) {
+    return "Unknown Time"
+  }
+}
+
+// Helper function to format date safely
+function formatDateSafely(dateString: string): string {
+  if (!dateString) return "Unknown Date"
+
+  try {
+    // Parse the date string and format it
+    const date = new Date(dateString + "T00:00:00") // Add time to avoid timezone issues
+    if (isNaN(date.getTime())) return "Invalid Date"
+
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+  } catch (error) {
+    return "Invalid Date"
+  }
+}
 
 export default async function MyReservationsPage() {
   const supabase = createClient()
@@ -67,7 +107,7 @@ export default async function MyReservationsPage() {
               <h1 className="text-3xl font-bold tracking-tight">My Reservations</h1>
               <p className="text-muted-foreground">View and manage your tee time reservations</p>
             </div>
-            <Link href="/dashboard">
+            <Link href="/dashboard?tab=book">
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
                 Book Tee Time
@@ -82,7 +122,7 @@ export default async function MyReservationsPage() {
                   <CardHeader className="bg-muted/50">
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle>{formatDate(new Date(date))}</CardTitle>
+                      <CardTitle>{formatDateSafely(date)}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -91,7 +131,7 @@ export default async function MyReservationsPage() {
                         <div key={reservation.id} className="p-4">
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{formatTime(reservation.tee_times.time)}</span>
+                            <span className="font-medium">{formatTimeFromString(reservation.tee_times.time)}</span>
                           </div>
                           <div className="mt-2">
                             <p className="font-medium">
@@ -122,7 +162,7 @@ export default async function MyReservationsPage() {
                 <CardDescription>You haven&apos;t made any tee time reservations yet.</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Link href="/dashboard">
+                <Link href="/dashboard?tab=book">
                   <Button>Book Your First Tee Time</Button>
                 </Link>
               </CardFooter>

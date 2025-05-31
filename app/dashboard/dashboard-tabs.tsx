@@ -3,9 +3,9 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { formatTime } from "@/lib/utils"
+import { formatTime, getUpcomingFridayForSeason } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -77,7 +77,9 @@ export function DashboardTabs({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [userDailyReservations, setUserDailyReservations] = useState<Record<string, number>>({})
-  const [activeTab, setActiveTab] = useState("reservations")
+  const searchParams = useSearchParams()
+  const tabFromUrl = searchParams.get("tab")
+  const [activeTab, setActiveTab] = useState(tabFromUrl === "book" ? "book" : "reservations")
 
   const router = useRouter()
   const { toast } = useToast()
@@ -226,7 +228,9 @@ export function DashboardTabs({
     if (upcomingFriday) {
       return formatDateDisplay(upcomingFriday)
     }
-    return "May 30, 2025"
+    // Fallback to calculated upcoming Friday
+    const calculatedFriday = getUpcomingFridayForSeason()
+    return formatDateDisplay(calculatedFriday.toISOString().split("T")[0])
   }
 
   const getDayOfWeek = () => {
@@ -239,7 +243,9 @@ export function DashboardTabs({
         const date = parseISO(upcomingFriday)
         return format(date, "EEEE")
       }
-      return "Friday"
+      // Fallback to calculated upcoming Friday
+      const calculatedFriday = getUpcomingFridayForSeason()
+      return format(calculatedFriday, "EEEE")
     } catch (error) {
       return "Friday"
     }

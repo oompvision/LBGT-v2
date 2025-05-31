@@ -28,28 +28,47 @@ export function formatTime(date: Date | string): string {
 // Tee time generation utilities
 export function getNextFriday(fromDate: Date = new Date()): Date {
   const date = new Date(fromDate)
-  const dayOfWeek = date.getDay()
+  const dayOfWeek = date.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+
+  // If it's Saturday (6), we want the next Friday (6 days ahead)
+  if (dayOfWeek === 6) {
+    date.setDate(date.getDate() + 6)
+    return date
+  }
+
+  // For all other days, calculate days until next Friday
   const daysUntilFriday = (5 - dayOfWeek + 7) % 7
-  if (daysUntilFriday === 0 && date.getHours() >= 18) {
-    // If it's Friday after 6 PM, get next Friday
+
+  // If it's Friday and we're past a certain time, get next Friday
+  if (daysUntilFriday === 0) {
     date.setDate(date.getDate() + 7)
   } else {
     date.setDate(date.getDate() + daysUntilFriday)
   }
+
   return date
 }
 
-export function getUpcomingFridayForSeason(): Date {
+export function getUpcomingFridayForSeason(): string {
   const today = new Date()
   const seasonStart = new Date(2025, 4, 23) // May 23, 2025
   const seasonEnd = new Date(2025, 8, 26) // September 26, 2025
 
   if (today < seasonStart) {
-    return seasonStart
+    return formatDateForDB(seasonStart)
   }
 
   const nextFriday = getNextFriday(today)
-  return nextFriday <= seasonEnd ? nextFriday : seasonEnd
+  const fridayToUse = nextFriday <= seasonEnd ? nextFriday : seasonEnd
+  return formatDateForDB(fridayToUse)
+}
+
+// Helper function to format date for database storage (YYYY-MM-DD)
+export function formatDateForDB(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
 }
 
 export function getSeasonFridays(): Date[] {
