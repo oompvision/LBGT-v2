@@ -22,7 +22,12 @@ const courseData = {
   totalPar: 72,
 }
 
-export default async function RoundDetailsPage({ params }: { params: { id: string } }) {
+interface PageProps {
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
+}
+
+export default async function RoundDetailsPage({ params, searchParams }: PageProps) {
   const supabase = createClient()
 
   // Check if user is authenticated
@@ -45,16 +50,25 @@ export default async function RoundDetailsPage({ params }: { params: { id: strin
   const roundDate = scores[0].rounds.date
   const submittedBy = scores[0].rounds.users.name
 
+  // Check if we came from a player stats page
+  const fromPlayer = searchParams?.from === "player"
+  const playerId = searchParams?.playerId as string
+  const playerName = searchParams?.playerName as string
+
+  // Determine back link and text
+  const backHref = fromPlayer && playerId ? `/players/${playerId}/stats` : "/scores/my-rounds"
+  const backText = fromPlayer && playerName ? `Back to ${decodeURIComponent(playerName)}'s Stats` : "Back to My Rounds"
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
           <div className="mb-4">
-            <Link href="/scores/my-rounds">
+            <Link href={backHref}>
               <Button variant="ghost" className="pl-0">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to My Rounds
+                {backText}
               </Button>
             </Link>
           </div>

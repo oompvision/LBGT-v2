@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Trophy } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import Link from "next/link"
 
 // Updated course data with correct par values
 const courseData = {
@@ -74,6 +75,7 @@ export function RingerLeaderboard({ rounds }) {
       if (!playerRingerScores[userId]) {
         playerRingerScores[userId] = {
           name: playerName,
+          userId: userId, // Store userId for linking to player stats
           holes: Array(18).fill(null), // Best net score for each hole
           roundsPlayed: 0,
           strokesGiven: usersWithHandicap[userId] || 0,
@@ -147,7 +149,7 @@ export function RingerLeaderboard({ rounds }) {
       holesPlayed,
       toPar,
       roundsPlayed: data.roundsPlayed,
-      strokesGiven: usersWithHandicap[userId] || 0,
+      strokesGiven: data.strokesGiven,
     }
   })
 
@@ -208,7 +210,11 @@ export function RingerLeaderboard({ rounds }) {
                       <Badge variant="outline">{index + 1}</Badge>
                     )}
                   </td>
-                  <td className="px-4 py-2 font-medium">{player.name}</td>
+                  <td className="px-4 py-2 font-medium">
+                    <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
+                      {player.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2 text-center">{player.roundsPlayed}</td>
                   <td className="px-4 py-2 text-center">{player.holesPlayed}/18</td>
                   <td className="px-4 py-2 text-center">{player.totalRingerScore}</td>

@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Trophy } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import Link from "next/link"
 
 // Updated course data with correct par values
 const courseData = {
@@ -76,6 +77,7 @@ export function LeagueStats({ rounds }) {
       if (!playerStats[userId]) {
         playerStats[userId] = {
           name: playerName,
+          userId: userId, // Store userId for linking to player stats
           rounds: 0,
           totalScore: 0,
           bestScore: Number.POSITIVE_INFINITY,
@@ -214,7 +216,11 @@ export function LeagueStats({ rounds }) {
                               </Badge>
                             )}
                           </td>
-                          <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">{player.name}</td>
+                          <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">
+                            <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
+                              {player.name}
+                            </Link>
+                          </td>
                           <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.rounds}</td>
                           <td className="px-2 sm:px-4 py-2 text-center">{player.netAverageScore}</td>
                           <td className="px-2 sm:px-4 py-2 text-center">{player.strokesGiven}</td>
@@ -270,7 +276,11 @@ export function LeagueStats({ rounds }) {
                             </Badge>
                           )}
                         </td>
-                        <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">{player.name}</td>
+                        <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">
+                          <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
+                            {player.name}
+                          </Link>
+                        </td>
                         <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.rounds}</td>
                         <td className="px-2 sm:px-4 py-2 text-center">{player.averageScore}</td>
                         <td className="px-2 sm:px-4 py-2 text-center">{player.strokesGiven}</td>
