@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server"
-import { formatDate, formatTime, getSeasonFridays } from "@/lib/utils"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,21 +8,57 @@ import { CalendarIcon, Clock, Users } from "lucide-react"
 // Add this export to prevent static rendering
 export const dynamic = "force-dynamic"
 
+// Helper function to safely format dates without timezone issues
+function formatDateSafely(dateString: string): string {
+  // Parse the date string as YYYY-MM-DD and treat it as local time
+  const [year, month, day] = dateString.split("-").map(Number)
+  const date = new Date(year, month - 1, day) // month is 0-indexed
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
+// Helper function to safely format time strings
+function formatTimeFromString(timeString: string): string {
+  // Parse time string (HH:MM:SS or HH:MM)
+  const [hours, minutes] = timeString.split(":").map(Number)
+  const date = new Date()
+  date.setHours(hours, minutes, 0, 0)
+
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+}
+
 async function getScheduleData() {
   const supabase = createClient()
-  const currentYear = 2025 // Hardcoded to 2025 for the specific date range
-  const fridays = getSeasonFridays(currentYear)
 
-  // Get all tee times
+  // Get today's date in YYYY-MM-DD format for comparison
+  const today = new Date()
+  const todayString =
+    today.getFullYear() +
+    "-" +
+    String(today.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(today.getDate()).padStart(2, "0")
+
+  // Get all tee times for current and future dates only
   const { data: teeTimes, error: teeTimesError } = await supabase
     .from("tee_times")
     .select("*")
+    .gte("date", todayString) // Only get current and future dates
     .order("date")
     .order("time")
 
   if (teeTimesError) {
     console.error("Error fetching tee times:", teeTimesError)
-    return { fridays, teeTimes: [], reservations: [] }
+    return { teeTimes: [], reservations: [] }
   }
 
   // Get all reservations with user info
@@ -41,14 +76,14 @@ async function getScheduleData() {
 
   if (reservationsError) {
     console.error("Error fetching reservations:", reservationsError)
-    return { fridays, teeTimes, reservations: [] }
+    return { teeTimes, reservations: [] }
   }
 
-  return { fridays, teeTimes, reservations }
+  return { teeTimes, reservations }
 }
 
 export default async function SchedulePage() {
-  const { fridays, teeTimes, reservations } = await getScheduleData()
+  const { teeTimes, reservations } = await getScheduleData()
 
   // Group tee times by date
   const teeTimesByDate =
@@ -84,7 +119,7 @@ export default async function SchedulePage() {
       <main className="flex-1 py-8">
         <div className="container">
           <div className="mb-8 flex flex-col">
-            <h1 className="text-3xl font-bold tracking-tight">League Schedule</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Tour Schedule</h1>
             <p className="text-muted-foreground">View all tee times and reservations for the season</p>
           </div>
 
@@ -95,7 +130,7 @@ export default async function SchedulePage() {
                   <CardHeader className="bg-muted/50">
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle>{formatDate(new Date(date))}</CardTitle>
+                      <CardTitle>{formatDateSafely(date)}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="p-0">
@@ -111,7 +146,7 @@ export default async function SchedulePage() {
                             <div className="mb-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{formatTime(teeTime.time)}</span>
+                                <span className="font-medium">{formatTimeFromString(teeTime.time)}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <Users className="h-4 w-4 text-muted-foreground" />

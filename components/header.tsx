@@ -105,6 +105,13 @@ export function Header() {
                         >
                           My Reservations
                         </Link>
+                        <Link
+                          href="/schedule"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setActiveDropdown(null)}
+                        >
+                          Schedule
+                        </Link>
                       </div>
                     </div>
                   )}
