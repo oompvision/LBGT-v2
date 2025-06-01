@@ -218,7 +218,7 @@ export async function getAllReservationsWithDetails() {
     return { success: true, reservations: correctedReservations }
   } catch (error: any) {
     console.error("Error in getAllReservationsWithDetails:", error)
-    return { success: false, error: error.message || "An unexpected error occurred" }
+    return { success: false, error: error.message || "An unexpected error occurred", reservations: [] }
   }
 }
 
