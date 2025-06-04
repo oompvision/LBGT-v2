@@ -257,6 +257,74 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
     ringerScorecard.netTotalScore = ringerScorecard.netHoles.reduce((sum, h) => sum + (h || 0), 0)
   }
 
+  // Calculate scoring statistics
+  const scoringStats = {
+    holeInOne: 0,
+    albatross: 0,
+    eagle: 0,
+    birdie: 0,
+    par: 0,
+    bogey: 0,
+    doubleBogey: 0,
+    tripleBogey: 0,
+    quadrupleBogey: 0,
+    totalHoles: 0,
+  }
+
+  // Process all rounds for scoring statistics
+  if (playerScores) {
+    playerScores.forEach((score) => {
+      const holeScores = [
+        score.hole_1,
+        score.hole_2,
+        score.hole_3,
+        score.hole_4,
+        score.hole_5,
+        score.hole_6,
+        score.hole_7,
+        score.hole_8,
+        score.hole_9,
+        score.hole_10,
+        score.hole_11,
+        score.hole_12,
+        score.hole_13,
+        score.hole_14,
+        score.hole_15,
+        score.hole_16,
+        score.hole_17,
+        score.hole_18,
+      ]
+
+      holeScores.forEach((holeScore, index) => {
+        if (holeScore === null || holeScore === 0) return
+
+        const par = courseData.pars[index]
+        const scoreToPar = holeScore - par
+        scoringStats.totalHoles += 1
+
+        if (holeScore === 1) {
+          scoringStats.holeInOne += 1
+        } else if (scoreToPar === -3) {
+          scoringStats.albatross += 1
+        } else if (scoreToPar === -2) {
+          scoringStats.eagle += 1
+        } else if (scoreToPar === -1) {
+          scoringStats.birdie += 1
+        } else if (scoreToPar === 0) {
+          scoringStats.par += 1
+        } else if (scoreToPar === 1) {
+          scoringStats.bogey += 1
+        } else if (scoreToPar === 2) {
+          scoringStats.doubleBogey += 1
+        } else if (scoreToPar === 3) {
+          scoringStats.tripleBogey += 1
+        } else if (scoreToPar >= 4) {
+          scoringStats.quadrupleBogey += 1
+        }
+      })
+    })
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -391,6 +459,123 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
               </CardContent>
             </Card>
           </div>
+
+          {/* Scoring Statistics */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Scoring Statistics</CardTitle>
+              <CardDescription>Breakdown of scoring performance by hole (gross scores)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Hole in One</p>
+                  <p className="text-lg font-medium">{scoringStats.holeInOne}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.holeInOne / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Albatross (-3)</p>
+                  <p className="text-lg font-medium">{scoringStats.albatross}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.albatross / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Eagle (-2)</p>
+                  <p className="text-lg font-medium">{scoringStats.eagle}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.eagle / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Birdie (-1)</p>
+                  <p className="text-lg font-medium">{scoringStats.birdie}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.birdie / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Par (Even)</p>
+                  <p className="text-lg font-medium">{scoringStats.par}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.par / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Bogey (+1)</p>
+                  <p className="text-lg font-medium">{scoringStats.bogey}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.bogey / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Double Bogey (+2)</p>
+                  <p className="text-lg font-medium">{scoringStats.doubleBogey}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.doubleBogey / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Triple Bogey (+3)</p>
+                  <p className="text-lg font-medium">{scoringStats.tripleBogey}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.tripleBogey / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+
+                <div className="text-center p-3 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">Quadruple+ Bogey (+4 or more)</p>
+                  <p className="text-lg font-medium">{scoringStats.quadrupleBogey}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {scoringStats.totalHoles > 0
+                      ? ((scoringStats.quadrupleBogey / scoringStats.totalHoles) * 100).toFixed(1)
+                      : "0.0"}
+                    %
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Total Holes Played</p>
+                  <p className="text-2xl font-bold">{scoringStats.totalHoles}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Round History */}
           <Card>
