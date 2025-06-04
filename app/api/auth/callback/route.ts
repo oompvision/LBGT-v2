@@ -5,17 +5,24 @@ import { NextResponse } from "next/server"
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get("code")
+  const next = requestUrl.searchParams.get("next") ?? "/"
 
   if (code) {
     try {
       const supabase = createRouteHandlerClient({ cookies })
-      await supabase.auth.exchangeCodeForSession(code)
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        console.error("Error exchanging code for session:", error)
+        // Redirect to signin page with error
+        return NextResponse.redirect(`${requestUrl.origin}/signin?error=confirmation_failed`)
+      }
     } catch (error) {
-      console.error("Error exchanging code for session:", error)
-      // Continue anyway to avoid leaving the user stranded
+      console.error("Error in auth callback:", error)
+      return NextResponse.redirect(`${requestUrl.origin}/signin?error=confirmation_failed`)
     }
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(requestUrl.origin)
+  // Successful confirmation - redirect to dashboard or home
+  return NextResponse.redirect(`${requestUrl.origin}${next}`)
 }

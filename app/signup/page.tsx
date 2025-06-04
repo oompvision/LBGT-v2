@@ -74,6 +74,7 @@ export default function SignUpPage() {
           data: {
             name,
           },
+          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard`,
         },
       })
 

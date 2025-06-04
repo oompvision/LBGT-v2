@@ -21,6 +21,9 @@ export function Header() {
     }
   }
 
+  // Check if user is admin
+  const isAdmin = user?.user_metadata?.is_admin === true
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -197,97 +200,99 @@ export function Header() {
                   )}
                 </div>
 
-                {/* Custom Dropdown for Admin */}
-                <div className="relative" ref={(el) => (dropdownRefs.current.admin = el)}>
-                  <div className="flex items-center">
-                    <Link
-                      href="/admin"
-                      className="text-sm text-lbgt-medium hover:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 rounded-sm px-2 py-1"
-                      aria-label="Admin dashboard"
-                    >
-                      Admin
-                    </Link>
-                    <button
-                      className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-1 py-2 rounded-sm flex items-center ${
-                        activeDropdown === "admin" ? "bg-lbgt-light" : ""
-                      }`}
-                      aria-label="Admin menu"
-                      onClick={() => toggleDropdown("admin")}
-                    >
-                      <ChevronDown className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </div>
-
-                  {activeDropdown === "admin" && (
-                    <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 right-0">
-                      <div className="py-1" role="menu" aria-orientation="vertical">
-                        <Link
-                          href="/admin/dashboard"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Dashboard
-                        </Link>
-                        <Link
-                          href="/admin/users"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Users
-                        </Link>
-                        <Link
-                          href="/admin/applications"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Applications
-                        </Link>
-                        <Link
-                          href="/admin/messages"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Messages
-                        </Link>
-                        <Link
-                          href="/admin/reservations"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Reservations
-                        </Link>
-                        <Link
-                          href="/admin/tee-times"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Tee Times
-                        </Link>
-                        <Link
-                          href="/admin/manual-tee-times"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Manual Tee Times
-                        </Link>
-                        <Link
-                          href="/admin/generate-tee-times"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Generate Tee Times
-                        </Link>
-                        <Link
-                          href="/admin/reset-password"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setActiveDropdown(null)}
-                        >
-                          Reset Password
-                        </Link>
-                      </div>
+                {/* Admin Dropdown - Only shown to admin users */}
+                {isAdmin && (
+                  <div className="relative" ref={(el) => (dropdownRefs.current.admin = el)}>
+                    <div className="flex items-center">
+                      <Link
+                        href="/admin"
+                        className="text-sm text-lbgt-medium hover:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 rounded-sm px-2 py-1"
+                        aria-label="Admin dashboard"
+                      >
+                        Admin
+                      </Link>
+                      <button
+                        className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-1 py-2 rounded-sm flex items-center ${
+                          activeDropdown === "admin" ? "bg-lbgt-light" : ""
+                        }`}
+                        aria-label="Admin menu"
+                        onClick={() => toggleDropdown("admin")}
+                      >
+                        <ChevronDown className="h-3 w-3" aria-hidden="true" />
+                      </button>
                     </div>
-                  )}
-                </div>
+
+                    {activeDropdown === "admin" && (
+                      <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 right-0">
+                        <div className="py-1" role="menu" aria-orientation="vertical">
+                          <Link
+                            href="/admin/dashboard"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Dashboard
+                          </Link>
+                          <Link
+                            href="/admin/users"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Users
+                          </Link>
+                          <Link
+                            href="/admin/applications"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Applications
+                          </Link>
+                          <Link
+                            href="/admin/messages"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Messages
+                          </Link>
+                          <Link
+                            href="/admin/reservations"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Reservations
+                          </Link>
+                          <Link
+                            href="/admin/tee-times"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Tee Times
+                          </Link>
+                          <Link
+                            href="/admin/manual-tee-times"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Manual Tee Times
+                          </Link>
+                          <Link
+                            href="/admin/generate-tee-times"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Generate Tee Times
+                          </Link>
+                          <Link
+                            href="/admin/reset-password"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Reset Password
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex items-center space-x-4">

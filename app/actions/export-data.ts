@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient } from "@supabase/supabase-js"
-import { formatDate, formatTime } from "@/lib/utils"
+import { formatDate } from "@/lib/utils"
 
 // Create a Supabase client with service role key to bypass RLS
 const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
@@ -133,7 +133,20 @@ export async function exportReservationsToCSV(weekDate: string) {
       }
 
       const date = formatDate(new Date(reservation.tee_times.date))
-      const time = formatTime(reservation.tee_times.time)
+      // Handle time formatting - reservation.tee_times.time is a string like "14:30:00"
+      const timeString = reservation.tee_times.time
+      let time = timeString
+      if (timeString) {
+        // Parse the time string and format it to 12-hour format
+        const [hours, minutes] = timeString.split(":").map(Number)
+        const date = new Date()
+        date.setHours(hours, minutes, 0, 0)
+        time = date.toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+        })
+      }
       const createdAt = reservation.created_at ? new Date(reservation.created_at).toLocaleString() : "Unknown"
 
       console.log(`Processing reservation ${reservation.id} with ${reservation.slots} slots`)
