@@ -7,21 +7,18 @@ import type { User } from "@supabase/supabase-js"
 
 type AuthContextType = {
   user: User | null
-  isAdmin: boolean
   isLoading: boolean
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  isAdmin: false,
   isLoading: true,
   signOut: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -39,18 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) {
           if (session && !error) {
             setUser(session.user)
-
-            // Check if user is admin
-            const { data: userData } = await supabase
-              .from("users")
-              .select("is_admin")
-              .eq("id", session.user.id)
-              .single()
-
-            setIsAdmin(userData?.is_admin === true)
           } else {
             setUser(null)
-            setIsAdmin(false)
           }
           setIsLoading(false)
         }
@@ -59,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (mounted) {
           clearAuthStorage()
           setUser(null)
-          setIsAdmin(false)
           setIsLoading(false)
         }
       }
@@ -77,22 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === "SIGNED_IN" && session) {
         setUser(session.user)
-
-        // Check if user is admin
-        const { data: userData } = await supabase.from("users").select("is_admin").eq("id", session.user.id).single()
-
-        setIsAdmin(userData?.is_admin === true)
       } else if (event === "SIGNED_OUT") {
         setUser(null)
-        setIsAdmin(false)
         clearAuthStorage()
       } else if (event === "TOKEN_REFRESHED" && session) {
         setUser(session.user)
-
-        // Check if user is admin
-        const { data: userData } = await supabase.from("users").select("is_admin").eq("id", session.user.id).single()
-
-        setIsAdmin(userData?.is_admin === true)
       }
 
       setIsLoading(false)
@@ -109,17 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient()
       await supabase.auth.signOut()
       setUser(null)
-      setIsAdmin(false)
       clearAuthStorage()
     } catch (error) {
       console.error("Error signing out:", error)
       setUser(null)
-      setIsAdmin(false)
       clearAuthStorage()
     }
   }
 
-  return <AuthContext.Provider value={{ user, isAdmin, isLoading, signOut }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, isLoading, signOut }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

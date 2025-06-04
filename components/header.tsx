@@ -7,11 +7,34 @@ import { Button } from "@/components/ui/button"
 import { ChevronDown } from "lucide-react"
 import { MobileMenu } from "./mobile-menu"
 import { useAuth } from "./auth-provider"
+import { createClient } from "@/lib/supabase/client"
 
-const Header = () => {
-  const { user, isAdmin, isLoading, signOut } = useAuth()
+export function Header() {
+  const { user, isLoading, signOut } = useAuth()
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
+
+  // Check admin status when user changes
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        try {
+          const supabase = createClient()
+          const { data: userData } = await supabase.from("users").select("is_admin").eq("id", user.id).single()
+
+          setIsAdmin(userData?.is_admin === true)
+        } catch (error) {
+          console.error("Error checking admin status:", error)
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+      }
+    }
+
+    checkAdminStatus()
+  }, [user])
 
   const toggleDropdown = (name: string) => {
     if (activeDropdown === name) {
@@ -323,5 +346,3 @@ const Header = () => {
     </header>
   )
 }
-
-export { Header }
