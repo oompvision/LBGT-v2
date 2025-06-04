@@ -8,8 +8,8 @@ import { ChevronDown } from "lucide-react"
 import { MobileMenu } from "./mobile-menu"
 import { useAuth } from "./auth-provider"
 
-export function Header() {
-  const { user, isLoading, signOut } = useAuth()
+const Header = () => {
+  const { user, isAdmin, isLoading, signOut } = useAuth()
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null)
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
 
@@ -20,9 +20,6 @@ export function Header() {
       setActiveDropdown(name)
     }
   }
-
-  // Check if user is admin
-  const isAdmin = user?.is_admin === true
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -326,3 +323,5 @@ export function Header() {
     </header>
   )
 }
+
+export { Header }
