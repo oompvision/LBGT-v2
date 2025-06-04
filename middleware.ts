@@ -1,54 +1,47 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
 
-export async function middleware(req: NextRequest) {
-  // Clone the request to avoid modifying the original
+export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
+  const supabase = createMiddlewareClient({ req: request, res })
 
-  try {
-    // Check if the request is for an admin route
-    const isAdminRoute = req.nextUrl.pathname.startsWith("/admin")
+  // Check if the user is authenticated
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-    if (isAdminRoute) {
-      // Create a Supabase client
-      const supabase = createClient()
+  // If the user is not authenticated and trying to access a protected route, redirect to signin
+  if (!session && !request.nextUrl.pathname.startsWith("/signin") && !request.nextUrl.pathname.startsWith("/signup")) {
+    // Public routes that don't require authentication
+    const publicRoutes = ["/", "/apply", "/mobile-signin"]
+    if (!publicRoutes.includes(request.nextUrl.pathname)) {
+      return NextResponse.redirect(new URL("/signin", request.url))
+    }
+  }
 
-      // Get the user's session
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-
-      // If no session or user is not an admin, redirect to home page
-      if (!session || session.user.user_metadata?.is_admin !== true) {
-        return NextResponse.redirect(new URL("/", req.url))
-      }
+  // If the user is trying to access admin routes, check if they are an admin
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/signin", request.url))
     }
 
-    // Handle auth cookies cleanup if there are JWT errors
-    const authCookie = req.cookies.get("sb-supabase-auth-token")
+    try {
+      // Check if the user is an admin
+      const { data: userData, error } = await supabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", session.user.id)
+        .single()
 
-    if (authCookie) {
-      try {
-        // Basic JWT validation - check if it's expired
-        const payload = JSON.parse(atob(authCookie.value.split(".")[1]))
-        const now = Math.floor(Date.now() / 1000)
-
-        if (payload.exp && payload.exp < now) {
-          // Token is expired, clear it
-          res.cookies.delete("sb-supabase-auth-token")
-        }
-      } catch (e) {
-        // Invalid token format, clear it
-        res.cookies.delete("sb-supabase-auth-token")
+      if (error || !userData?.is_admin) {
+        // If there's an error or the user is not an admin, redirect to home
+        return NextResponse.redirect(new URL("/", request.url))
       }
-    }
-  } catch (error) {
-    console.error("Middleware error:", error)
-
-    // If there's an error in admin route check, redirect to home as a fallback
-    if (req.nextUrl.pathname.startsWith("/admin")) {
-      return NextResponse.redirect(new URL("/", req.url))
+    } catch (error) {
+      console.error("Error checking admin status:", error)
+      // If there's an error, redirect to home for safety
+      return NextResponse.redirect(new URL("/", request.url))
     }
   }
 
@@ -56,5 +49,14 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|public|api/auth).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|images|videos|.*\\.png$|.*\\.jpg$|.*\\.svg$|.*\\.mp4$).*)",
+  ],
 }

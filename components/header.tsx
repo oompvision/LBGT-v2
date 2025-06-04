@@ -22,7 +22,7 @@ export function Header() {
   }
 
   // Check if user is admin
-  const isAdmin = user?.user_metadata?.is_admin === true
+  const isAdmin = user?.is_admin === true
 
   // Close dropdown when clicking outside
   useEffect(() => {

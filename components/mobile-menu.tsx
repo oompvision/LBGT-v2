@@ -10,7 +10,7 @@ export function MobileMenu() {
   const { user, signOut } = useAuth()
 
   // Check if user is admin
-  const isAdmin = user?.user_metadata?.is_admin === true
+  const isAdmin = user?.is_admin === true
 
   const toggleMenu = () => {
     setIsOpen(!isOpen)
