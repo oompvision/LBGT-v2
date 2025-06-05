@@ -16,6 +16,86 @@ const courseData = {
   totalPar: 72,
 }
 
+// Score indicator component for the ringer leaderboard
+const ScoreIndicator = ({ score, par }) => {
+  if (score === null || score === undefined) return "-"
+
+  // Calculate the difference from par
+  const diff = score - par
+
+  // Eagle or better (double circle)
+  if (diff <= -2) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width="28" height="28" viewBox="0 0 28 28" className="absolute">
+          <circle cx="14" cy="14" r="12" fill="none" stroke="green" strokeWidth="1" />
+          <circle cx="14" cy="14" r="9" fill="none" stroke="green" strokeWidth="1" />
+        </svg>
+        <span>{score}</span>
+      </div>
+    )
+  }
+
+  // Birdie (single circle)
+  if (diff === -1) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width="24" height="24" viewBox="0 0 24 24" className="absolute">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="green" strokeWidth="1" />
+        </svg>
+        <span>{score}</span>
+      </div>
+    )
+  }
+
+  // Par (no indicator)
+  if (diff === 0) {
+    return <span>{score}</span>
+  }
+
+  // Bogey (single square)
+  if (diff === 1) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width="24" height="24" viewBox="0 0 24 24" className="absolute">
+          <rect x="2" y="2" width="20" height="20" fill="none" stroke="red" strokeWidth="1" />
+        </svg>
+        <span>{score}</span>
+      </div>
+    )
+  }
+
+  // Double bogey (double square)
+  if (diff === 2) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width="28" height="28" viewBox="0 0 28 28" className="absolute">
+          <rect x="4" y="4" width="20" height="20" fill="none" stroke="red" strokeWidth="1" />
+          <rect x="7" y="7" width="14" height="14" fill="none" stroke="red" strokeWidth="1" />
+        </svg>
+        <span>{score}</span>
+      </div>
+    )
+  }
+
+  // Triple bogey or worse (double square with single diagonal line)
+  if (diff >= 3) {
+    return (
+      <div className="relative inline-flex items-center justify-center">
+        <svg width="28" height="28" viewBox="0 0 28 28" className="absolute">
+          <rect x="4" y="4" width="20" height="20" fill="none" stroke="red" strokeWidth="1" />
+          <rect x="7" y="7" width="14" height="14" fill="none" stroke="red" strokeWidth="1" />
+          <line x1="4" y1="4" x2="24" y2="24" stroke="red" strokeWidth="1" />
+        </svg>
+        <span>{score}</span>
+      </div>
+    )
+  }
+
+  // Fallback
+  return <span>{score}</span>
+}
+
 export function RingerLeaderboard({ rounds }) {
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const supabase = createClient()
@@ -220,18 +300,10 @@ export function RingerLeaderboard({ rounds }) {
                   <td className="px-4 py-2 text-center">{player.totalRingerScore}</td>
                   <td className="px-4 py-2 text-center">{player.strokesGiven}</td>
                   {player.holes.map((score, holeIndex) => {
-                    // Calculate if the score is under, over, or at par
                     const par = courseData.pars[holeIndex]
-                    let scoreClass = ""
-
-                    if (score !== null) {
-                      if (score < par) scoreClass = "text-green-600 font-medium"
-                      else if (score > par) scoreClass = "text-red-600 font-medium"
-                    }
-
                     return (
-                      <td key={holeIndex} className={`px-2 py-2 text-center ${scoreClass}`}>
-                        {score !== null ? score : "-"}
+                      <td key={holeIndex} className="px-2 py-2 text-center h-10">
+                        {score !== null ? <ScoreIndicator score={score} par={par} /> : "-"}
                       </td>
                     )
                   })}
