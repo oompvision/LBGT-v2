@@ -80,7 +80,7 @@ export function Header() {
                 alt="LBGT Osprey Logo"
                 width={48}
                 height={48}
-                className="rounded-sm"
+                className="rounded-sm bg-transparent"
               />
               <span className="text-lg font-semibold text-lbgt-dark">The Long Beach Golf Tour</span>
             </Link>
