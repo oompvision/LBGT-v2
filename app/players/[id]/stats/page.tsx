@@ -13,7 +13,7 @@ import Image from "next/image"
 const courseData = {
   holes: Array.from({ length: 18 }, (_, i) => i + 1),
   pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [13, 9, 15, 5, 1, 17, 3, 11, 7, 12, 16, 2, 10, 8, 14, 18, 6, 4],
+  whiteHdcp: [11, 5, 17, 1, 9, 15, 7, 3, 13, 18, 8, 2, 12, 6, 10, 16, 4, 14],
   frontNinePar: 36,
   backNinePar: 36,
   totalPar: 72,

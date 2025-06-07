@@ -1,15 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
 import { useAuth } from "./auth-provider"
+import { createClient } from "@/lib/supabase/client"
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false)
-  const { user, isAdmin, signOut } = useAuth()
+  const { user, isAdmin: authIsAdmin, signOut } = useAuth()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Check admin status when user changes
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (user) {
+        try {
+          const supabase = createClient()
+          const { data: userData } = await supabase.from("users").select("is_admin").eq("id", user.id).single()
+          setIsAdmin(userData?.is_admin === true)
+        } catch (error) {
+          console.error("Error checking admin status:", error)
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+      }
+    }
+
+    checkAdminStatus()
+  }, [user])
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

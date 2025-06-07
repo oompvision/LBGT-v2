@@ -28,23 +28,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     const getInitialSession = async () => {
       try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+        const supabase = createClient()
+        const { data, error } = await supabase.auth.getSession()
 
         if (mounted) {
-          if (session && !error) {
-            setUser(session.user)
+          if (error) {
+            // Handle auth errors gracefully
+            if (
+              error.message?.includes("refresh_token_not_found") ||
+              error.message?.includes("Invalid Refresh Token") ||
+              error.message?.includes("JWT") ||
+              error.message?.includes("Invalid")
+            ) {
+              console.log("Auth error, clearing storage:", error.message)
+              clearAuthStorage()
+              setUser(null)
+            } else {
+              console.error("Session error:", error)
+              setUser(null)
+            }
+          } else if (data.session) {
+            setUser(data.session.user)
           } else {
             setUser(null)
           }
           setIsLoading(false)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error getting session:", error)
         if (mounted) {
-          clearAuthStorage()
+          // Clear auth storage on any auth-related error
+          if (
+            error.message?.includes("refresh_token_not_found") ||
+            error.message?.includes("Invalid Refresh Token") ||
+            error.message?.includes("JWT") ||
+            error.message?.includes("Invalid")
+          ) {
+            clearAuthStorage()
+          }
           setUser(null)
           setIsLoading(false)
         }
@@ -61,13 +82,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log("Auth event:", event)
 
-      if (event === "SIGNED_IN" && session) {
-        setUser(session.user)
-      } else if (event === "SIGNED_OUT") {
-        setUser(null)
-        clearAuthStorage()
-      } else if (event === "TOKEN_REFRESHED" && session) {
-        setUser(session.user)
+      try {
+        if (event === "SIGNED_IN" && session) {
+          setUser(session.user)
+        } else if (event === "SIGNED_OUT") {
+          setUser(null)
+          clearAuthStorage()
+        } else if (event === "TOKEN_REFRESHED" && session) {
+          setUser(session.user)
+        } else if (event === "SIGNED_OUT" || !session) {
+          setUser(null)
+          clearAuthStorage()
+        }
+      } catch (error: any) {
+        console.error("Auth state change error:", error)
+        if (error.message?.includes("refresh_token_not_found") || error.message?.includes("Invalid Refresh Token")) {
+          clearAuthStorage()
+          setUser(null)
+        }
       }
 
       setIsLoading(false)
