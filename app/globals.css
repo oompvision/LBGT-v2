@@ -111,3 +111,23 @@
 .hover\:bg-lbgt-green-dark:hover {
   background-color: hsl(120, 25%, 30%);
 }
+
+/* Fix video black bars by setting background color */
+.hero-video-container {
+  background-color: hsl(45, 15%, 92%) !important;
+}
+
+.hero-video-container video {
+  background-color: hsl(45, 15%, 92%) !important;
+}
+
+.hero-video-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: hsl(45, 15%, 92%);
+  z-index: -1;
+}

@@ -73,8 +73,8 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-black/40"></div>
           </div>
 
-          <div className="relative z-10 flex flex-col items-center justify-center h-full px-4">
-            {/* Main Title - Reduced Size */}
+          <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 pt-16">
+            {/* Main Title - Kept lower positioning to avoid overlap */}
             <div className="text-center mb-8">
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 drop-shadow-lg">
                 Welcome to The Long Beach Golf Tour
