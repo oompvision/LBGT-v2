@@ -165,8 +165,9 @@ export function DashboardTabs({
       }
 
       toast({
-        title: "Success!",
-        description: "Your tee time has been booked",
+        title: "🎉 Tee Time Booked Successfully!",
+        description: `Your tee time has been confirmed for ${formatDateDisplay(teeTimes.find((t) => t.id === selectedTeeTime)?.date || "")} at ${formatTimeString(teeTimes.find((t) => t.id === selectedTeeTime)?.time || "")} with ${slots} ${slots === 1 ? "player" : "players"}.`,
+        duration: 5000, // Show for 5 seconds
       })
 
       setSelectedTeeTime("")
