@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { CalendarIcon, Clock, Trash2, Info } from "lucide-react"
+import { CalendarIcon, Clock, Trash2, Info, CheckCircle } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useMobile } from "@/hooks/use-mobile"
@@ -77,6 +77,7 @@ export function DashboardTabs({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [userDailyReservations, setUserDailyReservations] = useState<Record<string, number>>({})
+  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState(tabFromUrl === "book" ? "book" : "reservations")
@@ -116,6 +117,16 @@ export function DashboardTabs({
     setUserDailyReservations(dailyReservations)
   }, [userReservations])
 
+  // Clear success message after 8 seconds
+  useEffect(() => {
+    if (bookingSuccess) {
+      const timer = setTimeout(() => {
+        setBookingSuccess(null)
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [bookingSuccess])
+
   const handleSlotsChange = (value: string) => {
     const slotsCount = Number.parseInt(value, 10)
     setSlots(slotsCount)
@@ -148,19 +159,13 @@ export function DashboardTabs({
     }
 
     setIsSubmitting(true)
+    setBookingSuccess(null) // Clear any previous success message
 
-    // Show confirmation immediately when form is submitted
+    // Get booking details for confirmation
     const selectedTeeTimeData = teeTimes.find((t) => t.id === selectedTeeTime)
     const confirmationMessage = selectedTeeTimeData
       ? `Booking confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${slots} ${slots === 1 ? "player" : "players"}.`
       : `Booking confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
-
-    // Show success toast immediately
-    toast({
-      title: "🎉 Tee Time Booked Successfully!",
-      description: confirmationMessage,
-      duration: 6000,
-    })
 
     try {
       const { error } = await supabase.from("reservations").insert([
@@ -174,15 +179,23 @@ export function DashboardTabs({
       ])
 
       if (error) {
-        // If there's an error, show an error toast to override the success one
         toast({
           title: "Booking Failed",
           description: error.message || "Failed to book tee time",
           variant: "destructive",
-          duration: 5000,
         })
         return
       }
+
+      // Show success message
+      setBookingSuccess(confirmationMessage)
+
+      // Also try the toast as backup
+      toast({
+        title: "🎉 Tee Time Booked Successfully!",
+        description: confirmationMessage,
+        duration: 5000,
+      })
 
       setSelectedTeeTime("")
       setSlots(1)
@@ -190,12 +203,10 @@ export function DashboardTabs({
       setPlayForMoney([false])
       router.refresh()
     } catch (error: any) {
-      // If there's an error, show an error toast to override the success one
       toast({
         title: "Booking Failed",
         description: error.message || "Failed to book tee time",
         variant: "destructive",
-        duration: 5000,
       })
     } finally {
       setIsSubmitting(false)
@@ -372,6 +383,15 @@ export function DashboardTabs({
       <TabsContent value="book" className="mt-6">
         <div className="space-y-6">
           <h2 className="text-xl font-semibold">Book a Tee Time</h2>
+
+          {/* Success Alert - Always visible when booking succeeds */}
+          {bookingSuccess && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle className="text-green-800">🎉 Tee Time Booked Successfully!</AlertTitle>
+              <AlertDescription className="text-green-700">{bookingSuccess}</AlertDescription>
+            </Alert>
+          )}
 
           <Alert>
             <Info className="h-4 w-4" />
