@@ -149,8 +149,18 @@ export function DashboardTabs({
 
     setIsSubmitting(true)
 
-    // Get the selected tee time details for confirmation
+    // Show confirmation immediately when form is submitted
     const selectedTeeTimeData = teeTimes.find((t) => t.id === selectedTeeTime)
+    const confirmationMessage = selectedTeeTimeData
+      ? `Booking confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${slots} ${slots === 1 ? "player" : "players"}.`
+      : `Booking confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
+
+    // Show success toast immediately
+    toast({
+      title: "🎉 Tee Time Booked Successfully!",
+      description: confirmationMessage,
+      duration: 6000,
+    })
 
     try {
       const { error } = await supabase.from("reservations").insert([
@@ -164,19 +174,15 @@ export function DashboardTabs({
       ])
 
       if (error) {
-        throw error
+        // If there's an error, show an error toast to override the success one
+        toast({
+          title: "Booking Failed",
+          description: error.message || "Failed to book tee time",
+          variant: "destructive",
+          duration: 5000,
+        })
+        return
       }
-
-      // Show detailed success confirmation
-      const confirmationMessage = selectedTeeTimeData
-        ? `Your tee time has been confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${slots} ${slots === 1 ? "player" : "players"}.`
-        : `Your tee time has been confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
-
-      toast({
-        title: "🎉 Tee Time Booked Successfully!",
-        description: confirmationMessage,
-        duration: 5000, // Show for 5 seconds
-      })
 
       setSelectedTeeTime("")
       setSlots(1)
@@ -184,10 +190,12 @@ export function DashboardTabs({
       setPlayForMoney([false])
       router.refresh()
     } catch (error: any) {
+      // If there's an error, show an error toast to override the success one
       toast({
-        title: "Error",
+        title: "Booking Failed",
         description: error.message || "Failed to book tee time",
         variant: "destructive",
+        duration: 5000,
       })
     } finally {
       setIsSubmitting(false)
