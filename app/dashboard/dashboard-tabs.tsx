@@ -214,7 +214,6 @@ export function DashboardTabs({
       setSlots(1)
       setPlayerNames([])
       setPlayForMoney([false])
-      router.refresh()
     } catch (error: any) {
       toast({
         title: "Booking Failed",
