@@ -122,7 +122,7 @@ export function Header() {
                           Reserve Tee Time
                         </Link>
                         <Link
-                          href="/reservations"
+                          href="/dashboard?tab=my-reservations"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setActiveDropdown(null)}
                         >

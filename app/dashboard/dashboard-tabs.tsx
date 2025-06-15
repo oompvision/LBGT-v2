@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { formatTime, getUpcomingFridayForSeason } from "@/lib/utils"
+import { getUpcomingFridayForSeason } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -80,7 +80,9 @@ export function DashboardTabs({
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
-  const [activeTab, setActiveTab] = useState(tabFromUrl === "book" ? "book" : "reservations")
+  const [activeTab, setActiveTab] = useState(
+    tabFromUrl === "book" ? "book" : tabFromUrl === "my-reservations" ? "reservations" : "reservations",
+  )
 
   const router = useRouter()
   const { toast } = useToast()
@@ -304,7 +306,7 @@ export function DashboardTabs({
                     </div>
                     <CardDescription className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {formatTime(reservation.tee_times.time)}
+                      {formatTimeString(reservation.tee_times.time)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pb-2">
