@@ -78,6 +78,7 @@ export function DashboardTabs({
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [userDailyReservations, setUserDailyReservations] = useState<Record<string, number>>({})
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null)
+  const [hasBookedInSession, setHasBookedInSession] = useState(false)
   const searchParams = useSearchParams()
   const tabFromUrl = searchParams.get("tab")
   const [activeTab, setActiveTab] = useState(
@@ -148,6 +149,15 @@ export function DashboardTabs({
     setPlayForMoney(newPlayForMoney)
   }
 
+  const handleTabChange = (newTab: string) => {
+    // If switching to reservations tab and user has booked in this session, refresh the page
+    if (newTab === "reservations" && hasBookedInSession) {
+      router.refresh()
+      setHasBookedInSession(false) // Reset the flag after refresh
+    }
+    setActiveTab(newTab)
+  }
+
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -191,6 +201,7 @@ export function DashboardTabs({
 
       // Show success message
       setBookingSuccess(confirmationMessage)
+      setHasBookedInSession(true) // Set flag to indicate user has booked in this session
 
       // Also try the toast as backup
       toast({
@@ -285,7 +296,7 @@ export function DashboardTabs({
   const dayOfWeek = getDayOfWeek()
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab}>
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
       <TabsList className={`grid w-full ${isMobile ? "max-w-none" : "max-w-md"} grid-cols-2`}>
         <TabsTrigger value="reservations">My Reservations</TabsTrigger>
         <TabsTrigger value="book">Book Tee Time</TabsTrigger>
