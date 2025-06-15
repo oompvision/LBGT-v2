@@ -149,32 +149,32 @@ export function DashboardTabs({
 
     setIsSubmitting(true)
 
+    // Get the selected tee time details for confirmation
+    const selectedTeeTimeData = teeTimes.find((t) => t.id === selectedTeeTime)
+
     try {
-      // Use the API route for production consistency
-      const response = await fetch("/api/reservations/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          teeTimeId: selectedTeeTime,
-          userId: user.id,
+      const { error } = await supabase.from("reservations").insert([
+        {
+          tee_time_id: selectedTeeTime,
+          user_id: user.id,
           slots,
-          playerNames: playerNames.filter((name) => name.trim() !== ""),
-          playForMoney,
-        }),
-      })
+          player_names: playerNames.filter((name) => name.trim() !== ""),
+          play_for_money: playForMoney,
+        },
+      ])
 
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to book tee time")
+      if (error) {
+        throw error
       }
 
-      // Show success toast with detailed confirmation
+      // Show detailed success confirmation
+      const confirmationMessage = selectedTeeTimeData
+        ? `Your tee time has been confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${slots} ${slots === 1 ? "player" : "players"}.`
+        : `Your tee time has been confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
+
       toast({
-        title: result.message || "🎉 Tee Time Booked Successfully!",
-        description: result.confirmationMessage || "Your tee time has been confirmed.",
+        title: "🎉 Tee Time Booked Successfully!",
+        description: confirmationMessage,
         duration: 5000, // Show for 5 seconds
       })
 
