@@ -150,23 +150,31 @@ export function DashboardTabs({
     setIsSubmitting(true)
 
     try {
-      const { error } = await supabase.from("reservations").insert([
-        {
-          tee_time_id: selectedTeeTime,
-          user_id: user.id,
-          slots,
-          player_names: playerNames.filter((name) => name.trim() !== ""),
-          play_for_money: playForMoney,
+      // Use the API route for production consistency
+      const response = await fetch("/api/reservations/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      ])
+        body: JSON.stringify({
+          teeTimeId: selectedTeeTime,
+          userId: user.id,
+          slots,
+          playerNames: playerNames.filter((name) => name.trim() !== ""),
+          playForMoney,
+        }),
+      })
 
-      if (error) {
-        throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to book tee time")
       }
 
+      // Show success toast with detailed confirmation
       toast({
-        title: "🎉 Tee Time Booked Successfully!",
-        description: `Your tee time has been confirmed for ${formatDateDisplay(teeTimes.find((t) => t.id === selectedTeeTime)?.date || "")} at ${formatTimeString(teeTimes.find((t) => t.id === selectedTeeTime)?.time || "")} with ${slots} ${slots === 1 ? "player" : "players"}.`,
+        title: result.message || "🎉 Tee Time Booked Successfully!",
+        description: result.confirmationMessage || "Your tee time has been confirmed.",
         duration: 5000, // Show for 5 seconds
       })
 
