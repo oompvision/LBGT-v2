@@ -86,7 +86,7 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               {user ? (
                 <>
-                  <Link href="/dashboard?tab=book">
+                  <Link href="/book-tee-time">
                     <Button
                       size="lg"
                       className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
@@ -100,14 +100,6 @@ export default function HomePage() {
                       className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
                     >
                       Submit Scorecard
-                    </Button>
-                  </Link>
-                  <Link href="/dashboard">
-                    <Button
-                      size="lg"
-                      className="bg-lbgt-green hover:bg-lbgt-green-dark text-white px-8 py-4 text-lg font-semibold w-[180px] shadow-lg"
-                    >
-                      Dashboard
                     </Button>
                   </Link>
                 </>

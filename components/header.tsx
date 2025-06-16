@@ -115,14 +115,14 @@ export function Header() {
                     <div className="absolute z-50 mt-1 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5">
                       <div className="py-1" role="menu" aria-orientation="vertical">
                         <Link
-                          href="/dashboard?tab=book"
+                          href="/book-tee-time"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setActiveDropdown(null)}
                         >
                           Reserve Tee Time
                         </Link>
                         <Link
-                          href="/dashboard?tab=my-reservations"
+                          href="/my-reservations"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setActiveDropdown(null)}
                         >
