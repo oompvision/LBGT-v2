@@ -12,29 +12,44 @@ import { RingerLeaderboard } from "./ringer-leaderboard"
 import { ErrorDisplay } from "./error-display"
 import { CommentsSection } from "./comments-section"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { SeasonSelector } from "@/components/season-selector"
 
 // Add this export to prevent static rendering
 export const dynamic = "force-dynamic"
 
-export default async function TourLeaderboardPage() {
+export default async function TourLeaderboardPage({ searchParams }: { searchParams: { season?: string } }) {
   const supabase = createClient()
 
   let roundsWithScores = []
   let success = false
   let errorMessage = ""
+  let seasons = []
+  let selectedSeason = null
 
   try {
-    // Get all rounds
+    const { data: seasonsData } = await supabase.from("seasons").select("*").order("year", { ascending: false })
+
+    seasons = seasonsData || []
+
+    if (searchParams.season) {
+      selectedSeason = Number.parseInt(searchParams.season)
+    } else {
+      const activeSeason = seasons.find((s) => s.is_active)
+      selectedSeason = activeSeason?.year || new Date().getFullYear()
+    }
+
     const { data: rounds, error: roundsError } = await supabase
       .from("rounds")
       .select(`
       id,
       date,
       submitted_by,
+      season,
       users:submitted_by (
         name
       )
     `)
+      .eq("season", selectedSeason) // Filter by season
       .order("date", { ascending: false })
 
     if (roundsError) {
@@ -119,6 +134,10 @@ export default async function TourLeaderboardPage() {
             </Link>
           </div>
 
+          <div className="mb-6">
+            <SeasonSelector seasons={seasons} selectedSeason={selectedSeason} />
+          </div>
+
           {/* Error message */}
           {!success && errorMessage && <ErrorDisplay error={errorMessage} />}
 
@@ -200,7 +219,7 @@ export default async function TourLeaderboardPage() {
                   </CardContent>
                   <CardFooter>
                     <Link href={`/scores/rounds/${round.id}`} className="w-full">
-                      <Button variant="outline" className="w-full">
+                      <Button variant="outline" className="w-full bg-transparent">
                         <Eye className="mr-2 h-4 w-4" />
                         View Full Scorecard
                       </Button>

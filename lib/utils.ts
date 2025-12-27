@@ -51,16 +51,8 @@ export function getNextFriday(fromDate: Date = new Date()): Date {
 
 export function getUpcomingFridayForSeason(): string {
   const today = new Date()
-  const seasonStart = new Date(2025, 4, 23) // May 23, 2025
-  const seasonEnd = new Date(2025, 8, 26) // September 26, 2025
-
-  if (today < seasonStart) {
-    return formatDateForDB(seasonStart)
-  }
-
   const nextFriday = getNextFriday(today)
-  const fridayToUse = nextFriday <= seasonEnd ? nextFriday : seasonEnd
-  return formatDateForDB(fridayToUse)
+  return formatDateForDB(nextFriday)
 }
 
 // Helper function to format date for database storage (YYYY-MM-DD)
@@ -73,14 +65,14 @@ export function formatDateForDB(date: Date): string {
 
 export function getSeasonFridays(): Date[] {
   const fridays: Date[] = []
-  const seasonStart = new Date(2025, 4, 23) // May 23, 2025
-  const seasonEnd = new Date(2025, 8, 26) // September 26, 2025
+  const today = new Date()
+  const currentFriday = getNextFriday(today)
 
-  const currentFriday = new Date(seasonStart)
-
-  while (currentFriday <= seasonEnd) {
-    fridays.push(new Date(currentFriday))
-    currentFriday.setDate(currentFriday.getDate() + 7)
+  // Return upcoming Fridays for the next 26 weeks (half year)
+  for (let i = 0; i < 26; i++) {
+    const friday = new Date(currentFriday)
+    friday.setDate(friday.getDate() + i * 7)
+    fridays.push(friday)
   }
 
   return fridays

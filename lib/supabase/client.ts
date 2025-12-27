@@ -1,94 +1,43 @@
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import type { Database } from "@/types/supabase"
+import { createBrowserClient } from "@supabase/ssr"
 
-let supabaseClient: ReturnType<typeof createClientComponentClient<Database>> | null = null
+export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-export const createClient = () => {
-  // Return existing client if available
-  if (supabaseClient) {
-    return supabaseClient
+  console.log("[v0] Supabase URL available:", !!supabaseUrl)
+  console.log("[v0] Supabase Anon Key available:", !!supabaseAnonKey)
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("[v0] Missing Supabase credentials")
+    throw new Error("Missing Supabase credentials. Please check environment variables.")
   }
 
-  try {
-    supabaseClient = createClientComponentClient<Database>({
-      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    })
-    return supabaseClient
-  } catch (error) {
-    console.error("Failed to create Supabase client:", error)
-    return null
-  }
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 
-export const clearAuthStorage = () => {
-  if (typeof window !== "undefined") {
-    try {
-      // Clear all possible Supabase auth keys
-      const keysToRemove = [
-        "sb-supabase-auth-token",
-        "supabase.auth.token",
-        "sb-auth-token",
-        "supabase-auth-token",
-        `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split("//")[1]?.split(".")[0]}-auth-token`,
-      ]
-
-      keysToRemove.forEach((key) => {
-        localStorage.removeItem(key)
-        sessionStorage.removeItem(key)
-      })
-
-      // Clear all localStorage items that start with 'sb-'
-      Object.keys(localStorage).forEach((key) => {
-        if (key.startsWith("sb-")) {
-          localStorage.removeItem(key)
-        }
-      })
-
-      // Clear all sessionStorage items that start with 'sb-'
-      Object.keys(sessionStorage).forEach((key) => {
-        if (key.startsWith("sb-")) {
-          sessionStorage.removeItem(key)
-        }
-      })
-    } catch (error) {
-      console.error("Error clearing auth storage:", error)
-    }
-  }
-}
-
-export const getSafeSession = async () => {
+export function clearAuthStorage() {
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.getSession()
-
-    if (error) {
-      // Handle various auth errors
-      if (
-        error.message?.includes("refresh_token_not_found") ||
-        error.message?.includes("Invalid Refresh Token") ||
-        error.message?.includes("JWT") ||
-        error.message?.includes("Invalid")
-      ) {
-        console.log("Auth token invalid, clearing storage")
-        clearAuthStorage()
-        return { data: { session: null }, error: null }
+    // Clear all Supabase-related items from localStorage
+    const keysToRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith("sb-")) {
+        keysToRemove.push(key)
       }
-      throw error
     }
 
-    return { data, error: null }
-  } catch (error: any) {
-    console.error("Session error:", error)
-    if (
-      error.message?.includes("refresh_token_not_found") ||
-      error.message?.includes("Invalid Refresh Token") ||
-      error.message?.includes("JWT") ||
-      error.message?.includes("Invalid")
-    ) {
-      clearAuthStorage()
-      return { data: { session: null }, error: null }
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key)
+    })
+
+    // Also clear sessionStorage
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i)
+      if (key && key.startsWith("sb-")) {
+        sessionStorage.removeItem(key)
+      }
     }
-    throw error
+  } catch (error) {
+    console.error("Error clearing auth storage:", error)
   }
 }

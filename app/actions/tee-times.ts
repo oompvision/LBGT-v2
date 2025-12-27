@@ -4,6 +4,13 @@ import { createClient } from "@/lib/supabase/server"
 import { generateTeeTimes, getUpcomingFridayForSeason, getNextFriday, formatDate } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 
+async function getActiveSeason() {
+  const supabase = createClient()
+  const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+
+  return data?.year || new Date().getFullYear()
+}
+
 // Function to get available tee times for a specific date
 export async function getAvailableTeeTimesByDate(date: string) {
   const supabase = createClient()
@@ -92,6 +99,8 @@ export async function createTeeTime(data: {
   const supabase = createClient()
 
   try {
+    const activeSeason = await getActiveSeason()
+
     // Format the date to ensure consistency
     const formattedDate = formatDate(new Date(data.date)).split("T")[0]
 
@@ -100,6 +109,7 @@ export async function createTeeTime(data: {
       date: formattedDate,
       time: data.time,
       max_slots: data.maxSlots,
+      season: activeSeason, // Add season to new tee time
       is_available: true, // New tee times are available by default
     })
 

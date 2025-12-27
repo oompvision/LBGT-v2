@@ -29,6 +29,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const getInitialSession = async () => {
       try {
         const supabase = createClient()
+        if (!supabase) {
+          if (mounted) {
+            setUser(null)
+            setIsLoading(false)
+          }
+          return
+        }
+
         const { data, error } = await supabase.auth.getSession()
 
         if (mounted) {
@@ -38,7 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               error.message?.includes("refresh_token_not_found") ||
               error.message?.includes("Invalid Refresh Token") ||
               error.message?.includes("JWT") ||
-              error.message?.includes("Invalid")
+              error.message?.includes("Invalid") ||
+              error.message?.includes("Auth session missing")
             ) {
               console.log("Auth error, clearing storage:", error.message)
               clearAuthStorage()
@@ -62,7 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error.message?.includes("refresh_token_not_found") ||
             error.message?.includes("Invalid Refresh Token") ||
             error.message?.includes("JWT") ||
-            error.message?.includes("Invalid")
+            error.message?.includes("Invalid") ||
+            error.message?.includes("Auth session missing")
           ) {
             clearAuthStorage()
           }

@@ -26,14 +26,24 @@ export function MessageBox() {
         setIsLoading(true)
         setFetchError(null)
 
-        const supabase = createClient()
-
-        if (!supabase) {
-          setFetchError("Failed to create Supabase client.")
+        let supabase
+        try {
+          supabase = createClient()
+        } catch (error: any) {
+          console.error("[v0] Failed to create Supabase client:", error)
+          // Silently fail - don't show error to users for messages
+          setMessages([])
+          setIsLoading(false)
           return
         }
 
-        // Add a try-catch specifically around the database query
+        if (!supabase) {
+          console.error("[v0] Supabase client is null")
+          setMessages([])
+          setIsLoading(false)
+          return
+        }
+
         let data, error
         try {
           const result = await supabase
@@ -45,23 +55,25 @@ export function MessageBox() {
           data = result.data
           error = result.error
         } catch (fetchError) {
-          console.error("Database fetch error:", fetchError)
-          // If there's a fetch error, just return empty messages instead of showing error
+          console.error("[v0] Database fetch error:", fetchError)
+          // Silently fail - don't show error to users for messages
           setMessages([])
+          setIsLoading(false)
           return
         }
 
         if (error) {
-          console.error("Error fetching messages:", error)
-          // Don't show error to user for message fetching, just log it
+          console.error("[v0] Error fetching messages:", error)
+          // Silently fail - don't show error to users for messages
           setMessages([])
+          setIsLoading(false)
           return
         }
 
         setMessages(data || [])
       } catch (error: any) {
-        console.error("Error fetching messages:", error)
-        // Don't show error to user for message fetching, just set empty messages
+        console.error("[v0] Error fetching messages:", error)
+        // Silently fail - don't show error to users for messages
         setMessages([])
       } finally {
         setIsLoading(false)

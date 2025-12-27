@@ -63,7 +63,11 @@ export async function submitScores(
       }
     }
 
-    console.log("Creating new round with date:", date)
+    const { data: activeSeason } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+
+    const currentSeason = activeSeason?.year || 2025
+
+    console.log("Creating new round with date:", date, "and season:", currentSeason)
 
     // Create a new round
     const { data: round, error: roundError } = await supabase
@@ -71,6 +75,7 @@ export async function submitScores(
       .insert({
         date,
         submitted_by: session.user.id,
+        season: currentSeason,
       })
       .select()
       .single()
@@ -190,6 +195,10 @@ export async function getMyRounds() {
       return { success: false, error: "You must be logged in to view your rounds", rounds: [] }
     }
 
+    const { data: activeSeason } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+
+    const currentSeason = activeSeason?.year || 2025
+
     // Get all scores for the current user with round details
     const { data: scores, error: scoresError } = await supabase
       .from("scores")
@@ -200,10 +209,11 @@ export async function getMyRounds() {
         net_total_score,
         strokes_given,
         round_id,
-        rounds (
+        rounds!inner (
           id,
           date,
           submitted_by,
+          season,
           users (
             name
           )
@@ -211,6 +221,7 @@ export async function getMyRounds() {
       `,
       )
       .eq("user_id", session.user.id)
+      .eq("rounds.season", currentSeason)
       .order("rounds(date)", { ascending: false })
 
     if (scoresError) {
@@ -240,9 +251,15 @@ export async function getMyRounds() {
 }
 
 // Function to get all league rounds - OPTIMIZED VERSION
-export async function getAllLeagueRounds() {
+export async function getAllLeagueRounds(season?: number) {
   try {
     const supabase = createClient()
+
+    let selectedSeason = season
+    if (!selectedSeason) {
+      const { data: activeSeason } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+      selectedSeason = activeSeason?.year || 2025
+    }
 
     // Get all rounds with submitter info in a single query
     const { data: rounds, error: roundsError } = await supabase
@@ -252,11 +269,13 @@ export async function getAllLeagueRounds() {
         id,
         date,
         submitted_by,
+        season,
         users (
           name
         )
       `,
       )
+      .eq("season", selectedSeason)
       .order("date", { ascending: false })
 
     if (roundsError) {

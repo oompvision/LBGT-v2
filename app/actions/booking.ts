@@ -3,6 +3,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { formatDate } from "@/lib/utils"
 
+// Helper to get active season
+async function getActiveSeason() {
+  const supabase = createClient()
+  const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+
+  return data?.year || new Date().getFullYear()
+}
+
 // Function to get available tee times for booking
 export async function getAvailableTeeTimesForBooking(date: string) {
   const supabase = createClient()
@@ -10,16 +18,17 @@ export async function getAvailableTeeTimesForBooking(date: string) {
   try {
     console.log(`Getting available tee times for booking on date: ${date}`)
 
-    // Format the date to ensure consistency
+    const activeSeason = await getActiveSeason()
+
     const formattedDate = formatDate(new Date(date)).split("T")[0]
 
-    // Query the available_tee_times view which combines tee times with availability
     const { data, error } = await supabase
       .from("available_tee_times")
       .select("*")
       .eq("date", formattedDate)
-      .eq("is_available", true) // Only get tee times marked as available
-      .gt("available_slots", 0) // Only get tee times with available slots
+      .eq("is_available", true)
+      .eq("season", activeSeason) // Filter by active season
+      .gt("available_slots", 0)
       .order("time")
 
     if (error) {

@@ -63,6 +63,10 @@ export default async function MyReservationsPage() {
     redirect("/signin")
   }
 
+  const { data: activeSeason } = await supabase.from("seasons").select("year").eq("is_active", true).single()
+
+  const seasonYear = activeSeason?.year || new Date().getFullYear()
+
   // Get user's reservations
   const { data: userReservations, error } = await supabase
     .from("reservations")
@@ -72,6 +76,7 @@ export default async function MyReservationsPage() {
       slots,
       player_names,
       play_for_money,
+      season,
       tee_times (
         id,
         date,
@@ -79,6 +84,7 @@ export default async function MyReservationsPage() {
       )
     `)
     .eq("user_id", session.user.id)
+    .eq("season", seasonYear) // Filter by active season
     .order("tee_times(date)", { ascending: true })
     .order("tee_times(time)", { ascending: true })
 

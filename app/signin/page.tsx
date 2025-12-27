@@ -21,7 +21,6 @@ export default function SignInPage() {
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,14 +30,25 @@ export default function SignInPage() {
     try {
       console.log("Attempting sign in for:", email)
 
+      const supabase = createClient()
+      if (!supabase) {
+        setErrorMessage("Authentication service unavailable")
+        setIsLoading(false)
+        return
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       })
 
       if (error) {
         console.error("Auth error:", error)
-        setErrorMessage(`Error: ${error.message}`)
+        if (error.message.includes("Invalid login credentials")) {
+          setErrorMessage("Invalid email or password. Please check your credentials and try again.")
+        } else {
+          setErrorMessage(`Error: ${error.message}`)
+        }
         setIsLoading(false)
         return
       }

@@ -1,10 +1,29 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+import { createServerClient } from "@supabase/ssr"
 
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req: request, res })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
+          })
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options)
+          })
+        },
+      },
+    },
+  )
 
   // Check if the user is authenticated
   const {
@@ -14,7 +33,7 @@ export async function middleware(request: NextRequest) {
   // If the user is not authenticated and trying to access a protected route, redirect to signin
   if (!session && !request.nextUrl.pathname.startsWith("/signin") && !request.nextUrl.pathname.startsWith("/signup")) {
     // Public routes that don't require authentication
-    const publicRoutes = ["/", "/apply", "/mobile-signin"]
+    const publicRoutes = ["/", "/apply", "/mobile-signin", "/reset-admin"]
     if (!publicRoutes.includes(request.nextUrl.pathname)) {
       return NextResponse.redirect(new URL("/signin", request.url))
     }
