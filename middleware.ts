@@ -5,6 +5,15 @@ import { createServerClient } from "@supabase/ssr"
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
 
+  const publicRoutes = ["/", "/apply", "/mobile-signin", "/reset-admin", "/signin", "/signup"]
+  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
+  const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
+
+  // Skip auth check for public routes that don't need it
+  if (isPublicRoute && !isAdminRoute) {
+    return res
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -25,28 +34,22 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  // Check if the user is authenticated
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   // If the user is not authenticated and trying to access a protected route, redirect to signin
-  if (!session && !request.nextUrl.pathname.startsWith("/signin") && !request.nextUrl.pathname.startsWith("/signup")) {
-    // Public routes that don't require authentication
-    const publicRoutes = ["/", "/apply", "/mobile-signin", "/reset-admin"]
-    if (!publicRoutes.includes(request.nextUrl.pathname)) {
-      return NextResponse.redirect(new URL("/signin", request.url))
-    }
+  if (!session && !isPublicRoute) {
+    return NextResponse.redirect(new URL("/signin", request.url))
   }
 
   // If the user is trying to access admin routes, check if they are an admin
-  if (request.nextUrl.pathname.startsWith("/admin")) {
+  if (isAdminRoute) {
     if (!session) {
       return NextResponse.redirect(new URL("/signin", request.url))
     }
 
     try {
-      // Check if the user is an admin
       const { data: userData, error } = await supabase
         .from("users")
         .select("is_admin")
@@ -54,12 +57,10 @@ export async function middleware(request: NextRequest) {
         .single()
 
       if (error || !userData?.is_admin) {
-        // If there's an error or the user is not an admin, redirect to home
         return NextResponse.redirect(new URL("/", request.url))
       }
     } catch (error) {
       console.error("Error checking admin status:", error)
-      // If there's an error, redirect to home for safety
       return NextResponse.redirect(new URL("/", request.url))
     }
   }
