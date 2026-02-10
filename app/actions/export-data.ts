@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/utils"
 const supabaseAdmin = createAdminClient()
 
 // Helper function to convert array of objects to CSV
-function objectsToCSV(data: any[], columns: { key: string; header: string }[]): string {
+function objectsToCSV(data: Record<string, unknown>[], columns: { key: string; header: string }[]): string {
   // Create header row
   const headerRow = columns.map((col) => `"${col.header}"`).join(",")
 
@@ -69,7 +69,7 @@ export async function exportReservationsToCSV(weekDate: string) {
     }
 
     // Initialize an empty array to hold all player rows
-    const playerRows: any[] = []
+    const playerRows: Record<string, unknown>[] = []
 
     // Process each reservation
     for (const reservation of reservations || []) {

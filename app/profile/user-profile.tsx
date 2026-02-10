@@ -14,7 +14,13 @@ import { CalendarIcon, Mail, User, Camera, X } from "lucide-react"
 import Image from "next/image"
 
 interface UserProfileProps {
-  user: any
+  user: {
+    name: string | null
+    email: string | null
+    profile_picture_url: string | null
+    created_at: string
+    strokes_given: number | null
+  }
 }
 
 export function UserProfile({ user }: UserProfileProps) {

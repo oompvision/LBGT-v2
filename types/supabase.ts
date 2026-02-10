@@ -489,3 +489,58 @@ export type Database = {
     }
   }
 }
+
+// Convenient type aliases for table rows
+type Tables = Database["public"]["Tables"]
+type Views = Database["public"]["Views"]
+
+export type User = Tables["users"]["Row"]
+export type TeeTime = Tables["tee_times"]["Row"]
+export type Reservation = Tables["reservations"]["Row"]
+export type Round = Tables["rounds"]["Row"]
+export type Score = Tables["scores"]["Row"]
+export type Season = Tables["seasons"]["Row"]
+export type Application = Tables["applications"]["Row"]
+export type TourComment = Tables["tour_comments"]["Row"]
+export type TeeTimeAvailability = Tables["tee_time_availability"]["Row"]
+export type SiteMessage = Tables["site_messages"]["Row"]
+export type TeeTimeTemplate = Tables["tee_time_templates"]["Row"]
+export type TeeTimeLog = Tables["tee_time_logs"]["Row"]
+export type AvailableTeeTime = Views["available_tee_times"]["Row"]
+
+// Common joined types used in components
+export type ReservationWithDetails = Reservation & {
+  users?: Pick<User, "name" | "email"> | null
+  tee_times?: Pick<TeeTime, "date" | "time"> | null
+}
+export type RoundWithScores = {
+  id: string
+  date: string
+  submitted_by: string
+  users: Pick<User, "name" | "email"> | null
+  scores: (Score & {
+    users: Pick<User, "id" | "name" | "email"> | null
+  })[]
+}
+
+// Score data for hole-by-hole editing
+export type HoleScores = {
+  hole_1?: number | null
+  hole_2?: number | null
+  hole_3?: number | null
+  hole_4?: number | null
+  hole_5?: number | null
+  hole_6?: number | null
+  hole_7?: number | null
+  hole_8?: number | null
+  hole_9?: number | null
+  hole_10?: number | null
+  hole_11?: number | null
+  hole_12?: number | null
+  hole_13?: number | null
+  hole_14?: number | null
+  hole_15?: number | null
+  hole_16?: number | null
+  hole_17?: number | null
+  hole_18?: number | null
+}

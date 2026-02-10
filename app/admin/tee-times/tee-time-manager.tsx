@@ -28,6 +28,7 @@ import {
   getUpcomingTeeTimeDates,
   type TeeTimeTemplate,
 } from "@/app/actions/tee-time-templates"
+import type { TeeTime } from "@/types/supabase"
 import { useToast } from "@/hooks/use-toast"
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -436,7 +437,7 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
   const { toast } = useToast()
   const [dates, setDates] = useState<string[]>([])
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
-  const [teeTimes, setTeeTimes] = useState<any[]>([])
+  const [teeTimes, setTeeTimes] = useState<(TeeTime & { reserved_slots: number; available_slots: number })[]>([])
   const [isLoadingDates, setIsLoadingDates] = useState(true)
   const [isLoadingTimes, setIsLoadingTimes] = useState(false)
 
@@ -481,7 +482,7 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
     }
   }
 
-  const getBookingStatus = (tt: any) => {
+  const getBookingStatus = (tt: TeeTime) => {
     if (!tt.booking_opens_at || !tt.booking_closes_at) {
       return { label: "No window set", variant: "secondary" as const }
     }

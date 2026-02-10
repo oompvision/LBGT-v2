@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
+import type { Score, User, HoleScores } from "@/types/supabase"
 
 // Updated course data from the new scorecard
 const courseData = {
@@ -17,8 +18,8 @@ const courseData = {
 }
 
 interface ScoreEditorProps {
-  score: any
-  onSave: (scoreData: any) => Promise<void>
+  score: Score & { users: Pick<User, "name"> | null }
+  onSave: (scoreData: HoleScores) => Promise<void>
   isSubmitting: boolean
 }
 

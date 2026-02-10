@@ -41,7 +41,7 @@ export async function getAvailableTeeTimesForDate(date: string) {
       teeTimes
         ?.map((teeTime) => {
           const reservedSlots =
-            teeTime.reservations?.reduce((sum: number, reservation: any) => sum + reservation.slots, 0) || 0
+            teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
           const availableSlots = (teeTime.max_slots || 4) - reservedSlots
 
           // Determine booking window status
@@ -111,7 +111,7 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
     }
 
     const reservedSlots =
-      teeTime.reservations?.reduce((sum: number, reservation: any) => sum + reservation.slots, 0) || 0
+      teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
     const availableSlots = (teeTime.max_slots || 4) - reservedSlots
     const isAvailable = availableSlots >= requestedSlots
 

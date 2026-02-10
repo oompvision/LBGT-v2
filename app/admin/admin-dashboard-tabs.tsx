@@ -20,11 +20,12 @@ import { Badge } from "@/components/ui/badge"
 import { CalendarIcon, Edit, Loader2, Search, Trash2, User } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { updateUser, deleteUser } from "@/app/actions/admin-management"
+import type { User, TeeTime, ReservationWithDetails } from "@/types/supabase"
 
 interface AdminDashboardTabsProps {
-  users: any[]
-  teeTimes: any[]
-  reservations: any[]
+  users: User[]
+  teeTimes: TeeTime[]
+  reservations: ReservationWithDetails[]
 }
 
 export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashboardTabsProps) {
@@ -32,7 +33,7 @@ export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashb
   const [activeTab, setActiveTab] = useState("tee-times")
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [editedUser, setEditedUser] = useState<{
     name: string
     email: string
@@ -71,7 +72,7 @@ export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashb
     )
   })
 
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: User) => {
     setSelectedUser(user)
     setEditedUser({
       name: user.name || "",

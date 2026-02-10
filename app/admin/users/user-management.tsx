@@ -24,9 +24,10 @@ import {
   adminUploadProfilePicture,
   adminRemoveProfilePicture,
 } from "@/app/actions/admin-management"
+import type { User } from "@/types/supabase"
 
 interface UserManagementProps {
-  users: any[]
+  users: User[]
 }
 
 export function UserManagement({ users }: UserManagementProps) {
@@ -34,7 +35,7 @@ export function UserManagement({ users }: UserManagementProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [editedUser, setEditedUser] = useState<{
     name: string
     email: string
@@ -56,7 +57,7 @@ export function UserManagement({ users }: UserManagementProps) {
     return user.name?.toLowerCase().includes(searchLower) || user.email?.toLowerCase().includes(searchLower)
   })
 
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: User) => {
     setSelectedUser(user)
     setEditedUser({
       name: user.name || "",

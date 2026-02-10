@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { format, parseISO, isValid } from "date-fns"
+import type { User, TeeTime, RoundWithScores, ReservationWithDetails, Score, HoleScores } from "@/types/supabase"
 import {
   addReservation,
   deleteReservation,
@@ -37,10 +38,10 @@ import { ScoreEditor } from "./score-editor"
 const FIRST_VALID_DATE = new Date(2025, 4, 23) // May 23, 2025
 
 interface AdminDashboardTabsProps {
-  rounds: any[]
-  reservations: any[]
-  teeTimes: any[]
-  users: any[]
+  rounds: RoundWithScores[]
+  reservations: ReservationWithDetails[]
+  teeTimes: TeeTime[]
+  users: User[]
 }
 
 export function AdminDashboardTabs({
@@ -49,10 +50,10 @@ export function AdminDashboardTabs({
   teeTimes: initialTeeTimes,
   users: initialUsers,
 }: AdminDashboardTabsProps) {
-  const [users, setUsers] = useState<any[]>(initialUsers)
-  const [teeTimes, setTeeTimes] = useState<any[]>(initialTeeTimes)
-  const [rounds, setRounds] = useState<any[]>(initialRounds)
-  const [reservations, setReservations] = useState<any[]>(initialReservations)
+  const [users, setUsers] = useState<User[]>(initialUsers)
+  const [teeTimes, setTeeTimes] = useState<TeeTime[]>(initialTeeTimes)
+  const [rounds, setRounds] = useState<RoundWithScores[]>(initialRounds)
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>(initialReservations)
   const [loading, setLoading] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
   const [selectedUser, setSelectedUser] = useState("")
@@ -64,7 +65,7 @@ export function AdminDashboardTabs({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<{ id: string; type: "round" | "reservation" } | null>(null)
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
-  const [selectedScore, setSelectedScore] = useState<any>(null)
+  const [selectedScore, setSelectedScore] = useState<(Score & { users: Pick<User, "id" | "name"> | null }) | null>(null)
 
   // Update state when props change
   useEffect(() => {
@@ -207,7 +208,7 @@ export function AdminDashboardTabs({
         const reservationsResponse = await getAllReservationsWithDetails()
         if (reservationsResponse.success) {
           // Validate dates in the new reservations
-          const validatedReservations = reservationsResponse.reservations.map((reservation: any) => {
+          const validatedReservations = reservationsResponse.reservations.map((reservation: ReservationWithDetails) => {
             if (reservation.tee_times && reservation.tee_times.date) {
               return {
                 ...reservation,
@@ -273,7 +274,7 @@ export function AdminDashboardTabs({
           const roundsResponse = await getAllRoundsWithDetails()
           if (roundsResponse.success) {
             // Validate dates in the new rounds
-            const validatedRounds = roundsResponse.rounds.map((round: any) => {
+            const validatedRounds = roundsResponse.rounds.map((round: RoundWithScores) => {
               if (round.date) {
                 return { ...round, date: ensureValidDate(round.date) }
               }
@@ -286,7 +287,7 @@ export function AdminDashboardTabs({
           const reservationsResponse = await getAllReservationsWithDetails()
           if (reservationsResponse.success) {
             // Validate dates in the new reservations
-            const validatedReservations = reservationsResponse.reservations.map((reservation: any) => {
+            const validatedReservations = reservationsResponse.reservations.map((reservation: ReservationWithDetails) => {
               if (reservation.tee_times && reservation.tee_times.date) {
                 return {
                   ...reservation,
@@ -328,12 +329,12 @@ export function AdminDashboardTabs({
     setDeleteDialogOpen(true)
   }
 
-  const handleEditScore = (score: any) => {
+  const handleEditScore = (score: Score & { users: Pick<User, "id" | "name" | "email"> | null }) => {
     setSelectedScore(score)
     setEditScoreDialogOpen(true)
   }
 
-  const handleSaveScore = async (scoreData: any) => {
+  const handleSaveScore = async (scoreData: HoleScores) => {
     if (!selectedScore) return
 
     setLoadingAction(true)
@@ -349,7 +350,7 @@ export function AdminDashboardTabs({
         // Refresh rounds data
         const roundsResponse = await getAllRoundsWithDetails()
         if (roundsResponse.success) {
-          const validatedRounds = roundsResponse.rounds.map((round: any) => {
+          const validatedRounds = roundsResponse.rounds.map((round: RoundWithScores) => {
             if (round.date) {
               return { ...round, date: ensureValidDate(round.date) }
             }
@@ -594,7 +595,7 @@ export function AdminDashboardTabs({
                               <div className="mt-2">
                                 <p className="text-xs font-medium">Scores:</p>
                                 <ul className="text-xs space-y-2">
-                                  {round.scores?.map((score: any) => (
+                                  {round.scores?.map((score) => (
                                     <li key={score.id} className="flex items-center justify-between">
                                       <span>
                                         {score.users?.name || "Unknown"}: {score.total_score}

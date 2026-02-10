@@ -38,9 +38,7 @@ export async function getAllRoundsWithDetails() {
           email
         ),
         scores (
-          id,
-          user_id,
-          total_score,
+          *,
           users (
             id,
             name,
@@ -311,7 +309,7 @@ export async function updateUser(userId: string, userData: { name?: string; emai
 
   try {
     // Ensure strokes_given is properly converted to a number if it exists
-    const dataToUpdate: any = { ...userData }
+    const dataToUpdate: { name?: string; email?: string; strokes_given?: number } = { ...userData }
 
     if (userData.strokes_given !== undefined) {
       // Force conversion to number and ensure it's not NaN

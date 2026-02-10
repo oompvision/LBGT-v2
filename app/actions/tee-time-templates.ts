@@ -4,6 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { getSeasonDatesForDay, toUTC } from "@/lib/tee-time-utils"
+import type { TeeTime } from "@/types/supabase"
 
 const DAYS_OF_WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
@@ -224,7 +225,7 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
 // Get tee times for a specific date with reservation counts
 export async function getTeeTimesForDate(dateStr: string): Promise<{
   success: boolean
-  teeTimes?: any[]
+  teeTimes?: (TeeTime & { reserved_slots: number; available_slots: number })[]
   error?: string
 }> {
   try {
@@ -247,7 +248,7 @@ export async function getTeeTimesForDate(dateStr: string): Promise<{
     }
 
     const teeTimes = (data || []).map((tt) => {
-      const reservedSlots = tt.reservations?.reduce((sum: number, r: any) => sum + r.slots, 0) || 0
+      const reservedSlots = tt.reservations?.reduce((sum: number, r: { slots: number }) => sum + r.slots, 0) || 0
       return {
         ...tt,
         reserved_slots: reservedSlots,

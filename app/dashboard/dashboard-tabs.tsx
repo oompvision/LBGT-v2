@@ -40,7 +40,7 @@ interface Reservation {
 }
 
 interface DashboardTabsProps {
-  user: any
+  user: { id: string; name: string | null }
   userReservations: Reservation[]
   teeTimes: TeeTime[]
   allReservations: { tee_time_id: string; slots: number }[]
