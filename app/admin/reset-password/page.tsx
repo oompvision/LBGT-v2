@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { AdminTabs } from "@/app/admin/admin-tabs"
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState("")
@@ -86,9 +87,14 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="container py-8">
-      <h1 className="text-2xl font-bold mb-6">Reset User Password</h1>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">Admin</h1>
+        <p className="text-muted-foreground">Reset a user's password</p>
+      </div>
 
-      <Card className="max-w-md">
+      <AdminTabs />
+
+      <Card className="max-w-md mt-6">
         <CardHeader>
           <CardTitle>Password Reset Tool</CardTitle>
           <CardDescription>

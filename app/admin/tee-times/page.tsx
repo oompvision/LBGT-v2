@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { TeeTimeManager } from "./tee-time-manager"
+import { AdminTabs } from "@/app/admin/admin-tabs"
 
 export default async function TeeTimesPage() {
   const supabase = await createClient()
@@ -30,6 +31,8 @@ export default async function TeeTimesPage() {
           Configure your weekly tee time template, generate the season schedule, and manage individual weeks.
         </p>
       </div>
+
+      <AdminTabs />
 
       {activeSeason ? (
         <TeeTimeManager
