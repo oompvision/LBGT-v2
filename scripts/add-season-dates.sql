@@ -5,10 +5,13 @@
 ALTER TABLE seasons ADD COLUMN IF NOT EXISTS start_date DATE;
 ALTER TABLE seasons ADD COLUMN IF NOT EXISTS end_date DATE;
 
--- Backfill the existing 2025 season with its dates
+-- Backfill ALL existing seasons with default dates based on their year
+-- (last Friday of May through Labor Day weekend)
 UPDATE seasons
-SET start_date = '2025-05-23', end_date = '2025-09-01'
-WHERE year = 2025;
+SET
+  start_date = COALESCE(start_date, make_date(year, 5, 23)),
+  end_date = COALESCE(end_date, make_date(year, 9, 1))
+WHERE start_date IS NULL OR end_date IS NULL;
 
 -- Make the columns required for future inserts
 ALTER TABLE seasons ALTER COLUMN start_date SET NOT NULL;
