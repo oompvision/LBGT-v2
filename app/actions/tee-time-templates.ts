@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { getSeasonDatesForDay, toUTC } from "@/lib/tee-time-utils"
 
+const DAYS_OF_WEEK_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+
 export interface TeeTimeTemplate {
   id: string
   season_id: string
@@ -169,7 +171,7 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
 
         if (existing) {
           // Update existing tee time with current season, booking window, and settings
-          await supabase
+          const { error: updateError } = await supabase
             .from("tee_times")
             .update({
               booking_opens_at: bookingOpensAt,
@@ -179,7 +181,12 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
               season: season.year,
             })
             .eq("id", existing.id)
-          updatedCount++
+
+          if (updateError) {
+            console.error(`Error updating tee time ${existing.id}:`, updateError)
+          } else {
+            updatedCount++
+          }
         } else {
           // Create new tee time
           const { error: insertError } = await supabase.from("tee_times").insert({
@@ -192,7 +199,9 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
             booking_closes_at: bookingClosesAt,
           })
 
-          if (!insertError) {
+          if (insertError) {
+            console.error(`Error inserting tee time ${dateStr} ${timeWithSeconds}:`, insertError)
+          } else {
             createdCount++
           }
         }
@@ -205,7 +214,7 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
 
     return {
       success: true,
-      message: `Generated ${createdCount} new tee times and updated ${updatedCount} existing ones across ${dates.length} weeks.`,
+      message: `Generated ${createdCount} new tee times and updated ${updatedCount} existing ones across ${dates.length} ${DAYS_OF_WEEK_NAMES[template.day_of_week] || "day"}s for the ${season.name} (season year: ${season.year}).`,
     }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to generate tee times" }
@@ -277,7 +286,7 @@ export async function toggleTeeTime(teeTimeId: string, isAvailable: boolean): Pr
   }
 }
 
-// Get upcoming dates that have tee times for the active season
+// Get all dates that have tee times for the active season
 export async function getUpcomingTeeTimeDates(): Promise<{
   success: boolean
   dates?: string[]
@@ -287,31 +296,32 @@ export async function getUpcomingTeeTimeDates(): Promise<{
     const supabase = await createClient()
 
     // Get active season
-    const { data: season } = await supabase
+    const { data: season, error: seasonError } = await supabase
       .from("seasons")
-      .select("year")
+      .select("*")
       .eq("is_active", true)
       .single()
 
-    if (!season) {
+    if (seasonError || !season) {
+      console.error("getUpcomingTeeTimeDates: no active season", seasonError)
       return { success: true, dates: [] }
     }
 
-    const today = format(new Date(), "yyyy-MM-dd")
-
+    // Get all tee time dates for this season — no date filter so admin can see everything
     const { data, error } = await supabase
       .from("tee_times")
       .select("date")
       .eq("season", season.year)
-      .gte("date", today)
       .order("date", { ascending: true })
 
     if (error) {
+      console.error("getUpcomingTeeTimeDates: query error", error)
       return { success: false, error: error.message }
     }
 
     // Deduplicate dates
     const uniqueDates = [...new Set(data?.map((d) => d.date) || [])]
+    console.log(`getUpcomingTeeTimeDates: season=${season.year}, found ${uniqueDates.length} dates, total rows=${data?.length || 0}`)
     return { success: true, dates: uniqueDates }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to get upcoming dates" }
