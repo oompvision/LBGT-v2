@@ -26,6 +26,8 @@ interface SeasonManagerProps {
 export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
   const [seasons, setSeasons] = useState<Season[]>(initialSeasons)
   const [newYear, setNewYear] = useState("")
+  const [newStartDate, setNewStartDate] = useState("")
+  const [newEndDate, setNewEndDate] = useState("")
   const [isCreating, setIsCreating] = useState(false)
 
   const handleCreateSeason = async () => {
@@ -34,14 +36,24 @@ export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
       alert("Please enter a valid year (2025-2100)")
       return
     }
+    if (!newStartDate || !newEndDate) {
+      alert("Please enter both a start date and end date")
+      return
+    }
+    if (newStartDate >= newEndDate) {
+      alert("Start date must be before end date")
+      return
+    }
 
     setIsCreating(true)
-    const result = await createSeason(year, `${year} Season`)
+    const result = await createSeason(year, `${year} Season`, newStartDate, newEndDate)
     setIsCreating(false)
 
     if (result.success && result.season) {
       setSeasons([result.season, ...seasons])
       setNewYear("")
+      setNewStartDate("")
+      setNewEndDate("")
     } else {
       alert(result.error || "Failed to create season")
     }
@@ -72,13 +84,19 @@ export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
 
   const activeSeason = seasons.find((s) => s.is_active)
 
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return "—"
+    const date = new Date(dateStr + "T00:00:00")
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  }
+
   return (
     <div className="space-y-6">
       {/* Create New Season */}
       <div className="space-y-4 p-4 border rounded-lg">
         <h3 className="font-semibold">Create New Season</h3>
-        <div className="flex gap-4 items-end">
-          <div className="flex-1">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+          <div>
             <Label htmlFor="year">Season Year</Label>
             <Input
               id="year"
@@ -90,7 +108,25 @@ export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
               max="2100"
             />
           </div>
-          <Button onClick={handleCreateSeason} disabled={isCreating || !newYear}>
+          <div>
+            <Label htmlFor="start-date">Start Date</Label>
+            <Input
+              id="start-date"
+              type="date"
+              value={newStartDate}
+              onChange={(e) => setNewStartDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="end-date">End Date</Label>
+            <Input
+              id="end-date"
+              type="date"
+              value={newEndDate}
+              onChange={(e) => setNewEndDate(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleCreateSeason} disabled={isCreating || !newYear || !newStartDate || !newEndDate}>
             <Plus className="mr-2 h-4 w-4" />
             Create Season
           </Button>
@@ -105,6 +141,7 @@ export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
             <span className="font-semibold">Active Season: {activeSeason.name}</span>
           </div>
           <p className="text-sm text-muted-foreground mt-1">
+            {formatDisplayDate(activeSeason.start_date)} — {formatDisplayDate(activeSeason.end_date)}.
             All new bookings and scorecards will be recorded for the {activeSeason.year} season.
           </p>
         </div>
@@ -128,7 +165,9 @@ export function SeasonManager({ initialSeasons }: SeasonManagerProps) {
                       <span className="font-medium">{season.name}</span>
                       {season.is_active && <Badge variant="default">Active</Badge>}
                     </div>
-                    <p className="text-sm text-muted-foreground">Year {season.year}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDisplayDate(season.start_date)} — {formatDisplayDate(season.end_date)}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">

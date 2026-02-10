@@ -1,11 +1,6 @@
-// NEW FILE - Updated tee time logic without touching existing utils
 import { format } from "date-fns"
 
-// Season constants
-const SEASON_START = new Date(2025, 4, 23) // May 23, 2025
-const SEASON_END = new Date(2025, 8, 1) // September 1, 2025 (Labor Day)
-
-// Generate the 5 specific tee times you want
+// Generate the 5 specific tee times for each Friday
 export function generateNewTeeTimes(): string[] {
   return [
     "15:40", // 3:40 PM
@@ -16,25 +11,36 @@ export function generateNewTeeTimes(): string[] {
   ]
 }
 
-// Get the current active Friday (May 30th since we're simulating Saturday May 24th)
+// Get the next upcoming Friday from today (or today if it's Friday and before tee times)
 export function getCurrentActiveFriday(): string {
-  // Simulate it's May 24, 2025 (Saturday after first Friday)
-  const simulatedNow = new Date(2025, 4, 24) // May 24, 2025 (Saturday)
+  const now = new Date()
+  const dayOfWeek = now.getDay() // 0=Sun, 5=Fri
 
-  // Since it's Saturday, show next Friday's tee times (May 30th)
-  const nextFriday = new Date(2025, 4, 30) // May 30, 2025 (Friday)
+  let daysUntilFriday: number
+  if (dayOfWeek === 5) {
+    // It's Friday — use today
+    daysUntilFriday = 0
+  } else if (dayOfWeek === 6) {
+    // Saturday — next Friday is 6 days away
+    daysUntilFriday = 6
+  } else {
+    // Sun(0)→5, Mon(1)→4, Tue(2)→3, Wed(3)→2, Thu(4)→1
+    daysUntilFriday = 5 - dayOfWeek
+  }
 
-  return format(nextFriday, "yyyy-MM-dd") // Returns "2025-05-30"
+  const nextFriday = new Date(now)
+  nextFriday.setDate(now.getDate() + daysUntilFriday)
+
+  return format(nextFriday, "yyyy-MM-dd")
 }
 
-// Get all season Fridays for calendar
-export function getNewSeasonFridays(): Date[] {
+// Get all Fridays between a start and end date
+export function getSeasonFridays(startDate: Date, endDate: Date): Date[] {
   const fridays: Date[] = []
-  const current = new Date(SEASON_START)
+  const current = new Date(startDate)
 
-  while (current <= SEASON_END) {
+  while (current <= endDate) {
     if (current.getDay() === 5) {
-      // Friday
       fridays.push(new Date(current))
     }
     current.setDate(current.getDate() + 1)

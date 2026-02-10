@@ -4,24 +4,30 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { generateTeeTimes } from "@/lib/utils"
+import { getSeasonFridays } from "@/lib/tee-time-utils"
 
-// Function to generate tee times for all Fridays in the season
+// Function to generate tee times for all Fridays in the active season
 export async function generateNewTeeTimesForSeason() {
   const supabase = await createClient()
 
   try {
-    // Get all Fridays in the season
-    const fridays = []
-    const seasonStart = new Date(2025, 4, 23) // May 23, 2025
-    const seasonEnd = new Date(2025, 7, 29) // August 29, 2025
+    // Fetch active season from the database
+    const { data: season, error: seasonError } = await supabase
+      .from("seasons")
+      .select("*")
+      .eq("is_active", true)
+      .single()
 
-    const current = new Date(seasonStart)
-    while (current <= seasonEnd) {
-      if (current.getDay() === 5) {
-        // 5 = Friday
-        fridays.push(new Date(current))
-      }
-      current.setDate(current.getDate() + 1)
+    if (seasonError || !season) {
+      return { success: false, error: "No active season found. Please set an active season first." }
+    }
+
+    const seasonStart = new Date(season.start_date)
+    const seasonEnd = new Date(season.end_date)
+    const fridays = getSeasonFridays(seasonStart, seasonEnd)
+
+    if (fridays.length === 0) {
+      return { success: false, error: "No Fridays found in the active season date range." }
     }
 
     // Generate tee times for each Friday
@@ -84,7 +90,7 @@ export async function generateNewTeeTimesForSeason() {
 
     return {
       success: true,
-      message: `Successfully generated ${createdCount} new tee times for the season.`,
+      message: `Successfully generated ${createdCount} new tee times for the ${season.name} (${fridays.length} Fridays).`,
     }
   } catch (error: any) {
     console.error("Error generating new tee times:", error)
