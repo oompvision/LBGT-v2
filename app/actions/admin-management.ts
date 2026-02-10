@@ -2,33 +2,12 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import { parseISO } from "date-fns"
 
 // Create a Supabase client with admin privileges
 const supabaseAdmin = createAdminClient()
 
-// Helper function to ensure dates are correct (May 23, 2025 and later)
-function ensureCorrectDate(dateString: string): string {
+export async function getAllUsersForAdmin() {
   try {
-    const date = parseISO(dateString)
-    const firstValidDate = new Date(2025, 4, 23) // May 23, 2025
-
-    // If the date is before May 23, 2025, return May 23, 2025
-    if (date < firstValidDate) {
-      console.warn(`Correcting invalid date: ${dateString} to 2025-05-23`)
-      return "2025-05-23"
-    }
-
-    return dateString
-  } catch (error) {
-    console.error("Error processing date:", error)
-    return "2025-05-23" // Default to May 23, 2025 if there's an error
-  }
-}
-
-export async function getAllUsersWithDetails() {
-  try {
-    // Use the admin client to bypass RLS policies
     const { data: users, error } = await supabaseAdmin.from("users").select("*").order("name")
 
     if (error) {
@@ -38,75 +17,8 @@ export async function getAllUsersWithDetails() {
 
     return { success: true, users: users || [] }
   } catch (error: any) {
-    console.error("Error in getAllUsersWithDetails:", error)
+    console.error("Error in getAllUsersForAdmin:", error)
     return { success: false, error: error.message || "An unexpected error occurred", users: [] }
-  }
-}
-
-// Helper function to delay execution (for rate limiting)
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-// Process a single round to get its scores
-async function processRound(round: any) {
-  const supabase = await createClient()
-
-  try {
-    // Use a direct approach with error handling for "Too Many Requests"
-    try {
-      const { data: scores, error: scoresError } = await supabase
-        .from("scores")
-        .select(
-          `
-          id,
-          user_id,
-          total_score,
-          users (
-            id,
-            name,
-            email
-          )
-        `,
-        )
-        .eq("round_id", round.id)
-        .order("total_score", { ascending: true })
-
-      if (scoresError) {
-        console.error(`Error fetching scores for round ${round.id}:`, scoresError)
-        return {
-          ...round,
-          scores: [],
-          error: `Failed to load scores: ${scoresError.message}`,
-        }
-      }
-
-      // Ensure the round date is correct
-      if (round.date) {
-        round.date = ensureCorrectDate(round.date)
-      }
-
-      return {
-        ...round,
-        scores: scores || [],
-      }
-    } catch (error: any) {
-      // Check if it's a "Too Many Requests" error
-      if (error.message && (error.message.includes("Too Many") || error.message.includes("rate limit"))) {
-        console.log(`Rate limit hit for round ${round.id}, returning without scores`)
-        return {
-          ...round,
-          scores: [],
-          error: "Rate limit exceeded. Please try again later.",
-        }
-      }
-      throw error // Re-throw other errors
-    }
-  } catch (error: any) {
-    console.error(`Exception fetching scores for round ${round.id}:`, error)
-    return {
-      ...round,
-      scores: [],
-      error: `Failed to load scores: ${error.message || "Unknown error"}`,
-    }
   }
 }
 
@@ -114,7 +26,6 @@ export async function getAllRoundsWithDetails() {
   const supabase = await createClient()
 
   try {
-    // First, get a very limited number of the most recent rounds to reduce load
     const { data: rounds, error } = await supabase
       .from("rounds")
       .select(
@@ -125,43 +36,28 @@ export async function getAllRoundsWithDetails() {
         users (
           name,
           email
+        ),
+        scores (
+          id,
+          user_id,
+          total_score,
+          users (
+            id,
+            name,
+            email
+          )
         )
       `,
       )
       .order("date", { ascending: false })
-      .limit(5) // Limit to 5 most recent rounds to reduce load even further
+      .limit(10)
 
     if (error) {
       console.error("Error fetching rounds:", error)
       return { success: false, error: error.message, rounds: [] }
     }
 
-    if (!rounds || rounds.length === 0) {
-      return { success: true, rounds: [] }
-    }
-
-    // Process rounds sequentially to avoid rate limiting
-    const roundsWithScores = []
-    for (const round of rounds) {
-      try {
-        // Add a delay between each round
-        if (rounds.indexOf(round) > 0) {
-          await delay(1500) // 1.5 second delay between rounds
-        }
-
-        const processedRound = await processRound(round)
-        roundsWithScores.push(processedRound)
-      } catch (error: any) {
-        console.error(`Error processing round ${round.id}:`, error)
-        roundsWithScores.push({
-          ...round,
-          scores: [],
-          error: `Failed to load scores: ${error.message || "Unknown error"}`,
-        })
-      }
-    }
-
-    return { success: true, rounds: roundsWithScores }
+    return { success: true, rounds: rounds || [] }
   } catch (error: any) {
     console.error("Error in getAllRoundsWithDetails:", error)
     return { success: false, error: error.message || "An unexpected error occurred", rounds: [] }
@@ -200,22 +96,7 @@ export async function getAllReservationsWithDetails() {
       return { success: false, error: error.message, reservations: [] }
     }
 
-    // Ensure all dates are correct in the reservations
-    const correctedReservations =
-      reservations?.map((reservation) => {
-        if (reservation.tee_times && reservation.tee_times.date) {
-          return {
-            ...reservation,
-            tee_times: {
-              ...reservation.tee_times,
-              date: ensureCorrectDate(reservation.tee_times.date),
-            },
-          }
-        }
-        return reservation
-      }) || []
-
-    return { success: true, reservations: correctedReservations }
+    return { success: true, reservations: reservations || [] }
   } catch (error: any) {
     console.error("Error in getAllReservationsWithDetails:", error)
     return { success: false, error: error.message || "An unexpected error occurred", reservations: [] }
@@ -226,45 +107,16 @@ export async function getAllTeeTimes() {
   const supabase = await createClient()
 
   try {
-    const { data: teeTimes, error } = await supabase.from("tee_times").select("*").order("date").order("time").limit(20) // Limit to 20 tee times
+    const { data: teeTimes, error } = await supabase.from("tee_times").select("*").order("date").order("time").limit(20)
 
     if (error) {
       console.error("Error fetching tee times:", error)
       return { success: false, error: error.message, teeTimes: [] }
     }
 
-    // Ensure all dates are correct in the tee times
-    const correctedTeeTimes =
-      teeTimes?.map((teeTime) => {
-        if (teeTime.date) {
-          return {
-            ...teeTime,
-            date: ensureCorrectDate(teeTime.date),
-          }
-        }
-        return teeTime
-      }) || []
-
-    return { success: true, teeTimes: correctedTeeTimes }
+    return { success: true, teeTimes: teeTimes || [] }
   } catch (error: any) {
     console.error("Error in getAllTeeTimes:", error)
-    return { success: false, error: error.message || "An unexpected error occurred" }
-  }
-}
-
-export async function getAllUsersForAdmin() {
-  try {
-    // Use the admin client to bypass RLS policies
-    const { data: users, error } = await supabaseAdmin.from("users").select("*").order("name")
-
-    if (error) {
-      console.error("Error fetching users:", error)
-      return { success: false, error: error.message, users: [] }
-    }
-
-    return { success: true, users: users || [] }
-  } catch (error: any) {
-    console.error("Error in getAllUsersForAdmin:", error)
     return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }
@@ -510,46 +362,7 @@ export async function updateUser(userId: string, userData: { name?: string; emai
   }
 }
 
-// Function specifically for updating strokes given
-export async function updateUserStrokesGiven(userId: string, strokesGiven: number) {
-  const supabase = await createClient()
-
-  try {
-    // Convert to number and validate
-    const strokesValue = Number(strokesGiven)
-    if (isNaN(strokesValue)) {
-      return { success: false, error: "Invalid strokes value" }
-    }
-
-    console.log(`Updating user ${userId} strokes_given to ${strokesValue}`)
-
-    // Direct update with only the strokes_given field
-    const { data, error } = await supabase
-      .from("users")
-      .update({ strokes_given: strokesValue })
-      .eq("id", userId)
-      .select()
-
-    if (error) {
-      console.error("Error updating strokes given:", error)
-      return { success: false, error: error.message }
-    }
-
-    console.log("Strokes update result:", data)
-
-    // Revalidate relevant paths
-    revalidatePath("/admin/dashboard")
-    revalidatePath("/admin/users")
-    revalidatePath("/profile")
-
-    return { success: true, message: "Strokes given updated successfully", data }
-  } catch (error: any) {
-    console.error("Error in updateUserStrokesGiven:", error)
-    return { success: false, error: error.message || "An unexpected error occurred" }
-  }
-}
-
-// New function to update strokes given using direct SQL
+// Update strokes given using SQL function (bypasses RLS)
 export async function updateStrokesGivenDirectly(userId: string, strokesGiven: number) {
   try {
     // Validate the input
