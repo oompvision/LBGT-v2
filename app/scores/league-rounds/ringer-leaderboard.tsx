@@ -8,6 +8,33 @@ import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import Image from "next/image"
 
+interface LeagueScore {
+  user_id: string
+  users?: { name: string }
+  total_score: number
+  net_total_score: number | null
+  net_hole_1: number | null; net_hole_2: number | null; net_hole_3: number | null
+  net_hole_4: number | null; net_hole_5: number | null; net_hole_6: number | null
+  net_hole_7: number | null; net_hole_8: number | null; net_hole_9: number | null
+  net_hole_10: number | null; net_hole_11: number | null; net_hole_12: number | null
+  net_hole_13: number | null; net_hole_14: number | null; net_hole_15: number | null
+  net_hole_16: number | null; net_hole_17: number | null; net_hole_18: number | null
+}
+
+interface LeagueRound {
+  id: string
+  date: string
+  scores: LeagueScore[]
+}
+
+interface PlayerRingerData {
+  name: string
+  userId: string
+  holes: (number | null)[]
+  roundsPlayed: number
+  strokesGiven: number
+}
+
 // Updated course data with correct par values and white handicap
 const courseData = {
   holes: Array.from({ length: 18 }, (_, i) => i + 1),
@@ -19,8 +46,8 @@ const courseData = {
 }
 
 // Score indicator component for the ringer leaderboard
-const ScoreIndicator = ({ score, par }) => {
-  if (score === null || score === undefined) return "-"
+const ScoreIndicator = ({ score, par }: { score: number; par: number }) => {
+  if (score === null || score === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = score - par
@@ -112,7 +139,7 @@ const formatPlayerName = (fullName: string, strokes: number) => {
   return `${firstInitial}. ${lastName} (${strokes})`
 }
 
-export function RingerLeaderboard({ rounds }) {
+export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const supabase = createClient()
 
@@ -158,7 +185,7 @@ export function RingerLeaderboard({ rounds }) {
   }, [supabase, rounds])
 
   // Process all scores from all rounds to create ringer scores
-  const playerRingerScores = {}
+  const playerRingerScores: Record<string, PlayerRingerData> = {}
 
   // Process all rounds and scores
   rounds.forEach((round) => {
@@ -213,7 +240,7 @@ export function RingerLeaderboard({ rounds }) {
         // Update if this is the first score or better than previous best
         if (
           playerRingerScores[userId].holes[index] === null ||
-          netHoleScore < playerRingerScores[userId].holes[index]
+          netHoleScore < playerRingerScores[userId].holes[index]!
         ) {
           playerRingerScores[userId].holes[index] = netHoleScore
         }
@@ -224,7 +251,7 @@ export function RingerLeaderboard({ rounds }) {
   // Calculate total ringer scores and to par
   const ringerLeaderboard = Object.entries(playerRingerScores).map(([userId, data]) => {
     // Calculate total of best net scores, ignoring null values
-    const validScores = data.holes.filter((score) => score !== null)
+    const validScores = data.holes.filter((score): score is number => score !== null)
     const totalRingerScore = validScores.reduce((sum, score) => sum + score, 0)
 
     // Calculate how many holes have been played

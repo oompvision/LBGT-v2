@@ -18,7 +18,7 @@ import { SeasonSelector } from "@/components/season-selector"
 export const dynamic = "force-dynamic"
 
 export default async function TourLeaderboardPage({ searchParams }: { searchParams: { season?: string } }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   let roundsWithScores = []
   let success = false

@@ -8,6 +8,32 @@ import { Trophy } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
+interface LeagueScore {
+  user_id: string
+  users?: { name: string }
+  total_score: number
+  net_total_score: number | null
+}
+
+interface LeagueRound {
+  id: string
+  date: string
+  scores: LeagueScore[]
+}
+
+interface PlayerStatData {
+  name: string
+  userId: string
+  rounds: number
+  totalScore: number
+  bestScore: number
+  worstScore: number
+  netTotalScore: number
+  netBestScore: number
+  netWorstScore: number
+  strokesGiven: number
+}
+
 // Updated course data with correct par values
 const courseData = {
   holes: Array.from({ length: 18 }, (_, i) => i + 1),
@@ -17,7 +43,7 @@ const courseData = {
   totalPar: 72,
 }
 
-export function LeagueStats({ rounds }) {
+export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
   const [sortBy, setSortBy] = useState("netAverage")
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const supabase = createClient()
@@ -64,7 +90,7 @@ export function LeagueStats({ rounds }) {
   }, [supabase, rounds])
 
   // Process all scores from all rounds
-  const playerStats = {}
+  const playerStats: Record<string, PlayerStatData> = {}
 
   // Process all rounds and scores
   rounds.forEach((round) => {

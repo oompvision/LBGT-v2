@@ -40,7 +40,7 @@ export default function SignUpPage() {
       try {
         // Check if there's an existing session with errors
         const { data, error } = await supabase.auth.getSession()
-        if (error || (data.session && data.session.expires_at * 1000 < Date.now())) {
+        if (error || (data.session && (data.session.expires_at ?? 0) * 1000 < Date.now())) {
           console.log("Clearing problematic session...")
           await supabase.auth.signOut()
         }

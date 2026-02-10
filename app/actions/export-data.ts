@@ -1,10 +1,10 @@
 "use server"
 
-import { createClient } from "@supabase/supabase-js"
+import { createAdminClient } from "@/lib/supabase/server"
 import { formatDate } from "@/lib/utils"
 
 // Create a Supabase client with service role key to bypass RLS
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabaseAdmin = createAdminClient()
 
 // Helper function to convert array of objects to CSV
 function objectsToCSV(data: any[], columns: { key: string; header: string }[]): string {

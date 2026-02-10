@@ -12,6 +12,26 @@ import { ArrowLeft, CalendarIcon, User } from "lucide-react"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
+interface RoundScore {
+  id: string
+  user_id: string
+  users: { name: string }
+  rounds: { date: string; users: { name: string } }
+  strokes_given: number
+  total_score: number
+  net_total_score: number | null
+  hole_1: number; hole_2: number; hole_3: number; hole_4: number; hole_5: number; hole_6: number
+  hole_7: number; hole_8: number; hole_9: number; hole_10: number; hole_11: number; hole_12: number
+  hole_13: number; hole_14: number; hole_15: number; hole_16: number; hole_17: number; hole_18: number
+  net_hole_1: number | null; net_hole_2: number | null; net_hole_3: number | null
+  net_hole_4: number | null; net_hole_5: number | null; net_hole_6: number | null
+  net_hole_7: number | null; net_hole_8: number | null; net_hole_9: number | null
+  net_hole_10: number | null; net_hole_11: number | null; net_hole_12: number | null
+  net_hole_13: number | null; net_hole_14: number | null; net_hole_15: number | null
+  net_hole_16: number | null; net_hole_17: number | null; net_hole_18: number | null
+  line_17: number
+}
+
 // Update the courseData object with the correct par values
 const courseData = {
   holes: Array.from({ length: 18 }, (_, i) => i + 1),
@@ -23,8 +43,8 @@ const courseData = {
 }
 
 // Golf score indicator components
-const ScoreIndicator = ({ score, par }) => {
-  if (score === null || score === undefined) return "-"
+const ScoreIndicator = ({ score, par }: { score: number; par: number }) => {
+  if (score === null || score === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = score - par
@@ -103,8 +123,8 @@ const ScoreIndicator = ({ score, par }) => {
 }
 
 // Net score indicator component
-const NetScoreIndicator = ({ netScore, par }) => {
-  if (netScore === null || netScore === undefined) return "-"
+const NetScoreIndicator = ({ netScore, par }: { netScore: number; par: number }) => {
+  if (netScore === null || netScore === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = netScore - par
@@ -183,12 +203,14 @@ const NetScoreIndicator = ({ netScore, par }) => {
 }
 
 interface PageProps {
-  params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function RoundDetailsPage({ params, searchParams }: PageProps) {
-  const supabase = createClient()
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  const supabase = await createClient()
 
   // Check if user is authenticated
   const {
@@ -200,7 +222,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   }
 
   // Get round details
-  const { scores } = await getRoundDetails(params.id)
+  const { scores } = (await getRoundDetails(resolvedParams.id)) as { scores: RoundScore[] }
 
   if (!scores || scores.length === 0) {
     return notFound()
@@ -211,9 +233,9 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   const submittedBy = scores[0].rounds.users.name
 
   // Check if we came from a player stats page
-  const fromPlayer = searchParams?.from === "player"
-  const playerId = searchParams?.playerId as string
-  const playerName = searchParams?.playerName as string
+  const fromPlayer = resolvedSearchParams?.from === "player"
+  const playerId = resolvedSearchParams?.playerId as string
+  const playerName = resolvedSearchParams?.playerName as string
 
   // Determine back link and text
   const backHref = fromPlayer && playerId ? `/players/${playerId}/stats` : "/scores/my-rounds"

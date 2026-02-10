@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 export async function addMikeSkudin() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // First check if Mike Skudin already exists in the auth system
     const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers()
@@ -88,7 +88,7 @@ export async function addMikeSkudin() {
 // Function to manually add a user to the database
 export async function addUserManually(userData: { name: string; email: string; userId?: string }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     let userId = userData.userId
 

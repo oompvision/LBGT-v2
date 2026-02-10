@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export const dynamic = "force-dynamic"
 
 export default async function TeeTimeLogsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Get the most recent 100 tee time logs
   const { data: logs, error } = await supabase

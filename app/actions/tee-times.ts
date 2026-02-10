@@ -5,7 +5,7 @@ import { generateTeeTimes, getUpcomingFridayForSeason, getNextFriday, formatDate
 import { revalidatePath } from "next/cache"
 
 async function getActiveSeason() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
 
   return data?.year || new Date().getFullYear()
@@ -13,7 +13,7 @@ async function getActiveSeason() {
 
 // Function to get available tee times for a specific date
 export async function getAvailableTeeTimesByDate(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Format the date to ensure consistency
@@ -42,7 +42,7 @@ export async function getAvailableTeeTimesByDate(date: string) {
 
 // Function to get all tee times for a specific week
 export async function getAllTeeTimesByWeek(startDate: string, endDate: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get all tee times
@@ -68,7 +68,7 @@ export async function getAllTeeTimesByWeek(startDate: string, endDate: string) {
 
 // Function to get all tee times for the admin dashboard
 export async function getAllTeeTimes() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get all tee times
@@ -96,7 +96,7 @@ export async function createTeeTime(data: {
   time: string
   maxSlots: number
 }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const activeSeason = await getActiveSeason()
@@ -155,7 +155,7 @@ export async function createTeeTime(data: {
 
 // Function to update tee time availability
 export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Updating tee time ${teeTimeId} availability to ${isAvailable}`)
@@ -227,7 +227,7 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 
 // Function to delete a tee time
 export async function deleteTeeTime(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Check if there are any reservations for this tee time
@@ -275,7 +275,7 @@ export async function createReservation(data: {
   playerNames: string[]
   playForMoney: boolean[]
 }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Creating reservation for tee time ${data.teeTimeId}`)
@@ -374,7 +374,7 @@ export async function createReservation(data: {
 
 // Function to get reservations for a specific user
 export async function getUserReservations(userId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { data, error } = await supabase
@@ -407,7 +407,7 @@ export async function getUserReservations(userId: string) {
 
 // Function to get all reservations for the admin dashboard
 export async function getAllReservations() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { data, error } = await supabase
@@ -439,7 +439,7 @@ export async function getAllReservations() {
 
 // Function to delete a reservation
 export async function deleteReservation(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { error } = await supabase.from("reservations").delete().eq("id", id)
@@ -462,7 +462,7 @@ export async function deleteReservation(id: string) {
 
 // Function to check if tee times exist for the upcoming Friday and generate them if they don't
 export async function checkAndGenerateTeeTimes() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get the upcoming Friday date
@@ -546,7 +546,7 @@ export async function checkAndGenerateTeeTimes() {
 
 // Function to update the system to the next Friday
 export async function updateToNextFriday() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get the current upcoming Friday
@@ -637,7 +637,7 @@ export async function updateToNextFriday() {
 
 // Function to check if a specific tee time is available
 export async function checkTeeTimeAvailability(teeTimeId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Checking availability for tee time ${teeTimeId}`)

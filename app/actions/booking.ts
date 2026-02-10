@@ -5,7 +5,7 @@ import { formatDate } from "@/lib/utils"
 
 // Helper to get active season
 async function getActiveSeason() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
 
   return data?.year || new Date().getFullYear()
@@ -13,7 +13,7 @@ async function getActiveSeason() {
 
 // Function to get available tee times for booking
 export async function getAvailableTeeTimesForBooking(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Getting available tee times for booking on date: ${date}`)
@@ -53,7 +53,7 @@ export async function getAvailableTeeTimesForBooking(date: string) {
 
 // Function to check if a specific tee time is available for booking
 export async function checkTeeTimeAvailableForBooking(teeTimeId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Checking if tee time ${teeTimeId} is available for booking`)

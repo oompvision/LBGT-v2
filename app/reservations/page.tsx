@@ -51,7 +51,7 @@ function formatDateSafely(dateString: string): string {
 }
 
 export default async function MyReservationsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Check if user is authenticated
   const {

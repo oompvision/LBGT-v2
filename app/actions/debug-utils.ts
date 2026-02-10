@@ -9,7 +9,7 @@ export async function logDebugInfo(message: string, data?: any) {
 
 // Function to check if a tee time's availability matches what we expect
 export async function verifyTeeTimeAvailability(teeTimeId: string, expectedAvailability: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { data, error } = await supabase
@@ -51,7 +51,7 @@ export async function verifyTeeTimeAvailability(teeTimeId: string, expectedAvail
 
 // Function to directly update a tee time's availability in the database
 export async function forceUpdateTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`[FORCE] Updating tee time ${teeTimeId} availability to ${isAvailable}`)

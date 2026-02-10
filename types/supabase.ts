@@ -35,21 +35,27 @@ export type Database = {
           id: string
           date: string
           time: string
-          max_players: number
+          max_slots: number
+          is_available: boolean
+          season: number | null
           created_at: string
         }
         Insert: {
           id?: string
           date: string
           time: string
-          max_players?: number
+          max_slots?: number
+          is_available?: boolean
+          season?: number | null
           created_at?: string
         }
         Update: {
           id?: string
           date?: string
           time?: string
-          max_players?: number
+          max_slots?: number
+          is_available?: boolean
+          season?: number | null
           created_at?: string
         }
       }
@@ -60,6 +66,8 @@ export type Database = {
           tee_time_id: string
           slots: number
           player_names: string[] | null
+          play_for_money: boolean[] | null
+          season: number | null
           created_at: string
         }
         Insert: {
@@ -68,6 +76,8 @@ export type Database = {
           tee_time_id: string
           slots: number
           player_names?: string[] | null
+          play_for_money?: boolean[] | null
+          season?: number | null
           created_at?: string
         }
         Update: {
@@ -76,6 +86,8 @@ export type Database = {
           tee_time_id?: string
           slots?: number
           player_names?: string[] | null
+          play_for_money?: boolean[] | null
+          season?: number | null
           created_at?: string
         }
       }
@@ -84,18 +96,21 @@ export type Database = {
           id: string
           date: string
           submitted_by: string
+          season: number
           created_at: string
         }
         Insert: {
           id?: string
           date: string
           submitted_by: string
+          season: number
           created_at?: string
         }
         Update: {
           id?: string
           date?: string
           submitted_by?: string
+          season?: number
           created_at?: string
         }
       }
@@ -106,6 +121,7 @@ export type Database = {
           user_id: string
           total_score: number
           net_total_score: number | null
+          strokes_given: number
           hole_1: number
           hole_2: number
           hole_3: number
@@ -150,6 +166,7 @@ export type Database = {
           user_id: string
           total_score: number
           net_total_score?: number | null
+          strokes_given?: number
           hole_1: number
           hole_2: number
           hole_3: number
@@ -194,6 +211,7 @@ export type Database = {
           user_id?: string
           total_score?: number
           net_total_score?: number | null
+          strokes_given?: number
           hole_1?: number
           hole_2?: number
           hole_3?: number
@@ -233,6 +251,185 @@ export type Database = {
           created_at?: string
         }
       }
+      applications: {
+        Row: {
+          id: string
+          name: string
+          email: string
+          phone: string
+          hometown: string
+          handicap: string
+          referral_source: string
+          notes: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          email: string
+          phone: string
+          hometown: string
+          handicap: string
+          referral_source: string
+          notes?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          email?: string
+          phone?: string
+          hometown?: string
+          handicap?: string
+          referral_source?: string
+          notes?: string | null
+          status?: string
+          created_at?: string
+        }
+      }
+      tour_comments: {
+        Row: {
+          id: string
+          user_id: string
+          comment: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          comment: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          comment?: string
+          created_at?: string
+        }
+      }
+      seasons: {
+        Row: {
+          id: string
+          year: number
+          name: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          name: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          name?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      tee_time_availability: {
+        Row: {
+          id: string
+          tee_time_id: string
+          is_available: boolean
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          tee_time_id: string
+          is_available: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          tee_time_id?: string
+          is_available?: boolean
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+      }
+      site_messages: {
+        Row: {
+          id: string
+          title: string | null
+          content: string
+          type: string | null
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          title?: string | null
+          content: string
+          type?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string | null
+          content?: string
+          type?: string | null
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      tee_time_logs: {
+        Row: {
+          id: string
+          tee_time_id: string
+          action: string
+          old_data: Record<string, unknown> | null
+          new_data: Record<string, unknown> | null
+          changed_at: string
+        }
+        Insert: {
+          id?: string
+          tee_time_id: string
+          action: string
+          old_data?: Record<string, unknown> | null
+          new_data?: Record<string, unknown> | null
+          changed_at?: string
+        }
+        Update: {
+          id?: string
+          tee_time_id?: string
+          action?: string
+          old_data?: Record<string, unknown> | null
+          new_data?: Record<string, unknown> | null
+          changed_at?: string
+        }
+      }
+    }
+    Views: {
+      available_tee_times: {
+        Row: {
+          id: string
+          date: string
+          time: string
+          max_slots: number
+          is_available: boolean
+          season: number | null
+          reserved_slots: number
+          available_slots: number
+        }
+      }
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }

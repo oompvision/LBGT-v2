@@ -3,14 +3,20 @@
 import { createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
+const ADMIN_EMAIL = "anthony@sidelineswap.com"
+
 export async function createAdminUser() {
   try {
+    const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD
+    if (!adminPassword) {
+      return { success: false, error: "ADMIN_DEFAULT_PASSWORD environment variable is not set" }
+    }
+
     const supabaseAdmin = createAdminClient()
 
-    // Create the admin user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: "anthony@sidelineswap.com",
-      password: "GolfAdmin123",
+      email: ADMIN_EMAIL,
+      password: adminPassword,
       email_confirm: true,
     })
 
@@ -19,10 +25,9 @@ export async function createAdminUser() {
       return { success: false, error: authError.message }
     }
 
-    // Create the user in the database
     const { error: dbError } = await supabaseAdmin.from("users").insert({
       id: authData.user.id,
-      email: "anthony@sidelineswap.com",
+      email: ADMIN_EMAIL,
       name: "Anthony Admin",
       is_admin: true,
     })
@@ -41,9 +46,13 @@ export async function createAdminUser() {
 
 export async function resetAdminUser() {
   try {
+    const adminPassword = process.env.ADMIN_DEFAULT_PASSWORD
+    if (!adminPassword) {
+      return { success: false, error: "ADMIN_DEFAULT_PASSWORD environment variable is not set" }
+    }
+
     const supabaseAdmin = createAdminClient()
 
-    // First, try to get the existing user
     const { data: existingUsers, error: getUserError } = await supabaseAdmin.auth.admin.listUsers()
 
     if (getUserError) {
@@ -51,12 +60,11 @@ export async function resetAdminUser() {
       return { success: false, error: getUserError.message }
     }
 
-    const existingUser = existingUsers.users.find((user) => user.email === "anthony@sidelineswap.com")
+    const existingUser = existingUsers.users.find((user) => user.email === ADMIN_EMAIL)
 
     if (existingUser) {
-      // Update the existing user's password
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
-        password: "GolfAdmin123",
+        password: adminPassword,
       })
 
       if (updateError) {
@@ -64,12 +72,11 @@ export async function resetAdminUser() {
         return { success: false, error: updateError.message }
       }
 
-      // Ensure user exists in database with admin privileges
       const { error: upsertError } = await supabaseAdmin
         .from("users")
         .upsert({
           id: existingUser.id,
-          email: "anthony@sidelineswap.com",
+          email: ADMIN_EMAIL,
           name: "Anthony Admin",
           is_admin: true,
         })
@@ -82,7 +89,6 @@ export async function resetAdminUser() {
 
       return { success: true, message: "Admin user password reset successfully" }
     } else {
-      // Create new admin user if doesn't exist
       return await createAdminUser()
     }
   } catch (error: any) {

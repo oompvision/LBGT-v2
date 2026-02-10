@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 // Function to debug tee time availability
 export async function debugTeeTimeAvailability(teeTimeId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get the tee time details

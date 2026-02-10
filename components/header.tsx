@@ -99,7 +99,7 @@ export function Header() {
                 </Link>
 
                 {/* Custom Dropdown for Reservations */}
-                <div className="relative" ref={(el) => (dropdownRefs.current.reservations = el)}>
+                <div className="relative" ref={(el) => { dropdownRefs.current.reservations = el }}>
                   <button
                     className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "reservations" ? "bg-lbgt-light" : ""
@@ -141,7 +141,7 @@ export function Header() {
                 </div>
 
                 {/* Custom Dropdown for Scores */}
-                <div className="relative" ref={(el) => (dropdownRefs.current.scores = el)}>
+                <div className="relative" ref={(el) => { dropdownRefs.current.scores = el }}>
                   <button
                     className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "scores" ? "bg-lbgt-light" : ""
@@ -184,7 +184,7 @@ export function Header() {
                 </Link>
 
                 {/* Custom Dropdown for Profile */}
-                <div className="relative" ref={(el) => (dropdownRefs.current.profile = el)}>
+                <div className="relative" ref={(el) => { dropdownRefs.current.profile = el }}>
                   <button
                     className={`text-sm text-lbgt-medium hover:text-lbgt-dark hover:bg-lbgt-light transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 px-3 py-2 rounded-sm flex items-center ${
                       activeDropdown === "profile" ? "bg-lbgt-light" : ""
@@ -222,7 +222,7 @@ export function Header() {
 
                 {/* Admin Dropdown - Only shown to admin users */}
                 {isAdmin && (
-                  <div className="relative" ref={(el) => (dropdownRefs.current.admin = el)}>
+                  <div className="relative" ref={(el) => { dropdownRefs.current.admin = el }}>
                     <div className="flex items-center">
                       <Link
                         href="/admin"

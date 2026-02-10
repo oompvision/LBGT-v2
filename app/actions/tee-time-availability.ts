@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 // Get tee time availability for a specific date
 export async function getTeeTimeAvailabilityByDate(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Getting tee time availability for date: ${date}`)
@@ -49,7 +49,7 @@ export async function getTeeTimeAvailabilityByDate(date: string) {
 
 // Set tee time availability
 export async function setTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Setting tee time ${teeTimeId} availability to ${isAvailable}`)
@@ -108,7 +108,7 @@ export async function setTeeTimeAvailability(teeTimeId: string, isAvailable: boo
 
 // Check if a tee time is available
 export async function checkTeeTimeAvailability(teeTimeId: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Checking availability for tee time: ${teeTimeId}`)

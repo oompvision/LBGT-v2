@@ -49,7 +49,7 @@ export async function createUserInDatabase(userId: string, email: string, name: 
 // Function to update user profile
 export async function updateUserProfile(data: { name: string }) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {
@@ -86,7 +86,7 @@ export async function updateUserProfile(data: { name: string }) {
 // Function to upload profile picture
 export async function uploadProfilePicture(formData: FormData) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     // Use admin client to bypass RLS
     const supabaseAdmin = createAdminClient()
 
@@ -162,7 +162,7 @@ export async function uploadProfilePicture(formData: FormData) {
 // Function to remove profile picture
 export async function removeProfilePicture() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     // Use admin client to bypass RLS
     const supabaseAdmin = createAdminClient()
 

@@ -100,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           clearAuthStorage()
         } else if (event === "TOKEN_REFRESHED" && session) {
           setUser(session.user)
-        } else if (event === "SIGNED_OUT" || !session) {
+        } else if (!session) {
           setUser(null)
           clearAuthStorage()
         }

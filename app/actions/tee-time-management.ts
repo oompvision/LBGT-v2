@@ -14,7 +14,7 @@ interface TeeTimeAvailability {
 
 // Function to get tee time availability for a specific date using direct SQL
 export async function getTeeTimeAvailability(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // First, get the tee times
@@ -74,7 +74,7 @@ export async function getTeeTimeAvailability(date: string) {
 
 // Function to update a single tee time's availability
 export async function updateSingleTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Use a direct update instead of RPC
@@ -105,7 +105,7 @@ export async function updateSingleTeeTimeAvailability(teeTimeId: string, isAvail
 
 // Function to bulk update tee time availability
 export async function bulkUpdateTeeTimeAvailability(updates: { id: string; is_available: boolean }[]) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Process updates one by one to avoid structure mismatch issues
@@ -148,7 +148,7 @@ export async function bulkUpdateTeeTimeAvailability(updates: { id: string; is_av
 
 // Function to get tee time logs
 export async function getTeeTimeLogs(teeTimeId?: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     let query = supabase.from("tee_time_logs").select("*").order("changed_at", { ascending: false })

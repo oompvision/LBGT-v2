@@ -103,7 +103,7 @@ export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
 export default async function PlayerStatsPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+  const supabase = await createClient()
   const playerId = params.id
 
   // Get player info including profile picture

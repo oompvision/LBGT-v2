@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 
 // Function to generate tee times for the current active Friday
 export async function generateTeeTimesForCurrentWeek() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const activeFriday = getCurrentActiveFriday() // Gets "2025-05-30"

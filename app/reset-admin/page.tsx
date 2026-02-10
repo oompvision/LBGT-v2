@@ -33,7 +33,7 @@ export default function ResetAdminPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Reset Admin Password</CardTitle>
-          <CardDescription>Reset the password for anthony@sidelineswap.com to GolfAdmin123</CardDescription>
+          <CardDescription>Reset the admin account password to the configured default</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button onClick={handleReset} disabled={isLoading} className="w-full">
@@ -51,14 +51,6 @@ export default function ResetAdminPage() {
               {message.text}
             </div>
           )}
-
-          <div className="text-sm text-muted-foreground space-y-2">
-            <p>After resetting, you can log in with:</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Email: anthony@sidelineswap.com</li>
-              <li>Password: GolfAdmin123</li>
-            </ul>
-          </div>
         </CardContent>
       </Card>
     </div>

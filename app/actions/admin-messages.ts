@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 // Create a new site message
 export async function createMessage(content: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Check if user is authenticated and is an admin
@@ -55,7 +55,7 @@ export async function createMessage(content: string) {
 
 // Update a site message
 export async function updateMessage(id: string, data: { content?: string; is_active?: boolean }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Check if user is authenticated and is an admin
@@ -104,7 +104,7 @@ export async function updateMessage(id: string, data: { content?: string; is_act
 
 // Delete a site message
 export async function deleteMessage(id: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Check if user is authenticated and is an admin

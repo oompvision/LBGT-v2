@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 
 export async function sendPasswordResetEmail(email: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user exists first
     const { data: user } = await supabase.from("users").select("email").eq("email", email).single()
@@ -38,7 +38,7 @@ export async function sendPasswordResetEmail(email: string) {
 
 export async function checkUserExists(email: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user exists in our users table
     const { data: user, error: userError } = await supabase

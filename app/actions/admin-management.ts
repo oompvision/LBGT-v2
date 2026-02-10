@@ -1,11 +1,11 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { parseISO } from "date-fns"
 
 // Create a Supabase client with admin privileges
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabaseAdmin = createAdminClient()
 
 // Helper function to ensure dates are correct (May 23, 2025 and later)
 function ensureCorrectDate(dateString: string): string {
@@ -48,7 +48,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 // Process a single round to get its scores
 async function processRound(round: any) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Use a direct approach with error handling for "Too Many Requests"
@@ -111,7 +111,7 @@ async function processRound(round: any) {
 }
 
 export async function getAllRoundsWithDetails() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // First, get a very limited number of the most recent rounds to reduce load
@@ -169,7 +169,7 @@ export async function getAllRoundsWithDetails() {
 }
 
 export async function getAllReservationsWithDetails() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { data: reservations, error } = await supabase
@@ -223,7 +223,7 @@ export async function getAllReservationsWithDetails() {
 }
 
 export async function getAllTeeTimes() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     const { data: teeTimes, error } = await supabase.from("tee_times").select("*").order("date").order("time").limit(20) // Limit to 20 tee times
@@ -395,7 +395,7 @@ export async function editPlayerScore(
     hole_18?: number
   },
 ) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Calculate the total score
@@ -469,7 +469,7 @@ export async function deleteRound(roundId: string) {
 
 // Function to update a user
 export async function updateUser(userId: string, userData: { name?: string; email?: string; strokes_given?: number }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Ensure strokes_given is properly converted to a number if it exists
@@ -512,7 +512,7 @@ export async function updateUser(userId: string, userData: { name?: string; emai
 
 // Function specifically for updating strokes given
 export async function updateUserStrokesGiven(userId: string, strokesGiven: number) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Convert to number and validate
@@ -678,7 +678,7 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
 export async function adminRemoveProfilePicture(userId: string) {
   try {
     // Use admin client to bypass RLS
-    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const supabaseAdmin = createAdminClient()
 
     // Get current user data to find existing picture
     const { data: userData, error: userError } = await supabaseAdmin

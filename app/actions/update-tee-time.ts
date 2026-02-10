@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     console.log(`Updating tee time ${teeTimeId} availability to ${isAvailable}`)

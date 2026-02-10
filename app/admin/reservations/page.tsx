@@ -52,7 +52,7 @@ export default async function AdminReservationsPage() {
   let error = null
 
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Fetch all reservations with related data
     const { data, error: fetchError } = await supabase

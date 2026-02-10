@@ -15,14 +15,14 @@ export const runtime = "nodejs"
 export default async function AdminDashboardPage() {
   try {
     // Import these functions only when needed to avoid build-time issues
-    const { createClient } = await import("@/lib/supabase/server")
+    const { createClient, createAdminClient } = await import("@/lib/supabase/server")
     const { getAllRoundsWithDetails, getAllReservationsWithDetails, getAllTeeTimes, getAllUsersForAdmin } =
       await import("@/app/actions/admin-management")
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Create admin client to bypass RLS policies
-    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const supabaseAdmin = createAdminClient()
 
     // Check if user is authenticated
     const {

@@ -63,7 +63,7 @@ export async function getAllLeagueDates() {
 
 // Function to get tee times for a specific date
 export async function getLeagueTeeTimesByDate(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Validate the date
@@ -125,7 +125,7 @@ export async function getLeagueTeeTimesByDate(date: string) {
 
 // Function to update tee time availability
 export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: boolean) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Update the tee time
@@ -151,7 +151,7 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 
 // Function to bulk update tee time availability
 export async function bulkUpdateTeeTimeAvailability(updates: { id: string; is_available: boolean }[]) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Create an array of promises for all updates
@@ -199,7 +199,7 @@ export async function bulkUpdateTeeTimeAvailability(updates: { id: string; is_av
 
 // Function to generate tee times for a specific date
 export async function generateTeeTimesForDate(date: string) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Validate the date
@@ -261,7 +261,7 @@ export async function generateTeeTimesForDate(date: string) {
 
 // Function to get all tee times for the admin dashboard
 export async function getAllLeagueTeeTimesForAdmin() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get all tee times within the league date range

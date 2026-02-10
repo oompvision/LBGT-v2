@@ -7,7 +7,7 @@ import { generateTeeTimes } from "@/lib/utils"
 
 // Function to generate tee times for all Fridays in the season
 export async function generateNewTeeTimesForSeason() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Get all Fridays in the season

@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 
 export async function fixDevinAccount() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // First, check if Devin exists in auth.users

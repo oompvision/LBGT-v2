@@ -14,7 +14,7 @@ export async function submitScores(
   }[],
 ) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {
@@ -184,7 +184,7 @@ export async function submitScores(
 // Function to get rounds for the current user
 export async function getMyRounds() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {
@@ -253,7 +253,7 @@ export async function getMyRounds() {
 // Function to get all league rounds - OPTIMIZED VERSION
 export async function getAllLeagueRounds(season?: number) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     let selectedSeason = season
     if (!selectedSeason) {
@@ -349,7 +349,7 @@ export async function getAllLeagueRounds(season?: number) {
 // Function to get details for a specific round
 export async function getRoundDetails(roundId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the round
     const { data: round, error: roundError } = await supabase
@@ -416,7 +416,7 @@ export async function getRoundDetails(roundId: string) {
 
 export async function getAllUsers() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const { data: users, error } = await supabase.from("users").select("id, name").order("name")
 

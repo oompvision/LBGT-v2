@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 
 async function getActiveSeason() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
 
   return data?.year || new Date().getFullYear()
@@ -13,7 +13,7 @@ export async function getAvailableTeeTimesForDate(date: string) {
   try {
     console.log(`Getting available tee times for date: ${date}`)
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     const activeSeason = await getActiveSeason()
 
@@ -66,7 +66,7 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
   try {
     console.log(`Checking availability for tee time ${teeTimeId}, requested slots: ${requestedSlots}`)
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the tee time with current reservations
     const { data: teeTime, error } = await supabase

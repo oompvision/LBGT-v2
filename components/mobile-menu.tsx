@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client"
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false)
-  const { user, isAdmin: authIsAdmin, signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const [isAdmin, setIsAdmin] = useState(false)
 
   // Check admin status when user changes
