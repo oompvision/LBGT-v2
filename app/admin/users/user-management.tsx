@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Loader2, Search, Trash2, User, AlertTriangle, Camera, X } from "lucide-react"
+import { Edit, Loader2, Search, Trash2, User, Camera, X } from "lucide-react"
 import {
   updateUser,
   updateStrokesGivenDirectly,
@@ -229,12 +228,6 @@ export function UserManagement({ users }: UserManagementProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Link href="/admin/fix-user">
-          <Button variant="outline" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Fix User Issues
-          </Button>
-        </Link>
       </div>
 
       <div className="space-y-4">
