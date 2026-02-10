@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { generateTeeTimes, getUpcomingFridayForSeason, getNextFriday, formatDate } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 
 async function getActiveSeason() {
   const supabase = await createClient()
@@ -482,7 +483,7 @@ export async function checkAndGenerateTeeTimes() {
     const teeTimesToInsert = times.map((time) => ({
       date: upcomingFriday,
       time,
-      max_slots: 4, // Each tee time can have up to 4 players
+      max_slots: DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
       is_available: true, // New tee times are available by default
     }))
 
@@ -573,7 +574,7 @@ export async function updateToNextFriday() {
     const teeTimesToInsert = times.map((time) => ({
       date: nextFridayStr,
       time,
-      max_slots: 4, // Each tee time can have up to 4 players
+      max_slots: DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
       is_available: true, // New tee times are available by default
     }))
 

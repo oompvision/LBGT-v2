@@ -34,14 +34,7 @@ interface PlayerStatData {
   strokesGiven: number
 }
 
-// Updated course data with correct par values
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
-}
+import { COURSE_DATA } from "@/lib/constants"
 
 export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
   const [sortBy, setSortBy] = useState("netAverage")
@@ -150,8 +143,8 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
     const netAverageScore = stats.rounds > 0 ? stats.netTotalScore / stats.rounds : 0
 
     // Calculate to par values
-    const toPar = averageScore - courseData.totalPar
-    const netToPar = netAverageScore - courseData.totalPar
+    const toPar = averageScore - COURSE_DATA.totalPar
+    const netToPar = netAverageScore - COURSE_DATA.totalPar
 
     return {
       userId,

@@ -21,6 +21,7 @@ import { CalendarIcon, Edit, Loader2, Search, Trash2, User } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { updateUser, deleteUser } from "@/app/actions/admin-management"
 import type { User, TeeTime, ReservationWithDetails } from "@/types/supabase"
+import { MAX_STROKES_GIVEN } from "@/lib/constants"
 
 interface AdminDashboardTabsProps {
   users: User[]
@@ -86,10 +87,10 @@ export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashb
     try {
       // Validate strokes_given is between 0 and 20
       const strokesGiven = Number.parseInt(editedUser.strokes_given.toString())
-      if (isNaN(strokesGiven) || strokesGiven < 0 || strokesGiven > 20) {
+      if (isNaN(strokesGiven) || strokesGiven < 0 || strokesGiven > MAX_STROKES_GIVEN) {
         toast({
           title: "Validation Error",
-          description: "Strokes Given must be a number between 0 and 20",
+          description: `Strokes Given must be a number between 0 and ${MAX_STROKES_GIVEN}`,
           variant: "destructive",
         })
         return
@@ -367,12 +368,12 @@ export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashb
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="strokes_given">Strokes Given (0-20)</Label>
+              <Label htmlFor="strokes_given">Strokes Given (0-{MAX_STROKES_GIVEN})</Label>
               <Input
                 id="strokes_given"
                 type="number"
                 min="0"
-                max="20"
+                max={MAX_STROKES_GIVEN}
                 value={editedUser.strokes_given}
                 onChange={(e) => setEditedUser({ ...editedUser, strokes_given: Number.parseInt(e.target.value) || 0 })}
               />

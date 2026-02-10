@@ -35,15 +35,7 @@ interface PlayerRingerData {
   strokesGiven: number
 }
 
-// Updated course data with correct par values and white handicap
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [11, 5, 17, 1, 9, 15, 7, 3, 13, 18, 8, 2, 12, 6, 10, 16, 4, 14], // White tee handicap for each hole
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
-}
+import { COURSE_DATA } from "@/lib/constants"
 
 // Score indicator component for the ringer leaderboard
 const ScoreIndicator = ({ score, par }: { score: number; par: number }) => {
@@ -259,7 +251,7 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
 
     // Calculate to par based on holes played
     const parForHolesPlayed = data.holes
-      .map((score, index) => (score !== null ? courseData.pars[index] : 0))
+      .map((score, index) => (score !== null ? COURSE_DATA.pars[index] : 0))
       .reduce((sum, par) => sum + par, 0)
 
     const toPar = totalRingerScore - parForHolesPlayed
@@ -322,7 +314,7 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
                   </div>
                 </td>
                 <th className="px-4 py-2 text-center font-medium border-l border-gray-300">Hole</th>
-                {courseData.holes.map((hole, index) => (
+                {COURSE_DATA.holes.map((hole, index) => (
                   <th
                     key={hole}
                     className={`px-2 py-2 text-center font-medium ${index < 17 ? "border-r border-gray-300" : ""}`}
@@ -340,7 +332,7 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
                 >
                   Par
                 </td>
-                {courseData.pars.map((par, index) => (
+                {COURSE_DATA.pars.map((par, index) => (
                   <td
                     key={index}
                     className={`px-2 py-2 text-center text-white ${index < 17 ? "border-r border-gray-300" : ""}`}
@@ -358,7 +350,7 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Score</th>
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Rounds</th>
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Hdcp</th>
-                {courseData.whiteHdcp.map((hdcp, index) => (
+                {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                   <td key={index} className={`px-2 py-2 text-center ${index < 17 ? "border-r border-gray-300" : ""}`}>
                     {hdcp}
                   </td>
@@ -394,7 +386,7 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
                   <td className="px-4 py-2 text-center border-r border-gray-300">{player.roundsPlayed}</td>
                   <td className="px-4 py-2 text-center border-r border-gray-300"></td>
                   {player.holes.map((score, holeIndex) => {
-                    const par = courseData.pars[holeIndex]
+                    const par = COURSE_DATA.pars[holeIndex]
                     return (
                       <td
                         key={holeIndex}

@@ -9,6 +9,7 @@ import { Loader2, Clock, Lock } from "lucide-react"
 import { getAvailableTeeTimesForDate } from "@/app/actions/available-tee-times"
 import { getUpcomingTeeTimeDates } from "@/app/actions/tee-time-templates"
 import { formatTime } from "@/lib/utils"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 
 export function AvailableTeeTimesDisplay() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -149,7 +150,7 @@ export function AvailableTeeTimesDisplay() {
                         </CardHeader>
                         <CardContent className="p-4">
                           <p className="text-sm text-muted-foreground mb-2">
-                            Available Slots: {teeTime.available_slots} of {teeTime.max_slots || 4}
+                            Available Slots: {teeTime.available_slots} of {teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME}
                           </p>
                           {!isBookable && teeTime.booking_status === "not_yet_open" && teeTime.booking_opens_at && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">

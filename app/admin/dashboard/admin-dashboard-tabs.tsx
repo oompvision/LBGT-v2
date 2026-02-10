@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { format, parseISO, isValid } from "date-fns"
 import type { User, TeeTime, RoundWithScores, ReservationWithDetails, Score, HoleScores } from "@/types/supabase"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 import {
   addReservation,
   deleteReservation,
@@ -134,7 +135,7 @@ export function AdminDashboardTabs({
   }
 
   const handleSlotsChange = (value: number) => {
-    const newValue = Math.max(1, Math.min(4, value))
+    const newValue = Math.max(1, Math.min(DEFAULT_MAX_PLAYERS_PER_TEE_TIME, value))
     setSlots(newValue)
 
     // Update player names array - only for additional players (slots 2-4)
@@ -445,7 +446,7 @@ export function AdminDashboardTabs({
                   id="slots"
                   type="number"
                   min={1}
-                  max={4}
+                  max={DEFAULT_MAX_PLAYERS_PER_TEE_TIME}
                   value={slots}
                   onChange={(e) => handleSlotsChange(Number.parseInt(e.target.value) || 1)}
                 />

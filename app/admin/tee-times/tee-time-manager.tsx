@@ -29,6 +29,13 @@ import {
   type TeeTimeTemplate,
 } from "@/app/actions/tee-time-templates"
 import type { TeeTime } from "@/types/supabase"
+import {
+  DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
+  DEFAULT_BOOKING_OPENS_DAYS_BEFORE,
+  DEFAULT_BOOKING_OPENS_TIME,
+  DEFAULT_BOOKING_CLOSES_DAYS_BEFORE,
+  DEFAULT_BOOKING_CLOSES_TIME,
+} from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]

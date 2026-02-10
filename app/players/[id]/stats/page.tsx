@@ -8,16 +8,7 @@ import { CalendarIcon, User } from "lucide-react"
 import { format } from "date-fns"
 import Link from "next/link"
 import Image from "next/image"
-
-// Course data
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [11, 5, 17, 1, 9, 15, 7, 3, 13, 18, 8, 2, 12, 6, 10, 16, 4, 14],
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
-}
+import { COURSE_DATA } from "@/lib/constants"
 
 // Score indicator component
 const ScoreIndicator = ({ score, par }) => {
@@ -378,7 +369,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       holeScores.forEach((holeScore, index) => {
         if (holeScore === null || holeScore === 0) return
 
-        const par = courseData.pars[index]
+        const par = COURSE_DATA.pars[index]
         const scoreToPar = holeScore - par
         scoringStats.totalHoles += 1
 
@@ -499,7 +490,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                     <thead>
                       <tr className="border-b">
                         <th className="px-1 py-2 text-left">Hole</th>
-                        {courseData.holes.map((hole) => (
+                        {COURSE_DATA.holes.map((hole) => (
                           <th key={hole} className="px-1 py-2 text-center">
                             {hole}
                           </th>
@@ -507,7 +498,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                       </tr>
                       <tr className="border-b">
                         <th className="px-1 py-2 text-left">Par</th>
-                        {courseData.pars.map((par, i) => (
+                        {COURSE_DATA.pars.map((par, i) => (
                           <td key={i} className="px-1 py-2 text-center text-muted-foreground">
                             {par}
                           </td>
@@ -518,7 +509,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                       <tr className="border-b">
                         <th className="px-1 py-2 text-left">Net</th>
                         {ringerScorecard.netHoles.map((score, i) => {
-                          const par = courseData.pars[i]
+                          const par = COURSE_DATA.pars[i]
                           return (
                             <td key={i} className="px-1 py-2 text-center h-8">
                               {score !== null ? <ScoreIndicator score={score} par={par} /> : "-"}
@@ -751,7 +742,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">To Par</p>
-                                  <p className="text-xl font-medium">{score.total_score - courseData.totalPar}</p>
+                                  <p className="text-xl font-medium">{score.total_score - COURSE_DATA.totalPar}</p>
                                 </div>
                                 <div>
                                   <p className="text-sm text-muted-foreground">Strokes Given</p>

@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 
 async function getActiveSeason() {
   const supabase = await createClient()
@@ -42,7 +43,7 @@ export async function getAvailableTeeTimesForDate(date: string) {
         ?.map((teeTime) => {
           const reservedSlots =
             teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
-          const availableSlots = (teeTime.max_slots || 4) - reservedSlots
+          const availableSlots = (teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME) - reservedSlots
 
           // Determine booking window status
           let bookingOpen = true
@@ -112,7 +113,7 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
 
     const reservedSlots =
       teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
-    const availableSlots = (teeTime.max_slots || 4) - reservedSlots
+    const availableSlots = (teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME) - reservedSlots
     const isAvailable = availableSlots >= requestedSlots
 
     return {
@@ -120,7 +121,7 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
       available: isAvailable,
       availableSlots,
       reservedSlots,
-      maxSlots: teeTime.max_slots || 4,
+      maxSlots: teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
       teeTime,
     }
   } catch (error: any) {
