@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import { format } from "date-fns"
 import { getSeasonDatesForDay, toUTC } from "@/lib/tee-time-utils"
@@ -59,7 +59,7 @@ export async function saveTemplate(input: {
   timezone: string
 }): Promise<{ success: boolean; template?: TeeTimeTemplate; error?: string }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Check if template already exists for this season
     const { data: existing } = await supabase
@@ -107,7 +107,7 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
   error?: string
 }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // Get the template
     const { data: template, error: templateError } = await supabase
@@ -267,7 +267,7 @@ export async function toggleTeeTime(teeTimeId: string, isAvailable: boolean): Pr
   error?: string
 }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from("tee_times")
