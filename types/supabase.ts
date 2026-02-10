@@ -38,6 +38,8 @@ export type Database = {
           max_slots: number
           is_available: boolean
           season: number | null
+          booking_opens_at: string | null
+          booking_closes_at: string | null
           created_at: string
         }
         Insert: {
@@ -47,6 +49,8 @@ export type Database = {
           max_slots?: number
           is_available?: boolean
           season?: number | null
+          booking_opens_at?: string | null
+          booking_closes_at?: string | null
           created_at?: string
         }
         Update: {
@@ -56,6 +60,8 @@ export type Database = {
           max_slots?: number
           is_available?: boolean
           season?: number | null
+          booking_opens_at?: string | null
+          booking_closes_at?: string | null
           created_at?: string
         }
       }
@@ -388,6 +394,50 @@ export type Database = {
           type?: string | null
           is_active?: boolean
           created_at?: string
+        }
+      }
+      tee_time_templates: {
+        Row: {
+          id: string
+          season_id: string
+          day_of_week: number
+          time_slots: string[]
+          max_slots: number
+          booking_opens_days_before: number
+          booking_opens_time: string
+          booking_closes_days_before: number
+          booking_closes_time: string
+          timezone: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          season_id: string
+          day_of_week?: number
+          time_slots?: string[]
+          max_slots?: number
+          booking_opens_days_before?: number
+          booking_opens_time?: string
+          booking_closes_days_before?: number
+          booking_closes_time?: string
+          timezone?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          season_id?: string
+          day_of_week?: number
+          time_slots?: string[]
+          max_slots?: number
+          booking_opens_days_before?: number
+          booking_opens_time?: string
+          booking_closes_days_before?: number
+          booking_closes_time?: string
+          timezone?: string
+          created_at?: string
+          updated_at?: string
         }
       }
       tee_time_logs: {

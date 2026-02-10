@@ -2,23 +2,34 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns"
-import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, Clock, Lock } from "lucide-react"
 import { getAvailableTeeTimesForDate } from "@/app/actions/available-tee-times"
+import { getUpcomingTeeTimeDates } from "@/app/actions/tee-time-templates"
 import { formatTime } from "@/lib/utils"
 
 export function AvailableTeeTimesDisplay() {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>()
-  const [isLoading, setIsLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [isLoadingDates, setIsLoadingDates] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
   const [teeTimes, setTeeTimes] = useState<any[]>([])
   const router = useRouter()
 
-  // Initialize with May 30th, 2025 (the date you created tee times for)
+  // Load upcoming dates dynamically from the database
   useEffect(() => {
-    const may30th = new Date("2025-05-30")
-    setSelectedDate(may30th)
+    const loadDates = async () => {
+      setIsLoadingDates(true)
+      const result = await getUpcomingTeeTimeDates()
+      if (result.success && result.dates && result.dates.length > 0) {
+        setAvailableDates(result.dates)
+        setSelectedDate(result.dates[0])
+      }
+      setIsLoadingDates(false)
+    }
+    loadDates()
   }, [])
 
   // Load tee times for the selected date
@@ -27,19 +38,11 @@ export function AvailableTeeTimesDisplay() {
       if (!selectedDate) return
 
       setIsLoading(true)
-
       try {
-        // Format date for API
-        const formattedDate = format(selectedDate, "yyyy-MM-dd")
-        console.log(`Loading tee times for date: ${formattedDate}`)
-
-        const result = await getAvailableTeeTimesForDate(formattedDate)
-
+        const result = await getAvailableTeeTimesForDate(selectedDate)
         if (result.success) {
-          console.log(`Found ${result.teeTimes?.length || 0} tee times for ${formattedDate}`)
           setTeeTimes(result.teeTimes || [])
         } else {
-          console.error("Error loading tee times:", result.error)
           setTeeTimes([])
         }
       } catch (error) {
@@ -53,28 +56,30 @@ export function AvailableTeeTimesDisplay() {
     loadTeeTimes()
   }, [selectedDate])
 
-  // Get available dates (you can customize this to show specific dates)
-  const availableDates = [
-    new Date("2025-05-23"),
-    new Date("2025-05-30"),
-    new Date("2025-06-06"),
-    new Date("2025-06-13"),
-    new Date("2025-06-20"),
-  ]
+  const handleBookTeeTime = (teeTimeId: string) => {
+    router.push(`/reservations?teeTimeId=${teeTimeId}`)
+  }
 
-  // Filter dates to only show available dates
-  const isDateAvailable = (date: Date) => {
-    return availableDates.some(
-      (availableDate) =>
-        availableDate.getFullYear() === date.getFullYear() &&
-        availableDate.getMonth() === date.getMonth() &&
-        availableDate.getDate() === date.getDate(),
+  if (isLoadingDates) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     )
   }
 
-  // Handle booking a tee time
-  const handleBookTeeTime = (teeTimeId: string) => {
-    router.push(`/reservations?teeTimeId=${teeTimeId}`)
+  if (availableDates.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Available Tee Times</h2>
+          <p className="text-muted-foreground">Select a date to view available tee times</p>
+        </div>
+        <div className="text-center py-8 border rounded-lg">
+          <p className="text-muted-foreground">No upcoming tee times available at this time.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -82,64 +87,100 @@ export function AvailableTeeTimesDisplay() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Available Tee Times</h2>
-          <p className="text-muted-foreground">Select a Friday to view available tee times</p>
+          <p className="text-muted-foreground">Select a date to view available tee times</p>
         </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-6">
-        <Card className="md:w-auto">
+        {/* Date Selector */}
+        <Card className="md:w-[280px]">
           <CardHeader>
             <CardTitle>Select Date</CardTitle>
-            <CardDescription>Choose a Friday with available tee times</CardDescription>
+            <CardDescription>Choose an upcoming date</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={setSelectedDate}
-              disabled={(date) => !isDateAvailable(date)}
-              initialFocus
-            />
+          <CardContent className="p-0">
+            <div className="max-h-[400px] overflow-y-auto">
+              {availableDates.map((date) => (
+                <button
+                  key={date}
+                  className={`w-full text-left px-4 py-3 border-b transition-colors ${
+                    selectedDate === date
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-accent/50"
+                  }`}
+                  onClick={() => setSelectedDate(date)}
+                >
+                  {formatDateDisplay(date)}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
+        {/* Tee Times */}
         <div className="flex-1">
           <Card className="h-full">
             <CardHeader>
-              <CardTitle>{selectedDate ? format(selectedDate, "MMMM d, yyyy") : "Select a date"}</CardTitle>
+              <CardTitle>
+                {selectedDate ? formatDateDisplay(selectedDate) : "Select a date"}
+              </CardTitle>
               <CardDescription>Available tee times for this date</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                  <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
               ) : teeTimes.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {teeTimes.map((teeTime) => (
-                    <Card key={teeTime.id} className="overflow-hidden">
-                      <CardHeader className="bg-muted/50 p-4">
-                        <CardTitle className="text-lg">{formatTime(teeTime.time_slot || teeTime.time)}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4">
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Available Slots: {teeTime.available_slots || teeTime.availableSlots} of{" "}
-                          {teeTime.max_slots || 4}
-                        </p>
-                      </CardContent>
-                      <CardFooter className="p-4 pt-0">
-                        <Button className="w-full" onClick={() => handleBookTeeTime(teeTime.id)}>
-                          Book Tee Time
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  ))}
+                  {teeTimes.map((teeTime) => {
+                    const isBookable = teeTime.booking_open !== false
+                    return (
+                      <Card key={teeTime.id} className="overflow-hidden">
+                        <CardHeader className="bg-muted/50 p-4">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-lg">
+                              {formatTime(teeTime.time_slot || teeTime.time)}
+                            </CardTitle>
+                            {!isBookable && (
+                              <Lock className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Available Slots: {teeTime.available_slots} of {teeTime.max_slots || 4}
+                          </p>
+                          {!isBookable && teeTime.booking_status === "not_yet_open" && teeTime.booking_opens_at && (
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>Opens {formatBookingTime(teeTime.booking_opens_at)}</span>
+                            </div>
+                          )}
+                          {!isBookable && teeTime.booking_status === "closed" && (
+                            <Badge variant="secondary" className="text-xs">Booking closed</Badge>
+                          )}
+                        </CardContent>
+                        <CardFooter className="p-4 pt-0">
+                          {isBookable ? (
+                            <Button className="w-full" onClick={() => handleBookTeeTime(teeTime.id)}>
+                              Book Tee Time
+                            </Button>
+                          ) : (
+                            <Button className="w-full" disabled variant="secondary">
+                              {teeTime.booking_status === "not_yet_open" ? "Not Yet Open" : "Booking Closed"}
+                            </Button>
+                          )}
+                        </CardFooter>
+                      </Card>
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground mb-2">No available tee times for this date</p>
                   <p className="text-sm">
-                    {selectedDate ? `Selected: ${format(selectedDate, "MMMM d, yyyy")}` : "Please select a date"}
+                    {selectedDate ? `Selected: ${formatDateDisplay(selectedDate)}` : "Please select a date"}
                   </p>
                 </div>
               )}
@@ -149,4 +190,26 @@ export function AvailableTeeTimesDisplay() {
       </div>
     </div>
   )
+}
+
+function formatDateDisplay(dateStr: string): string {
+  const date = new Date(dateStr + "T00:00:00")
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
+function formatBookingTime(isoStr: string): string {
+  const date = new Date(isoStr)
+  return date.toLocaleString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
 }
