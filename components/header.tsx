@@ -274,13 +274,6 @@ export function Header() {
                             Messages
                           </Link>
                           <Link
-                            href="/admin/reservations"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            Reservations
-                          </Link>
-                          <Link
                             href="/admin/seasons"
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setActiveDropdown(null)}
@@ -293,20 +286,6 @@ export function Header() {
                             onClick={() => setActiveDropdown(null)}
                           >
                             Tee Times
-                          </Link>
-                          <Link
-                            href="/admin/manual-tee-times"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            Manual Tee Times
-                          </Link>
-                          <Link
-                            href="/admin/generate-tee-times"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setActiveDropdown(null)}
-                          >
-                            Generate Tee Times
                           </Link>
                           <Link
                             href="/admin/reset-password"
