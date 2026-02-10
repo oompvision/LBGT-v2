@@ -466,6 +466,61 @@ export type Database = {
           changed_at?: string
         }
       }
+      info_boxes: {
+        Row: {
+          id: string
+          title: string
+          content: string
+          display_order: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          content?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          content?: string
+          display_order?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      playoff_results: {
+        Row: {
+          id: string
+          year: number
+          champion_name: string
+          runner_up_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          champion_name: string
+          runner_up_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          champion_name?: string
+          runner_up_name?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       available_tee_times: {
@@ -506,6 +561,8 @@ export type TeeTimeAvailability = Tables["tee_time_availability"]["Row"]
 export type SiteMessage = Tables["site_messages"]["Row"]
 export type TeeTimeTemplate = Tables["tee_time_templates"]["Row"]
 export type TeeTimeLog = Tables["tee_time_logs"]["Row"]
+export type InfoBox = Tables["info_boxes"]["Row"]
+export type PlayoffResult = Tables["playoff_results"]["Row"]
 export type AvailableTeeTime = Views["available_tee_times"]["Row"]
 
 // Common joined types used in components

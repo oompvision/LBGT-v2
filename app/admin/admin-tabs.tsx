@@ -33,9 +33,14 @@ export function AdminTabs({ className }: AdminTabsProps) {
       isActive: pathname === "/admin/messages",
     },
     {
-      name: "Reservations",
-      href: "/admin/reservations",
-      isActive: pathname === "/admin/reservations",
+      name: "Info Boxes",
+      href: "/admin/info-boxes",
+      isActive: pathname === "/admin/info-boxes",
+    },
+    {
+      name: "Playoff Results",
+      href: "/admin/playoff-results",
+      isActive: pathname === "/admin/playoff-results",
     },
     {
       name: "Tee Times",

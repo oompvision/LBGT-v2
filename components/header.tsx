@@ -274,6 +274,20 @@ export function Header() {
                             Messages
                           </Link>
                           <Link
+                            href="/admin/info-boxes"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Info Boxes
+                          </Link>
+                          <Link
+                            href="/admin/playoff-results"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Playoff Results
+                          </Link>
+                          <Link
                             href="/admin/seasons"
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setActiveDropdown(null)}
