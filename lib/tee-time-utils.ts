@@ -74,8 +74,14 @@ export function toUTC(dateStr: string, timeStr: string, timezone: string): strin
   // Get the timezone offset in milliseconds
   const offsetMs = getTimezoneOffsetMs(refDate, timezone)
 
+  // Normalize time to HH:MM:SS format
+  const timeParts = timeStr.split(":")
+  const normalizedTime = timeParts.length >= 3
+    ? `${timeParts[0]}:${timeParts[1]}:${timeParts[2]}`
+    : `${timeStr}:00`
+
   // Create the "local" time as if it were UTC, then adjust by the offset
-  const fakeUTC = new Date(`${dateStr}T${timeStr}:00Z`)
+  const fakeUTC = new Date(`${dateStr}T${normalizedTime}Z`)
   const actualUTC = new Date(fakeUTC.getTime() - offsetMs)
 
   return actualUTC.toISOString()
