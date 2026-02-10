@@ -269,6 +269,7 @@ export async function getAllLeagueRounds(season?: number) {
       )
       .eq("season", selectedSeason)
       .order("date", { ascending: false })
+      .limit(52)
 
     if (roundsError) {
       console.error("Error fetching league rounds:", roundsError)

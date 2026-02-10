@@ -71,8 +71,9 @@ export async function getAllTeeTimes() {
     const { data: teeTimes, error: teeTimesError } = await supabase
       .from("tee_times")
       .select("*")
-      .order("date")
+      .order("date", { ascending: false })
       .order("time")
+      .limit(200)
 
     if (teeTimesError) {
       console.error("Error fetching tee times:", teeTimesError)
@@ -410,6 +411,7 @@ export async function getAllReservations() {
         )
       `)
       .order("created_at", { ascending: false })
+      .limit(200)
 
     if (error) {
       console.error("Error fetching all reservations:", error)

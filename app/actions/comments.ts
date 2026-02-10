@@ -53,6 +53,7 @@ export async function getComments() {
         )
       `)
       .order("created_at", { ascending: false })
+      .limit(50)
 
     if (error) {
       console.error("Error fetching comments:", error)
