@@ -10,7 +10,7 @@ import { checkTeeTimeAvailability } from "@/app/actions/tee-times"
 export const dynamic = "force-dynamic"
 
 export default async function ReservationPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Get the current user
   const {

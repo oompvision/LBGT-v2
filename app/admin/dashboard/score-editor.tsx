@@ -5,20 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DialogFooter } from "@/components/ui/dialog"
 import { Loader2 } from "lucide-react"
-
-// Updated course data from the new scorecard
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [13, 9, 15, 5, 1, 17, 3, 11, 7, 12, 16, 2, 10, 8, 14, 18, 6, 4], // White Handicap values
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
-}
+import type { Score, User, HoleScores } from "@/types/supabase"
+import { COURSE_DATA } from "@/lib/constants"
 
 interface ScoreEditorProps {
-  score: any
-  onSave: (scoreData: any) => Promise<void>
+  score: Score & { users: Pick<User, "name"> | null }
+  onSave: (scoreData: HoleScores) => Promise<void>
   isSubmitting: boolean
 }
 
@@ -93,7 +85,7 @@ export function ScoreEditor({ score, onSave, isSubmitting }: ScoreEditorProps) {
           <thead>
             <tr className="border-b bg-muted/50">
               <th className="px-2 py-2 text-left font-medium">Hole</th>
-              {courseData.holes.map((hole) => (
+              {COURSE_DATA.holes.map((hole) => (
                 <th key={hole} className="px-2 py-2 text-center font-medium">
                   {hole}
                 </th>
@@ -104,18 +96,18 @@ export function ScoreEditor({ score, onSave, isSubmitting }: ScoreEditorProps) {
             </tr>
             <tr className="border-b bg-muted/30">
               <th className="px-2 py-2 text-left font-medium">Par</th>
-              {courseData.pars.map((par, index) => (
+              {COURSE_DATA.pars.map((par, index) => (
                 <td key={index} className="px-2 py-2 text-center">
                   {par}
                 </td>
               ))}
-              <td className="px-2 py-2 text-center font-medium">{courseData.frontNinePar}</td>
-              <td className="px-2 py-2 text-center font-medium">{courseData.backNinePar}</td>
-              <td className="px-2 py-2 text-center font-medium">{courseData.totalPar}</td>
+              <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.frontNinePar}</td>
+              <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.backNinePar}</td>
+              <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.totalPar}</td>
             </tr>
             <tr className="border-b bg-muted/20">
               <th className="px-2 py-2 text-left font-medium">White Hdcp</th>
-              {courseData.whiteHdcp.map((hdcp, index) => (
+              {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                 <td key={index} className="px-2 py-2 text-center">
                   {hdcp}
                 </td>
@@ -127,10 +119,10 @@ export function ScoreEditor({ score, onSave, isSubmitting }: ScoreEditorProps) {
           </thead>
           <tbody>
             <tr className="border-b">
-              <td className="px-2 py-2 font-medium">{score.users.name}</td>
+              <td className="px-2 py-2 font-medium">{score.users?.name || "Unknown"}</td>
               {scores.map((holeScore, index) => {
                 // Calculate if the score is under, over, or at par
-                const par = courseData.pars[index]
+                const par = COURSE_DATA.pars[index]
                 let scoreClass = ""
 
                 if (holeScore !== null) {

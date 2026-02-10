@@ -12,19 +12,31 @@ import { ArrowLeft, CalendarIcon, User } from "lucide-react"
 import { format } from "date-fns"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-// Update the courseData object with the correct par values
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [13, 9, 15, 5, 1, 17, 3, 11, 7, 12, 16, 2, 10, 8, 14, 18, 6, 4], // White Handicap values
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
+interface RoundScore {
+  id: string
+  user_id: string
+  users: { name: string }
+  rounds: { date: string; users: { name: string } }
+  strokes_given: number
+  total_score: number
+  net_total_score: number | null
+  hole_1: number; hole_2: number; hole_3: number; hole_4: number; hole_5: number; hole_6: number
+  hole_7: number; hole_8: number; hole_9: number; hole_10: number; hole_11: number; hole_12: number
+  hole_13: number; hole_14: number; hole_15: number; hole_16: number; hole_17: number; hole_18: number
+  net_hole_1: number | null; net_hole_2: number | null; net_hole_3: number | null
+  net_hole_4: number | null; net_hole_5: number | null; net_hole_6: number | null
+  net_hole_7: number | null; net_hole_8: number | null; net_hole_9: number | null
+  net_hole_10: number | null; net_hole_11: number | null; net_hole_12: number | null
+  net_hole_13: number | null; net_hole_14: number | null; net_hole_15: number | null
+  net_hole_16: number | null; net_hole_17: number | null; net_hole_18: number | null
+  line_17: number
 }
 
+import { COURSE_DATA } from "@/lib/constants"
+
 // Golf score indicator components
-const ScoreIndicator = ({ score, par }) => {
-  if (score === null || score === undefined) return "-"
+const ScoreIndicator = ({ score, par }: { score: number; par: number }) => {
+  if (score === null || score === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = score - par
@@ -103,8 +115,8 @@ const ScoreIndicator = ({ score, par }) => {
 }
 
 // Net score indicator component
-const NetScoreIndicator = ({ netScore, par }) => {
-  if (netScore === null || netScore === undefined) return "-"
+const NetScoreIndicator = ({ netScore, par }: { netScore: number; par: number }) => {
+  if (netScore === null || netScore === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = netScore - par
@@ -183,12 +195,14 @@ const NetScoreIndicator = ({ netScore, par }) => {
 }
 
 interface PageProps {
-  params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 export default async function RoundDetailsPage({ params, searchParams }: PageProps) {
-  const supabase = createClient()
+  const resolvedParams = await params
+  const resolvedSearchParams = await searchParams
+  const supabase = await createClient()
 
   // Check if user is authenticated
   const {
@@ -200,7 +214,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   }
 
   // Get round details
-  const { scores } = await getRoundDetails(params.id)
+  const { scores } = (await getRoundDetails(resolvedParams.id)) as { scores: RoundScore[] }
 
   if (!scores || scores.length === 0) {
     return notFound()
@@ -211,9 +225,9 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   const submittedBy = scores[0].rounds.users.name
 
   // Check if we came from a player stats page
-  const fromPlayer = searchParams?.from === "player"
-  const playerId = searchParams?.playerId as string
-  const playerName = searchParams?.playerName as string
+  const fromPlayer = resolvedSearchParams?.from === "player"
+  const playerId = resolvedSearchParams?.playerId as string
+  const playerName = resolvedSearchParams?.playerName as string
 
   // Determine back link and text
   const backHref = fromPlayer && playerId ? `/players/${playerId}/stats` : "/scores/my-rounds"
@@ -267,7 +281,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                       <thead>
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300 w-40">Hole</th>
-                          {courseData.holes.map((hole) => (
+                          {COURSE_DATA.holes.map((hole) => (
                             <th key={hole} className="px-2 py-2 text-center font-medium border-r border-gray-300 w-12">
                               {hole}
                             </th>
@@ -283,7 +297,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                           >
                             Par
                           </th>
-                          {courseData.pars.map((par, index) => (
+                          {COURSE_DATA.pars.map((par, index) => (
                             <td
                               key={index}
                               className="px-2 py-2 text-center border-r border-gray-300 w-12"
@@ -296,21 +310,21 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                             className="px-2 py-2 text-center font-medium border-r border-gray-300"
                             style={{ backgroundColor: "#2d4a2d" }}
                           >
-                            {courseData.frontNinePar}
+                            {COURSE_DATA.frontNinePar}
                           </td>
                           <td
                             className="px-2 py-2 text-center font-medium border-r border-gray-300"
                             style={{ backgroundColor: "#2d4a2d" }}
                           >
-                            {courseData.backNinePar}
+                            {COURSE_DATA.backNinePar}
                           </td>
                           <td className="px-2 py-2 text-center font-medium" style={{ backgroundColor: "#2d4a2d" }}>
-                            {courseData.totalPar}
+                            {COURSE_DATA.totalPar}
                           </td>
                         </tr>
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Hdcp</th>
-                          {courseData.whiteHdcp.map((hdcp, index) => (
+                          {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                             <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
                               {hdcp}
                             </td>
@@ -358,7 +372,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                                 )}
                               </td>
                               {playerScores.map((holeScore, index) => {
-                                const par = courseData.pars[index]
+                                const par = COURSE_DATA.pars[index]
                                 return (
                                   <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
                                     {holeScore !== null ? <ScoreIndicator score={holeScore} par={par} /> : "-"}
@@ -386,7 +400,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                       <thead>
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300 w-40">Hole</th>
-                          {courseData.holes.map((hole) => (
+                          {COURSE_DATA.holes.map((hole) => (
                             <th key={hole} className="px-2 py-2 text-center font-medium border-r border-gray-300 w-12">
                               {hole}
                             </th>
@@ -402,7 +416,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                           >
                             Par
                           </th>
-                          {courseData.pars.map((par, index) => (
+                          {COURSE_DATA.pars.map((par, index) => (
                             <td
                               key={index}
                               className="px-2 py-2 text-center border-r border-gray-300 w-12"
@@ -415,21 +429,21 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                             className="px-2 py-2 text-center font-medium border-r border-gray-300"
                             style={{ backgroundColor: "#2d4a2d" }}
                           >
-                            {courseData.frontNinePar}
+                            {COURSE_DATA.frontNinePar}
                           </td>
                           <td
                             className="px-2 py-2 text-center font-medium border-r border-gray-300"
                             style={{ backgroundColor: "#2d4a2d" }}
                           >
-                            {courseData.backNinePar}
+                            {COURSE_DATA.backNinePar}
                           </td>
                           <td className="px-2 py-2 text-center font-medium" style={{ backgroundColor: "#2d4a2d" }}>
-                            {courseData.totalPar}
+                            {COURSE_DATA.totalPar}
                           </td>
                         </tr>
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Hdcp</th>
-                          {courseData.whiteHdcp.map((hdcp, index) => (
+                          {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                             <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
                               {hdcp}
                             </td>
@@ -481,7 +495,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                                 <span className="ml-1 text-xs text-gray-600">({score.strokes_given})</span>
                               </td>
                               {netScores.map((netScore, index) => {
-                                const par = courseData.pars[index]
+                                const par = COURSE_DATA.pars[index]
                                 return (
                                   <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
                                     {netScore !== null ? <NetScoreIndicator netScore={netScore} par={par} /> : "-"}

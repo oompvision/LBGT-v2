@@ -16,7 +16,7 @@ export type ApplicationFormData = {
 export async function submitApplication(formData: ApplicationFormData) {
   try {
     const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+    const supabase = await createClient(cookieStore)
 
     // Use the SQL function we created to bypass RLS
     const { data, error } = await supabase.rpc("submit_application", {
@@ -44,7 +44,7 @@ export async function submitApplication(formData: ApplicationFormData) {
 export async function getApplications() {
   try {
     const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+    const supabase = await createClient(cookieStore)
 
     const { data, error } = await supabase.from("applications").select("*").order("created_at", { ascending: false })
 
@@ -63,7 +63,7 @@ export async function getApplications() {
 export async function updateApplicationStatus(id: string, status: string) {
   try {
     const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+    const supabase = await createClient(cookieStore)
 
     const { error } = await supabase.from("applications").update({ status }).eq("id", id)
 
@@ -82,7 +82,7 @@ export async function updateApplicationStatus(id: string, status: string) {
 export async function deleteApplication(id: string) {
   try {
     const cookieStore = cookies()
-    const supabase = createClient(cookieStore)
+    const supabase = await createClient(cookieStore)
 
     const { error } = await supabase.from("applications").delete().eq("id", id)
 

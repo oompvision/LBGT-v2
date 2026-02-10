@@ -29,44 +29,15 @@ export default function SignUpPage() {
   // Redirect if user is already signed in
   useEffect(() => {
     if (user && !authLoading) {
-      // Immediate redirect to home page
       window.location.href = "/"
     }
   }, [user, authLoading])
-
-  // Clear any existing session on page load
-  useEffect(() => {
-    const clearSession = async () => {
-      try {
-        // Check if there's an existing session with errors
-        const { data, error } = await supabase.auth.getSession()
-        if (error || (data.session && data.session.expires_at * 1000 < Date.now())) {
-          console.log("Clearing problematic session...")
-          await supabase.auth.signOut()
-        }
-      } catch (err) {
-        console.error("Error checking session:", err)
-        // Try to sign out anyway
-        try {
-          await supabase.auth.signOut()
-        } catch (signOutErr) {
-          console.error("Error signing out:", signOutErr)
-        }
-      }
-    }
-
-    clearSession()
-  }, [supabase])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      // Clear any existing session first to avoid token conflicts
-      await supabase.auth.signOut()
-
-      // Sign up with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -88,7 +59,7 @@ export default function SignUpPage() {
         return
       }
 
-      // Use the server action to create the user in the database
+      // Create the user profile in the database
       if (authData.user) {
         const result = await createUserInDatabase(authData.user.id, email, name)
 
@@ -123,26 +94,6 @@ export default function SignUpPage() {
         return
       }
 
-      // Double-check that the user was created in the database
-      if (authData.user) {
-        // Wait a moment for the database to update
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-
-        // Check if the user exists in the database
-        const { data: dbUser, error: dbError } = await supabase
-          .from("users")
-          .select("id")
-          .eq("id", authData.user.id)
-          .maybeSingle()
-
-        if (dbError || !dbUser) {
-          console.error("User not found in database after signup, trying again:", dbError)
-          // Try creating the user again
-          await createUserInDatabase(authData.user.id, email, name)
-        }
-      }
-
-      // Use window.location for a full page navigation
       window.location.href = "/"
     } catch (error) {
       toast({
@@ -154,12 +105,10 @@ export default function SignUpPage() {
     }
   }
 
-  // If user is already authenticated, show minimal loading UI
   if (user && !authLoading) {
-    return null // Return nothing as we're redirecting immediately
+    return null
   }
 
-  // If still checking authentication status, show minimal loading
   if (authLoading) {
     return (
       <div className="flex min-h-screen flex-col">

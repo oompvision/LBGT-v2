@@ -33,19 +33,19 @@ export function AdminTabs({ className }: AdminTabsProps) {
       isActive: pathname === "/admin/messages",
     },
     {
-      name: "Reservations",
-      href: "/admin/reservations",
-      isActive: pathname === "/admin/reservations",
+      name: "Info Boxes",
+      href: "/admin/info-boxes",
+      isActive: pathname === "/admin/info-boxes",
     },
     {
-      name: "Manual Tee Times",
-      href: "/admin/manual-tee-times",
-      isActive: pathname === "/admin/manual-tee-times",
+      name: "Playoff Results",
+      href: "/admin/playoff-results",
+      isActive: pathname === "/admin/playoff-results",
     },
     {
-      name: "Generate Tee Times",
-      href: "/admin/generate-tee-times",
-      isActive: pathname === "/admin/generate-tee-times",
+      name: "Tee Times",
+      href: "/admin/tee-times",
+      isActive: pathname === "/admin/tee-times",
     },
     {
       name: "Seasons",

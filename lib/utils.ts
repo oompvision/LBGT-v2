@@ -62,36 +62,3 @@ export function formatDateForDB(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0")
   return `${year}-${month}-${day}`
 }
-
-export function getSeasonFridays(): Date[] {
-  const fridays: Date[] = []
-  const today = new Date()
-  const currentFriday = getNextFriday(today)
-
-  // Return upcoming Fridays for the next 26 weeks (half year)
-  for (let i = 0; i < 26; i++) {
-    const friday = new Date(currentFriday)
-    friday.setDate(friday.getDate() + i * 7)
-    fridays.push(friday)
-  }
-
-  return fridays
-}
-
-export function generateTeeTimes(date: Date): Array<{ time: string; available: boolean }> {
-  const teeTimes = []
-  const startHour = 7 // 7:00 AM
-  const endHour = 17 // 5:00 PM
-
-  for (let hour = startHour; hour <= endHour; hour++) {
-    for (let minute = 0; minute < 60; minute += 10) {
-      const timeString = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
-      teeTimes.push({
-        time: timeString,
-        available: Math.random() > 0.3, // Random availability for demo
-      })
-    }
-  }
-
-  return teeTimes
-}

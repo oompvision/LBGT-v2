@@ -1,9 +1,10 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 
 async function getActiveSeason() {
-  const supabase = createClient()
+  const supabase = await createClient()
   const { data } = await supabase.from("seasons").select("year").eq("is_active", true).single()
 
   return data?.year || new Date().getFullYear()
@@ -11,10 +12,7 @@ async function getActiveSeason() {
 
 export async function getAvailableTeeTimesForDate(date: string) {
   try {
-    console.log(`Getting available tee times for date: ${date}`)
-
-    const supabase = createClient()
-
+    const supabase = await createClient()
     const activeSeason = await getActiveSeason()
 
     const { data: teeTimes, error } = await supabase
@@ -27,7 +25,8 @@ export async function getAvailableTeeTimesForDate(date: string) {
         )
       `)
       .eq("date", date)
-      .eq("season", activeSeason) // Filter by active season
+      .eq("season", activeSeason)
+      .eq("is_available", true)
       .gt("max_slots", 0)
       .order("time", { ascending: true })
 
@@ -36,24 +35,39 @@ export async function getAvailableTeeTimesForDate(date: string) {
       return { success: false, error: error.message, teeTimes: [] }
     }
 
-    // Calculate available slots for each tee time
+    const now = new Date().toISOString()
+
+    // Calculate available slots and check booking window
     const availableTeeTimes =
       teeTimes
         ?.map((teeTime) => {
           const reservedSlots =
-            teeTime.reservations?.reduce((sum: number, reservation: any) => sum + reservation.slots, 0) || 0
-          const availableSlots = (teeTime.max_slots || 4) - reservedSlots
+            teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
+          const availableSlots = (teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME) - reservedSlots
+
+          // Determine booking window status
+          let bookingOpen = true
+          let bookingStatus = "open"
+          if (teeTime.booking_opens_at && teeTime.booking_closes_at) {
+            if (now < teeTime.booking_opens_at) {
+              bookingOpen = false
+              bookingStatus = "not_yet_open"
+            } else if (now > teeTime.booking_closes_at) {
+              bookingOpen = false
+              bookingStatus = "closed"
+            }
+          }
 
           return {
             ...teeTime,
             available_slots: availableSlots,
             reserved_slots: reservedSlots,
-            time_slot: teeTime.time, // For compatibility
+            time_slot: teeTime.time,
+            booking_open: bookingOpen,
+            booking_status: bookingStatus,
           }
         })
-        .filter((teeTime) => teeTime.available_slots > 0) || [] // Only return tee times with available slots
-
-    console.log(`Found ${availableTeeTimes.length} available tee times for ${date}`)
+        .filter((teeTime) => teeTime.available_slots > 0) || []
 
     return { success: true, teeTimes: availableTeeTimes }
   } catch (error: any) {
@@ -64,11 +78,8 @@ export async function getAvailableTeeTimesForDate(date: string) {
 
 export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots: number) {
   try {
-    console.log(`Checking availability for tee time ${teeTimeId}, requested slots: ${requestedSlots}`)
+    const supabase = await createClient()
 
-    const supabase = createClient()
-
-    // Get the tee time with current reservations
     const { data: teeTime, error } = await supabase
       .from("tee_times")
       .select(`
@@ -82,7 +93,6 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
       .single()
 
     if (error) {
-      console.error("Error fetching tee time:", error)
       return { success: false, error: error.message, available: false }
     }
 
@@ -90,13 +100,20 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
       return { success: false, error: "Tee time not found", available: false }
     }
 
-    // Calculate current reserved slots
+    // Check booking window
+    const now = new Date().toISOString()
+    if (teeTime.booking_opens_at && teeTime.booking_closes_at) {
+      if (now < teeTime.booking_opens_at) {
+        return { success: false, error: "Booking has not opened yet for this tee time", available: false }
+      }
+      if (now > teeTime.booking_closes_at) {
+        return { success: false, error: "Booking has closed for this tee time", available: false }
+      }
+    }
+
     const reservedSlots =
-      teeTime.reservations?.reduce((sum: number, reservation: any) => sum + reservation.slots, 0) || 0
-    const availableSlots = (teeTime.max_slots || 4) - reservedSlots
-
-    console.log(`Tee time ${teeTimeId}: ${availableSlots} slots available, ${requestedSlots} requested`)
-
+      teeTime.reservations?.reduce((sum: number, reservation: { slots: number }) => sum + reservation.slots, 0) || 0
+    const availableSlots = (teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME) - reservedSlots
     const isAvailable = availableSlots >= requestedSlots
 
     return {
@@ -104,7 +121,7 @@ export async function checkTeeTimeAvailability(teeTimeId: string, requestedSlots
       available: isAvailable,
       availableSlots,
       reservedSlots,
-      maxSlots: teeTime.max_slots || 4,
+      maxSlots: teeTime.max_slots || DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
       teeTime,
     }
   } catch (error: any) {

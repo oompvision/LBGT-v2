@@ -8,19 +8,38 @@ import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import Image from "next/image"
 
-// Updated course data with correct par values and white handicap
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [11, 5, 17, 1, 9, 15, 7, 3, 13, 18, 8, 2, 12, 6, 10, 16, 4, 14], // White tee handicap for each hole
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
+interface LeagueScore {
+  user_id: string
+  users?: { name: string }
+  total_score: number
+  net_total_score: number | null
+  net_hole_1: number | null; net_hole_2: number | null; net_hole_3: number | null
+  net_hole_4: number | null; net_hole_5: number | null; net_hole_6: number | null
+  net_hole_7: number | null; net_hole_8: number | null; net_hole_9: number | null
+  net_hole_10: number | null; net_hole_11: number | null; net_hole_12: number | null
+  net_hole_13: number | null; net_hole_14: number | null; net_hole_15: number | null
+  net_hole_16: number | null; net_hole_17: number | null; net_hole_18: number | null
 }
 
+interface LeagueRound {
+  id: string
+  date: string
+  scores: LeagueScore[]
+}
+
+interface PlayerRingerData {
+  name: string
+  userId: string
+  holes: (number | null)[]
+  roundsPlayed: number
+  strokesGiven: number
+}
+
+import { COURSE_DATA } from "@/lib/constants"
+
 // Score indicator component for the ringer leaderboard
-const ScoreIndicator = ({ score, par }) => {
-  if (score === null || score === undefined) return "-"
+const ScoreIndicator = ({ score, par }: { score: number; par: number }) => {
+  if (score === null || score === undefined) return <>{"-"}</>
 
   // Calculate the difference from par
   const diff = score - par
@@ -112,7 +131,7 @@ const formatPlayerName = (fullName: string, strokes: number) => {
   return `${firstInitial}. ${lastName} (${strokes})`
 }
 
-export function RingerLeaderboard({ rounds }) {
+export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const supabase = createClient()
 
@@ -158,7 +177,7 @@ export function RingerLeaderboard({ rounds }) {
   }, [supabase, rounds])
 
   // Process all scores from all rounds to create ringer scores
-  const playerRingerScores = {}
+  const playerRingerScores: Record<string, PlayerRingerData> = {}
 
   // Process all rounds and scores
   rounds.forEach((round) => {
@@ -213,7 +232,7 @@ export function RingerLeaderboard({ rounds }) {
         // Update if this is the first score or better than previous best
         if (
           playerRingerScores[userId].holes[index] === null ||
-          netHoleScore < playerRingerScores[userId].holes[index]
+          netHoleScore < playerRingerScores[userId].holes[index]!
         ) {
           playerRingerScores[userId].holes[index] = netHoleScore
         }
@@ -224,7 +243,7 @@ export function RingerLeaderboard({ rounds }) {
   // Calculate total ringer scores and to par
   const ringerLeaderboard = Object.entries(playerRingerScores).map(([userId, data]) => {
     // Calculate total of best net scores, ignoring null values
-    const validScores = data.holes.filter((score) => score !== null)
+    const validScores = data.holes.filter((score): score is number => score !== null)
     const totalRingerScore = validScores.reduce((sum, score) => sum + score, 0)
 
     // Calculate how many holes have been played
@@ -232,7 +251,7 @@ export function RingerLeaderboard({ rounds }) {
 
     // Calculate to par based on holes played
     const parForHolesPlayed = data.holes
-      .map((score, index) => (score !== null ? courseData.pars[index] : 0))
+      .map((score, index) => (score !== null ? COURSE_DATA.pars[index] : 0))
       .reduce((sum, par) => sum + par, 0)
 
     const toPar = totalRingerScore - parForHolesPlayed
@@ -295,7 +314,7 @@ export function RingerLeaderboard({ rounds }) {
                   </div>
                 </td>
                 <th className="px-4 py-2 text-center font-medium border-l border-gray-300">Hole</th>
-                {courseData.holes.map((hole, index) => (
+                {COURSE_DATA.holes.map((hole, index) => (
                   <th
                     key={hole}
                     className={`px-2 py-2 text-center font-medium ${index < 17 ? "border-r border-gray-300" : ""}`}
@@ -313,7 +332,7 @@ export function RingerLeaderboard({ rounds }) {
                 >
                   Par
                 </td>
-                {courseData.pars.map((par, index) => (
+                {COURSE_DATA.pars.map((par, index) => (
                   <td
                     key={index}
                     className={`px-2 py-2 text-center text-white ${index < 17 ? "border-r border-gray-300" : ""}`}
@@ -331,7 +350,7 @@ export function RingerLeaderboard({ rounds }) {
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Score</th>
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Rounds</th>
                 <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Hdcp</th>
-                {courseData.whiteHdcp.map((hdcp, index) => (
+                {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                   <td key={index} className={`px-2 py-2 text-center ${index < 17 ? "border-r border-gray-300" : ""}`}>
                     {hdcp}
                   </td>
@@ -367,7 +386,7 @@ export function RingerLeaderboard({ rounds }) {
                   <td className="px-4 py-2 text-center border-r border-gray-300">{player.roundsPlayed}</td>
                   <td className="px-4 py-2 text-center border-r border-gray-300"></td>
                   {player.holes.map((score, holeIndex) => {
-                    const par = courseData.pars[holeIndex]
+                    const par = COURSE_DATA.pars[holeIndex]
                     return (
                       <td
                         key={holeIndex}

@@ -1,13 +1,13 @@
 "use server"
 
-import { createClient } from "@supabase/supabase-js"
+import { createAdminClient } from "@/lib/supabase/server"
 import { formatDate } from "@/lib/utils"
 
 // Create a Supabase client with service role key to bypass RLS
-const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+const supabaseAdmin = createAdminClient()
 
 // Helper function to convert array of objects to CSV
-function objectsToCSV(data: any[], columns: { key: string; header: string }[]): string {
+function objectsToCSV(data: Record<string, unknown>[], columns: { key: string; header: string }[]): string {
   // Create header row
   const headerRow = columns.map((col) => `"${col.header}"`).join(",")
 
@@ -29,8 +29,6 @@ function objectsToCSV(data: any[], columns: { key: string; header: string }[]): 
 // Function to export reservations for a specific week
 export async function exportReservationsToCSV(weekDate: string) {
   try {
-    console.log("Starting reservation export for date:", weekDate)
-
     // Parse the provided date and get the month's start and end dates
     const date = new Date(weekDate)
 
@@ -40,18 +38,6 @@ export async function exportReservationsToCSV(weekDate: string) {
 
     const startDateStr = formatDate(startDate).split("T")[0]
     const endDateStr = formatDate(endDate).split("T")[0]
-
-    console.log(`Using date range: ${startDateStr} to ${endDateStr}`)
-
-    // First, let's check if there are any reservations in the database
-    // Use select('count') instead of count()
-    const { data: countData, error: countError } = await supabaseAdmin.from("reservations").select("count").single()
-
-    if (countError) {
-      console.error("Error counting reservations:", countError)
-    } else {
-      console.log(`Total reservations in database: ${countData?.count || 0}`)
-    }
 
     // Fetch all reservations for the month
     const { data: reservations, error } = await supabaseAdmin
@@ -82,53 +68,13 @@ export async function exportReservationsToCSV(weekDate: string) {
       return { success: false, error: error.message }
     }
 
-    console.log(`Found ${reservations?.length || 0} reservations for the date range`)
-
-    // If no reservations found, try fetching all reservations
-    if (!reservations || reservations.length === 0) {
-      console.log("No reservations found for the date range, fetching all reservations")
-
-      const { data: allReservations, error: allError } = await supabaseAdmin
-        .from("reservations")
-        .select(`
-          id,
-          user_id,
-          slots,
-          player_names,
-          play_for_money,
-          created_at,
-          users (
-            name,
-            email
-          ),
-          tee_times (
-            date,
-            time
-          )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(10)
-
-      if (allError) {
-        console.error("Error fetching all reservations:", allError)
-      } else {
-        console.log(`Found ${allReservations?.length || 0} recent reservations in total`)
-
-        // Log the first reservation for debugging
-        if (allReservations && allReservations.length > 0) {
-          console.log("First reservation:", JSON.stringify(allReservations[0], null, 2))
-        }
-      }
-    }
-
     // Initialize an empty array to hold all player rows
-    const playerRows: any[] = []
+    const playerRows: Record<string, unknown>[] = []
 
     // Process each reservation
     for (const reservation of reservations || []) {
       // Skip reservations with missing tee_times data
       if (!reservation.tee_times || !reservation.tee_times.date || !reservation.tee_times.time) {
-        console.log(`Skipping reservation ${reservation.id} - missing tee time data`)
         continue
       }
 
@@ -148,11 +94,6 @@ export async function exportReservationsToCSV(weekDate: string) {
         })
       }
       const createdAt = reservation.created_at ? new Date(reservation.created_at).toLocaleString() : "Unknown"
-
-      console.log(`Processing reservation ${reservation.id} with ${reservation.slots} slots`)
-      console.log(`Main player: ${reservation.users?.name || "Unknown"}`)
-      console.log(`Additional players: ${JSON.stringify(reservation.player_names || [])}`)
-      console.log(`Play for money: ${JSON.stringify(reservation.play_for_money || [])}`)
 
       // Add the main player (who made the reservation)
       playerRows.push({
@@ -196,8 +137,6 @@ export async function exportReservationsToCSV(weekDate: string) {
       }
     }
 
-    console.log(`Total player rows created: ${playerRows.length}`)
-
     if (playerRows.length === 0) {
       return {
         success: true,
@@ -222,8 +161,6 @@ export async function exportReservationsToCSV(weekDate: string) {
     // Generate CSV
     const csv = objectsToCSV(playerRows, columns)
 
-    console.log(`CSV generated with ${playerRows.length} rows`)
-
     return {
       success: true,
       csv,
@@ -239,8 +176,6 @@ export async function exportReservationsToCSV(weekDate: string) {
 // Function to export round scores (either for a specific week or all rounds)
 export async function exportScoresToCSV(weekDate?: string) {
   try {
-    console.log("Starting scores export", weekDate ? `for week: ${weekDate}` : "for all rounds")
-
     let query = supabaseAdmin.from("scores").select(`
         id,
         hole_1, hole_2, hole_3, hole_4, hole_5, hole_6, hole_7, hole_8, hole_9,
@@ -278,7 +213,6 @@ export async function exportScoresToCSV(weekDate?: string) {
       const startDateStr = formatDate(startDate).split("T")[0]
       const endDateStr = formatDate(endDate).split("T")[0]
 
-      console.log(`Using date range: ${startDateStr} to ${endDateStr}`)
       query = query.gte("rounds.date", startDateStr).lte("rounds.date", endDateStr)
     }
 
@@ -290,11 +224,8 @@ export async function exportScoresToCSV(weekDate?: string) {
       return { success: false, error: error.message }
     }
 
-    console.log(`Found ${scores?.length || 0} scores`)
-
     // Filter out scores with missing rounds data
     const validScores = (scores || []).filter((score) => score.rounds && score.rounds.date)
-    console.log(`Valid scores with round data: ${validScores.length}`)
 
     if (validScores.length === 0) {
       // Generate filename
@@ -480,7 +411,6 @@ export async function exportScoresToCSV(weekDate?: string) {
 
     // Generate CSV
     const csv = objectsToCSV(formattedData, columns)
-    console.log(`CSV generated with ${formattedData.length} rows`)
 
     // Generate filename
     let filename = "all-scores.csv"

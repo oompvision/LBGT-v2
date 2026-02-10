@@ -7,6 +7,8 @@ export interface Season {
   id: string
   year: number
   name: string
+  start_date: string
+  end_date: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -51,7 +53,7 @@ export async function getActiveSeason() {
 }
 
 // Create a new season
-export async function createSeason(year: number, name: string) {
+export async function createSeason(year: number, name: string, startDate: string, endDate: string) {
   try {
     const supabase = await createClient()
 
@@ -61,7 +63,11 @@ export async function createSeason(year: number, name: string) {
       return { success: false, error: `Season ${year} already exists` }
     }
 
-    const { data, error } = await supabase.from("seasons").insert({ year, name, is_active: false }).select().single()
+    const { data, error } = await supabase
+      .from("seasons")
+      .insert({ year, name, start_date: startDate, end_date: endDate, is_active: false })
+      .select()
+      .single()
 
     if (error) {
       console.error("Error creating season:", error)
@@ -98,6 +104,31 @@ export async function setActiveSeason(seasonId: string) {
   } catch (error) {
     console.error("Error in setActiveSeason:", error)
     return { success: false, error: "Failed to set active season" }
+  }
+}
+
+// Update a season's dates
+export async function updateSeasonDates(seasonId: string, startDate: string, endDate: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("seasons")
+      .update({ start_date: startDate, end_date: endDate, updated_at: new Date().toISOString() })
+      .eq("id", seasonId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating season dates:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/seasons")
+    return { success: true, season: data }
+  } catch (error) {
+    console.error("Error in updateSeasonDates:", error)
+    return { success: false, error: "Failed to update season dates" }
   }
 }
 

@@ -10,7 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
 export default async function SubmitScorePage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   try {
     // Check if user is authenticated

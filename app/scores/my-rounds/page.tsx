@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
 export default async function MyRoundsPage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Check if user is authenticated
   const {

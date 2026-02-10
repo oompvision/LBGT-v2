@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Loader2, Search, Trash2, User, AlertTriangle, Camera, X } from "lucide-react"
+import { Edit, Loader2, Search, Trash2, User, Camera, X } from "lucide-react"
 import {
   updateUser,
   updateStrokesGivenDirectly,
@@ -25,9 +24,11 @@ import {
   adminUploadProfilePicture,
   adminRemoveProfilePicture,
 } from "@/app/actions/admin-management"
+import type { User } from "@/types/supabase"
+import { MAX_STROKES_GIVEN } from "@/lib/constants"
 
 interface UserManagementProps {
-  users: any[]
+  users: User[]
 }
 
 export function UserManagement({ users }: UserManagementProps) {
@@ -35,7 +36,7 @@ export function UserManagement({ users }: UserManagementProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [editedUser, setEditedUser] = useState<{
     name: string
     email: string
@@ -57,7 +58,7 @@ export function UserManagement({ users }: UserManagementProps) {
     return user.name?.toLowerCase().includes(searchLower) || user.email?.toLowerCase().includes(searchLower)
   })
 
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: User) => {
     setSelectedUser(user)
     setEditedUser({
       name: user.name || "",
@@ -73,17 +74,15 @@ export function UserManagement({ users }: UserManagementProps) {
     try {
       // Validate strokes_given is between 0 and 20
       const strokesGiven = Number(editedUser.strokes_given)
-      if (isNaN(strokesGiven) || strokesGiven < 0 || strokesGiven > 20) {
+      if (isNaN(strokesGiven) || strokesGiven < 0 || strokesGiven > MAX_STROKES_GIVEN) {
         toast({
           title: "Validation Error",
-          description: "Strokes Given must be a number between 0 and 20",
+          description: `Strokes Given must be a number between 0 and ${MAX_STROKES_GIVEN}`,
           variant: "destructive",
         })
         setIsSubmitting(false)
         return
       }
-
-      console.log("Submitting strokes_given update:", strokesGiven)
 
       // First update the name and email
       const nameEmailResult = await updateUser(selectedUser.id, {
@@ -229,12 +228,6 @@ export function UserManagement({ users }: UserManagementProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Link href="/admin/fix-user">
-          <Button variant="outline" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Fix User Issues
-          </Button>
-        </Link>
       </div>
 
       <div className="space-y-4">
@@ -365,12 +358,12 @@ export function UserManagement({ users }: UserManagementProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="strokes_given">Strokes Given (0-20)</Label>
+              <Label htmlFor="strokes_given">Strokes Given (0-{MAX_STROKES_GIVEN})</Label>
               <Input
                 id="strokes_given"
                 type="number"
                 min="0"
-                max="20"
+                max={MAX_STROKES_GIVEN}
                 value={editedUser.strokes_given}
                 onChange={(e) =>
                   setEditedUser({

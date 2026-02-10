@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {
@@ -54,8 +54,6 @@ export async function POST(request: NextRequest) {
     // Calculate available slots using the same logic as dashboard
     const reservedSlots = existingReservations?.reduce((sum, r) => sum + r.slots, 0) || 0
     const availableSlots = teeTimeData.max_slots - reservedSlots
-
-    console.log(`Tee time ${teeTimeId}: ${availableSlots} slots available, ${slots} requested`)
 
     if (availableSlots < slots) {
       return NextResponse.json(

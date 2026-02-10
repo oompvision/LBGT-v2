@@ -3,8 +3,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/supabase"
 
-export const createClient = () => {
-  const cookieStore = cookies()
+export const createClient = async () => {
+  const cookieStore = await cookies()
 
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,9 +38,6 @@ export const createAdminClient = () => {
     console.error("Missing SUPABASE_SERVICE_ROLE_KEY environment variable")
     throw new Error("Missing Supabase service role key")
   }
-
-  console.log("Creating admin client with URL:", supabaseUrl.substring(0, 30) + "...")
-  console.log("Service role key available:", serviceRoleKey ? "Yes" : "No")
 
   return createSupabaseClient(supabaseUrl, serviceRoleKey, {
     auth: {

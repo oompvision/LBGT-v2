@@ -10,9 +10,9 @@ async function getAdminUsersData() {
   try {
     // Dynamic import to avoid build-time issues
     const { createClient } = await import("@/lib/supabase/server")
-    const { getAllUsersWithDetails } = await import("@/app/actions/admin-management")
+    const { getAllUsersForAdmin } = await import("@/app/actions/admin-management")
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {
@@ -32,7 +32,7 @@ async function getAdminUsersData() {
     }
 
     // Get all users with details
-    const { users } = await getAllUsersWithDetails()
+    const { users } = await getAllUsersForAdmin()
 
     return { users: users || [] }
   } catch (error) {

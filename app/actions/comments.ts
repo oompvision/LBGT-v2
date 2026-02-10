@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache"
 
 export async function addComment(comment: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {
@@ -39,7 +39,7 @@ export async function addComment(comment: string) {
 
 export async function getComments() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Use a LEFT JOIN to fetch user data in a single query
     const { data: comments, error } = await supabase
@@ -53,6 +53,7 @@ export async function getComments() {
         )
       `)
       .order("created_at", { ascending: false })
+      .limit(50)
 
     if (error) {
       console.error("Error fetching comments:", error)
@@ -68,7 +69,7 @@ export async function getComments() {
 
 export async function deleteComment(commentId: string) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Get the current user
     const {

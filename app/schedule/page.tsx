@@ -37,7 +37,7 @@ function formatTimeFromString(timeString: string): string {
 }
 
 async function getScheduleData() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Get today's date in YYYY-MM-DD format for comparison
   const today = new Date()

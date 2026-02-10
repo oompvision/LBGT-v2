@@ -15,14 +15,15 @@ export const runtime = "nodejs"
 export default async function AdminDashboardPage() {
   try {
     // Import these functions only when needed to avoid build-time issues
-    const { createClient } = await import("@/lib/supabase/server")
+    const { createClient, createAdminClient } = await import("@/lib/supabase/server")
     const { getAllRoundsWithDetails, getAllReservationsWithDetails, getAllTeeTimes, getAllUsersForAdmin } =
       await import("@/app/actions/admin-management")
+    const { getSeasons, getActiveSeason } = await import("@/app/actions/seasons")
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Create admin client to bypass RLS policies
-    const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    const supabaseAdmin = createAdminClient()
 
     // Check if user is authenticated
     const {
@@ -56,9 +57,16 @@ export default async function AdminDashboardPage() {
       redirect("/dashboard")
     }
 
+    // Fetch seasons first to determine the active season
+    const seasonsResult = await getSeasons().catch(() => ({ success: false, seasons: [] }))
+    const activeSeasonResult = await getActiveSeason().catch(() => ({ success: false, season: null }))
+    const seasons = seasonsResult.seasons || []
+    const activeSeason = activeSeasonResult.season
+    const activeSeasonYear = activeSeason?.year || null
+
     // Get data with error handling - fetch each one individually
-    const roundsPromise = getAllRoundsWithDetails()
-    const reservationsPromise = getAllReservationsWithDetails()
+    const roundsPromise = getAllRoundsWithDetails(activeSeasonYear || undefined)
+    const reservationsPromise = getAllReservationsWithDetails(activeSeasonYear || undefined)
     const teeTimesPromise = getAllTeeTimes()
     const usersPromise = getAllUsersForAdmin()
 
@@ -92,13 +100,13 @@ export default async function AdminDashboardPage() {
           <div className="container">
             <div className="mb-8">
               <h1 className="text-3xl font-bold tracking-tight">Admin Management Dashboard</h1>
-              <p className="text-muted-foreground">Manage rounds, scores, and reservations</p>
+              <p className="text-muted-foreground">Manage scores and reservations</p>
 
               {/* Display errors if any */}
               {roundsError && (
                 <Alert variant="destructive" className="mt-4">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error loading rounds</AlertTitle>
+                  <AlertTitle>Error loading scores</AlertTitle>
                   <AlertDescription>{roundsError}</AlertDescription>
                 </Alert>
               )}
@@ -143,7 +151,14 @@ export default async function AdminDashboardPage() {
 
             <div className="mt-6 grid gap-6 md:grid-cols-4">
               <div className="md:col-span-3">
-                <AdminDashboardTabs rounds={rounds} reservations={reservations} teeTimes={teeTimes} users={users} />
+                <AdminDashboardTabs
+                  rounds={rounds}
+                  reservations={reservations}
+                  teeTimes={teeTimes}
+                  users={users}
+                  seasons={seasons}
+                  initialSeason={activeSeasonYear}
+                />
               </div>
               <div>
                 <ExportData />
@@ -162,7 +177,7 @@ export default async function AdminDashboardPage() {
           <div className="container">
             <div className="mb-8">
               <h1 className="text-3xl font-bold tracking-tight">Admin Management Dashboard</h1>
-              <p className="text-muted-foreground">Manage rounds, scores, and reservations</p>
+              <p className="text-muted-foreground">Manage scores and reservations</p>
             </div>
 
             <Alert variant="destructive" className="mb-6">

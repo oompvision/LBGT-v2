@@ -5,7 +5,7 @@ import { createServerClient } from "@supabase/ssr"
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
 
-  const publicRoutes = ["/", "/apply", "/mobile-signin", "/reset-admin", "/signin", "/signup"]
+  const publicRoutes = ["/", "/apply", "/mobile-signin", "/signin", "/signup"]
   const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
 

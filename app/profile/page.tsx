@@ -7,7 +7,7 @@ import { Footer } from "@/components/footer"
 import { UserProfile } from "./user-profile"
 
 export default async function ProfilePage() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Check if user is authenticated
   const {

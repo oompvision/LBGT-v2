@@ -8,6 +8,8 @@ import { MessageBox } from "@/components/message-box"
 import { useAuth } from "@/components/auth-provider"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { InfoBoxSection } from "@/components/info-box-section"
+import { PlayoffResultsSection } from "@/components/playoff-results-section"
 
 export default function Home() {
   const { user, isLoading } = useAuth()
@@ -82,104 +84,11 @@ export default function Home() {
         {/* Message Box */}
         <MessageBox />
 
-        {/* Where/When Section */}
-        <section className="py-16 bg-muted/50">
-          <div className="container max-w-5xl">
-            <div className="grid gap-8 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl">Where</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-base">
-                    Join us every Friday at The Golf Club at Middlebay in Oceanside, NY for weekly matches and
-                    tournaments.
-                  </CardDescription>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl">When</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-base">
-                    Regular season play has commenced! Book your tee time before Wednesday afternoon to lock in for that
-                    Friday. Player's must log 4 rounds to qualify for this year's LBGT Playoff.
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
+        {/* Info Boxes Section */}
+        <InfoBoxSection />
 
         {/* LBGT Playoff Results */}
-        <section className="py-16">
-          <div className="container max-w-5xl">
-            <h2 className="text-3xl font-bold tracking-tight text-center mb-12">LBGT Playoff Results</h2>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-center text-xl">2024</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center space-y-2">
-                  <div>
-                    <p className="font-semibold text-green-600">Champion</p>
-                    <p>Dan Elliot</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-muted-foreground">Runner Up</p>
-                    <p>Anthony Piazza</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-center text-xl">2023</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center space-y-2">
-                  <div>
-                    <p className="font-semibold text-green-600">Champion</p>
-                    <p>Tom Chiancone</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-muted-foreground">Runner Up</p>
-                    <p>Devin Weinshank</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-center text-xl">2022</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center space-y-2">
-                  <div>
-                    <p className="font-semibold text-green-600">Champion</p>
-                    <p>Doug Witzenbocker</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-muted-foreground">Runner Up</p>
-                    <p>Greg Golding</p>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-center text-xl">2021</CardTitle>
-                </CardHeader>
-                <CardContent className="text-center space-y-2">
-                  <div>
-                    <p className="font-semibold text-green-600">Champion</p>
-                    <p>Doug Witzenbocker</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-muted-foreground">Runner Up</p>
-                    <p>Joey Diamond</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
+        <PlayoffResultsSection />
 
         {/* Instagram Embed */}
         <section className="py-16 bg-muted/50">

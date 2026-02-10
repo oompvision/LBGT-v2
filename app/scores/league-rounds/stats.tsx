@@ -8,16 +8,35 @@ import { Trophy } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
-// Updated course data with correct par values
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
+interface LeagueScore {
+  user_id: string
+  users?: { name: string }
+  total_score: number
+  net_total_score: number | null
 }
 
-export function LeagueStats({ rounds }) {
+interface LeagueRound {
+  id: string
+  date: string
+  scores: LeagueScore[]
+}
+
+interface PlayerStatData {
+  name: string
+  userId: string
+  rounds: number
+  totalScore: number
+  bestScore: number
+  worstScore: number
+  netTotalScore: number
+  netBestScore: number
+  netWorstScore: number
+  strokesGiven: number
+}
+
+import { COURSE_DATA } from "@/lib/constants"
+
+export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
   const [sortBy, setSortBy] = useState("netAverage")
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const supabase = createClient()
@@ -64,7 +83,7 @@ export function LeagueStats({ rounds }) {
   }, [supabase, rounds])
 
   // Process all scores from all rounds
-  const playerStats = {}
+  const playerStats: Record<string, PlayerStatData> = {}
 
   // Process all rounds and scores
   rounds.forEach((round) => {
@@ -124,8 +143,8 @@ export function LeagueStats({ rounds }) {
     const netAverageScore = stats.rounds > 0 ? stats.netTotalScore / stats.rounds : 0
 
     // Calculate to par values
-    const toPar = averageScore - courseData.totalPar
-    const netToPar = netAverageScore - courseData.totalPar
+    const toPar = averageScore - COURSE_DATA.totalPar
+    const netToPar = netAverageScore - COURSE_DATA.totalPar
 
     return {
       userId,

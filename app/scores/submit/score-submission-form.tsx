@@ -18,20 +18,11 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { createClient } from "@/lib/supabase/client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { COURSE_DATA } from "@/lib/constants"
 
 interface ScoreSubmissionFormProps {
   users: { id: string; name: string }[]
   currentUserId: string
-}
-
-// Updated course data from the new scorecard
-const courseData = {
-  holes: Array.from({ length: 18 }, (_, i) => i + 1),
-  pars: [4, 4, 3, 4, 5, 3, 4, 4, 5, 3, 4, 4, 5, 4, 4, 3, 4, 5],
-  whiteHdcp: [13, 9, 15, 5, 1, 17, 3, 11, 7, 12, 16, 2, 10, 8, 14, 18, 6, 4], // White Handicap values
-  frontNinePar: 36,
-  backNinePar: 36,
-  totalPar: 72,
 }
 
 export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFormProps) {
@@ -108,7 +99,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       if (strokesGiven > 0) {
         // Get the sorted holes by handicap difficulty
         const sortedHoleIndexes = [...Array(18).keys()].sort(
-          (a, b) => courseData.whiteHdcp[a] - courseData.whiteHdcp[b],
+          (a, b) => COURSE_DATA.whiteHdcp[a] - COURSE_DATA.whiteHdcp[b],
         )
 
         // Check if this hole should get a stroke off
@@ -255,7 +246,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="px-4 py-2 text-left font-medium">Hole</th>
-                    {courseData.holes.map((hole) => (
+                    {COURSE_DATA.holes.map((hole) => (
                       <th key={hole} className="px-2 py-2 text-center font-medium">
                         {hole}
                       </th>
@@ -266,18 +257,18 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   </tr>
                   <tr className="border-b bg-muted/30">
                     <th className="px-4 py-2 text-left font-medium">Par</th>
-                    {courseData.pars.map((par, index) => (
+                    {COURSE_DATA.pars.map((par, index) => (
                       <td key={index} className="px-2 py-2 text-center">
                         {par}
                       </td>
                     ))}
-                    <td className="px-2 py-2 text-center font-medium">{courseData.frontNinePar}</td>
-                    <td className="px-2 py-2 text-center font-medium">{courseData.backNinePar}</td>
-                    <td className="px-2 py-2 text-center font-medium">{courseData.totalPar}</td>
+                    <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.frontNinePar}</td>
+                    <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.backNinePar}</td>
+                    <td className="px-2 py-2 text-center font-medium">{COURSE_DATA.totalPar}</td>
                   </tr>
                   <tr className="border-b bg-muted/20">
                     <th className="px-4 py-2 text-left font-medium">White Hdcp</th>
-                    {courseData.whiteHdcp.map((hdcp, index) => (
+                    {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
                       <td key={index} className="px-2 py-2 text-center">
                         {hdcp}
                       </td>

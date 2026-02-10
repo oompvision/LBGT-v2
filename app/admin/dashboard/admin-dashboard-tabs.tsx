@@ -10,6 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "@/components/ui/use-toast"
 import { format, parseISO, isValid } from "date-fns"
+import type { User, TeeTime, RoundWithScores, ReservationWithDetails, Score, HoleScores } from "@/types/supabase"
+import type { Season } from "@/app/actions/seasons"
+import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 import {
   addReservation,
   deleteReservation,
@@ -37,10 +40,12 @@ import { ScoreEditor } from "./score-editor"
 const FIRST_VALID_DATE = new Date(2025, 4, 23) // May 23, 2025
 
 interface AdminDashboardTabsProps {
-  rounds: any[]
-  reservations: any[]
-  teeTimes: any[]
-  users: any[]
+  rounds: RoundWithScores[]
+  reservations: ReservationWithDetails[]
+  teeTimes: TeeTime[]
+  users: User[]
+  seasons: Season[]
+  initialSeason: number | null
 }
 
 export function AdminDashboardTabs({
@@ -48,12 +53,18 @@ export function AdminDashboardTabs({
   reservations: initialReservations,
   teeTimes: initialTeeTimes,
   users: initialUsers,
+  seasons,
+  initialSeason,
 }: AdminDashboardTabsProps) {
-  const [users, setUsers] = useState<any[]>(initialUsers)
-  const [teeTimes, setTeeTimes] = useState<any[]>(initialTeeTimes)
-  const [rounds, setRounds] = useState<any[]>(initialRounds)
-  const [reservations, setReservations] = useState<any[]>(initialReservations)
+  const [users, setUsers] = useState<User[]>(initialUsers)
+  const [teeTimes, setTeeTimes] = useState<TeeTime[]>(initialTeeTimes)
+  const [rounds, setRounds] = useState<RoundWithScores[]>(initialRounds)
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>(initialReservations)
   const [loading, setLoading] = useState(false)
+  const [selectedScoresSeason, setSelectedScoresSeason] = useState<string>(initialSeason?.toString() || "all")
+  const [selectedReservationsSeason, setSelectedReservationsSeason] = useState<string>(initialSeason?.toString() || "all")
+  const [loadingScores, setLoadingScores] = useState(false)
+  const [loadingReservations, setLoadingReservations] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
   const [selectedUser, setSelectedUser] = useState("")
   const [selectedUserName, setSelectedUserName] = useState("")
@@ -64,7 +75,7 @@ export function AdminDashboardTabs({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<{ id: string; type: "round" | "reservation" } | null>(null)
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
-  const [selectedScore, setSelectedScore] = useState<any>(null)
+  const [selectedScore, setSelectedScore] = useState<(Score & { users: Pick<User, "id" | "name"> | null }) | null>(null)
 
   // Update state when props change
   useEffect(() => {
@@ -73,6 +84,38 @@ export function AdminDashboardTabs({
     setRounds(initialRounds)
     setReservations(initialReservations)
   }, [initialUsers, initialTeeTimes, initialRounds, initialReservations])
+
+  const handleScoresSeasonChange = async (value: string) => {
+    setSelectedScoresSeason(value)
+    setLoadingScores(true)
+    try {
+      const season = value === "all" ? undefined : Number(value)
+      const result = await getAllRoundsWithDetails(season)
+      if (result.success) {
+        setRounds(result.rounds || [])
+      }
+    } catch (error) {
+      console.error("Error fetching scores for season:", error)
+    } finally {
+      setLoadingScores(false)
+    }
+  }
+
+  const handleReservationsSeasonChange = async (value: string) => {
+    setSelectedReservationsSeason(value)
+    setLoadingReservations(true)
+    try {
+      const season = value === "all" ? undefined : Number(value)
+      const result = await getAllReservationsWithDetails(season)
+      if (result.success) {
+        setReservations(result.reservations || [])
+      }
+    } catch (error) {
+      console.error("Error fetching reservations for season:", error)
+    } finally {
+      setLoadingReservations(false)
+    }
+  }
 
   // Helper function to ensure a date is valid and at least May 23, 2025
   const ensureValidDate = (dateString: string): string => {
@@ -133,7 +176,7 @@ export function AdminDashboardTabs({
   }
 
   const handleSlotsChange = (value: number) => {
-    const newValue = Math.max(1, Math.min(4, value))
+    const newValue = Math.max(1, Math.min(DEFAULT_MAX_PLAYERS_PER_TEE_TIME, value))
     setSlots(newValue)
 
     // Update player names array - only for additional players (slots 2-4)
@@ -189,14 +232,6 @@ export function AdminDashboardTabs({
 
     setLoadingAction(true)
     try {
-      console.log("Submitting reservation with data:", {
-        userId: selectedUser,
-        teeTimeId: selectedTeeTime,
-        slots,
-        playerNames,
-        playForMoney,
-      })
-
       const result = await addReservation({
         userId: selectedUser,
         teeTimeId: selectedTeeTime,
@@ -205,8 +240,6 @@ export function AdminDashboardTabs({
         playForMoney,
       })
 
-      console.log("Reservation result:", result)
-
       if (result.success) {
         toast({
           title: "Success",
@@ -214,10 +247,11 @@ export function AdminDashboardTabs({
         })
 
         // Refresh reservations
-        const reservationsResponse = await getAllReservationsWithDetails()
+        const resSeason = selectedReservationsSeason === "all" ? undefined : Number(selectedReservationsSeason)
+        const reservationsResponse = await getAllReservationsWithDetails(resSeason)
         if (reservationsResponse.success) {
           // Validate dates in the new reservations
-          const validatedReservations = reservationsResponse.reservations.map((reservation: any) => {
+          const validatedReservations = reservationsResponse.reservations.map((reservation: ReservationWithDetails) => {
             if (reservation.tee_times && reservation.tee_times.date) {
               return {
                 ...reservation,
@@ -280,10 +314,11 @@ export function AdminDashboardTabs({
 
         // Refresh data
         if (itemToDelete.type === "round") {
-          const roundsResponse = await getAllRoundsWithDetails()
+          const scoreSeason = selectedScoresSeason === "all" ? undefined : Number(selectedScoresSeason)
+          const roundsResponse = await getAllRoundsWithDetails(scoreSeason)
           if (roundsResponse.success) {
             // Validate dates in the new rounds
-            const validatedRounds = roundsResponse.rounds.map((round: any) => {
+            const validatedRounds = roundsResponse.rounds.map((round: RoundWithScores) => {
               if (round.date) {
                 return { ...round, date: ensureValidDate(round.date) }
               }
@@ -293,10 +328,11 @@ export function AdminDashboardTabs({
             setRounds(validatedRounds)
           }
         } else {
-          const reservationsResponse = await getAllReservationsWithDetails()
+          const resSeason = selectedReservationsSeason === "all" ? undefined : Number(selectedReservationsSeason)
+          const reservationsResponse = await getAllReservationsWithDetails(resSeason)
           if (reservationsResponse.success) {
             // Validate dates in the new reservations
-            const validatedReservations = reservationsResponse.reservations.map((reservation: any) => {
+            const validatedReservations = reservationsResponse.reservations.map((reservation: ReservationWithDetails) => {
               if (reservation.tee_times && reservation.tee_times.date) {
                 return {
                   ...reservation,
@@ -338,12 +374,12 @@ export function AdminDashboardTabs({
     setDeleteDialogOpen(true)
   }
 
-  const handleEditScore = (score: any) => {
+  const handleEditScore = (score: Score & { users: Pick<User, "id" | "name" | "email"> | null }) => {
     setSelectedScore(score)
     setEditScoreDialogOpen(true)
   }
 
-  const handleSaveScore = async (scoreData: any) => {
+  const handleSaveScore = async (scoreData: HoleScores) => {
     if (!selectedScore) return
 
     setLoadingAction(true)
@@ -357,9 +393,10 @@ export function AdminDashboardTabs({
         })
 
         // Refresh rounds data
-        const roundsResponse = await getAllRoundsWithDetails()
+        const scoreSeason = selectedScoresSeason === "all" ? undefined : Number(selectedScoresSeason)
+        const roundsResponse = await getAllRoundsWithDetails(scoreSeason)
         if (roundsResponse.success) {
-          const validatedRounds = roundsResponse.rounds.map((round: any) => {
+          const validatedRounds = roundsResponse.rounds.map((round: RoundWithScores) => {
             if (round.date) {
               return { ...round, date: ensureValidDate(round.date) }
             }
@@ -404,7 +441,7 @@ export function AdminDashboardTabs({
       <Tabs defaultValue="reservations" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="reservations">Reservations</TabsTrigger>
-          <TabsTrigger value="rounds">Rounds</TabsTrigger>
+          <TabsTrigger value="scores">Scores</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reservations" className="space-y-4">
@@ -454,7 +491,7 @@ export function AdminDashboardTabs({
                   id="slots"
                   type="number"
                   min={1}
-                  max={4}
+                  max={DEFAULT_MAX_PLAYERS_PER_TEE_TIME}
                   value={slots}
                   onChange={(e) => handleSlotsChange(Number.parseInt(e.target.value) || 1)}
                 />
@@ -519,13 +556,34 @@ export function AdminDashboardTabs({
 
           <Card>
             <CardHeader>
-              <CardTitle>Recent Reservations</CardTitle>
-              <CardDescription>View and manage recent reservations.</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Reservations</CardTitle>
+                  <CardDescription>View and manage reservations by season.</CardDescription>
+                </div>
+                <Select value={selectedReservationsSeason} onValueChange={handleReservationsSeasonChange}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select season" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Seasons</SelectItem>
+                    {seasons.map((s) => (
+                      <SelectItem key={s.id} value={s.year.toString()}>
+                        {s.name || s.year}{s.is_active ? " (Active)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[400px]">
                 <div className="space-y-4">
-                  {reservations.length === 0 ? (
+                  {loadingReservations ? (
+                    <div className="flex items-center justify-center p-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : reservations.length === 0 ? (
                     <p className="text-center text-muted-foreground">No reservations found.</p>
                   ) : (
                     reservations.map((reservation) => (
@@ -578,17 +636,38 @@ export function AdminDashboardTabs({
           </Card>
         </TabsContent>
 
-        <TabsContent value="rounds" className="space-y-4">
+        <TabsContent value="scores" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Rounds</CardTitle>
-              <CardDescription>View and manage recent rounds.</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Scores</CardTitle>
+                  <CardDescription>View and manage scores by season.</CardDescription>
+                </div>
+                <Select value={selectedScoresSeason} onValueChange={handleScoresSeasonChange}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Select season" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Seasons</SelectItem>
+                    {seasons.map((s) => (
+                      <SelectItem key={s.id} value={s.year.toString()}>
+                        {s.name || s.year}{s.is_active ? " (Active)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px]">
                 <div className="space-y-4">
-                  {rounds.length === 0 ? (
-                    <p className="text-center text-muted-foreground">No rounds found.</p>
+                  {loadingScores ? (
+                    <div className="flex items-center justify-center p-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : rounds.length === 0 ? (
+                    <p className="text-center text-muted-foreground">No scores found.</p>
                   ) : (
                     rounds.map((round) => (
                       <Card key={round.id} className="p-4">
@@ -604,7 +683,7 @@ export function AdminDashboardTabs({
                               <div className="mt-2">
                                 <p className="text-xs font-medium">Scores:</p>
                                 <ul className="text-xs space-y-2">
-                                  {round.scores?.map((score: any) => (
+                                  {round.scores?.map((score) => (
                                     <li key={score.id} className="flex items-center justify-between">
                                       <span>
                                         {score.users?.name || "Unknown"}: {score.total_score}

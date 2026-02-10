@@ -12,7 +12,7 @@ import Link from "next/link"
 
 export default async function AdminMessagesPage() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if user is authenticated
     const {

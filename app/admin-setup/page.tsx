@@ -16,19 +16,6 @@ export default function AdminSetupPage() {
   const [result, setResult] = useState<any>(null)
   const router = useRouter()
 
-  const handleCreateAdmin = async () => {
-    setIsLoading(true)
-    try {
-      const result = await createAdminUser()
-      setResult(result)
-    } catch (error) {
-      console.error("Error creating admin:", error)
-      setResult({ success: false, error: "Failed to create admin user" })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   const handleResetAdmin = async () => {
     setIsResetting(true)
     try {
@@ -50,42 +37,16 @@ export default function AdminSetupPage() {
           <Card className="mx-auto w-full max-w-md">
             <CardHeader>
               <CardTitle>Admin Setup</CardTitle>
-              <CardDescription>Create or reset the admin user for the golf league booking system</CardDescription>
+              <CardDescription>Reset the admin user for the golf league booking system</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {result ? (
+              {result && (
                 <Alert variant={result.success ? "default" : "destructive"}>
                   <AlertTitle>{result.success ? "Success!" : "Error"}</AlertTitle>
                   <AlertDescription>
-                    {result.success ? (
-                      <div>
-                        <p>{result.message}</p>
-                        <div className="mt-2 rounded-md bg-muted p-3">
-                          <p>
-                            <strong>Email:</strong> {result.credentials.email}
-                          </p>
-                          <p>
-                            <strong>Password:</strong> {result.credentials.password}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p>{result.error}</p>
-                    )}
+                    {result.success ? result.message : result.error}
                   </AlertDescription>
                 </Alert>
-              ) : (
-                <>
-                  <p>Use the buttons below to create or reset the admin user with the following credentials:</p>
-                  <div className="rounded-md bg-muted p-4">
-                    <p>
-                      <strong>Email:</strong> anthony@sidelineswap.com
-                    </p>
-                    <p>
-                      <strong>Password:</strong> GolfAdmin123!
-                    </p>
-                  </div>
-                </>
               )}
             </CardContent>
             <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
