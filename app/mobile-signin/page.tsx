@@ -30,7 +30,6 @@ export default function MobileSignInPage() {
         const { data, error } = await supabase.auth.getSession()
         if (data.session && !error) {
           setIsAuthenticated(true)
-          // Redirect to home
           window.location.href = "/"
         }
       } catch (err) {
@@ -47,32 +46,12 @@ export default function MobileSignInPage() {
     setErrorMessage(null)
 
     try {
-      // First clear any existing sessions
-      try {
-        await supabase.auth.signOut()
-        console.log("Signed out any existing sessions")
-
-        // Clear localStorage manually as well
-        localStorage.clear()
-        console.log("Cleared localStorage")
-
-        // Wait a moment for signout to complete
-        await new Promise((resolve) => setTimeout(resolve, 500))
-      } catch (signOutErr) {
-        console.error("Error during pre-signin cleanup:", signOutErr)
-        // Continue anyway
-      }
-
-      console.log("Attempting mobile sign in for:", email)
-
-      // Use a different auth method for mobile
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error("Mobile auth error:", error)
         setErrorMessage(`Error: ${error.message}`)
         toast({
           title: "Sign In Failed",
@@ -83,20 +62,15 @@ export default function MobileSignInPage() {
         return
       }
 
-      console.log("Mobile sign in successful, user:", data.user?.id)
-
       // Ensure user exists in database
       if (data.user) {
         try {
           await createUserInDatabase(data.user.id, data.user.email || "", data.user.user_metadata.name || "Golfer")
-          console.log("User created/updated in database")
         } catch (dbError) {
           console.error("Database error:", dbError)
-          // Continue anyway
         }
       }
 
-      // Set authenticated state
       setIsAuthenticated(true)
 
       toast({
@@ -104,11 +78,8 @@ export default function MobileSignInPage() {
         description: "You have been signed in.",
       })
 
-      // Use a longer delay for mobile
-      setTimeout(() => {
-        // Use a different approach for redirection on mobile
-        window.location.replace("/")
-      }, 1500)
+      // Full page reload for mobile browsers
+      window.location.replace("/")
     } catch (error) {
       console.error("Unexpected mobile sign in error:", error)
       setErrorMessage("An unexpected error occurred. Please try again.")
@@ -121,7 +92,6 @@ export default function MobileSignInPage() {
     }
   }
 
-  // If already authenticated, show loading
   if (isAuthenticated) {
     return (
       <div className="flex min-h-screen flex-col">
