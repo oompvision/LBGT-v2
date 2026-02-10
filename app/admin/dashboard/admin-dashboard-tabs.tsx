@@ -189,14 +189,6 @@ export function AdminDashboardTabs({
 
     setLoadingAction(true)
     try {
-      console.log("Submitting reservation with data:", {
-        userId: selectedUser,
-        teeTimeId: selectedTeeTime,
-        slots,
-        playerNames,
-        playForMoney,
-      })
-
       const result = await addReservation({
         userId: selectedUser,
         teeTimeId: selectedTeeTime,
@@ -204,8 +196,6 @@ export function AdminDashboardTabs({
         playerNames,
         playForMoney,
       })
-
-      console.log("Reservation result:", result)
 
       if (result.success) {
         toast({

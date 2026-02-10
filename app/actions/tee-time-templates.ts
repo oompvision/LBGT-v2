@@ -321,7 +321,6 @@ export async function getUpcomingTeeTimeDates(): Promise<{
 
     // Deduplicate dates
     const uniqueDates = [...new Set(data?.map((d) => d.date) || [])]
-    console.log(`getUpcomingTeeTimeDates: season=${season.year}, found ${uniqueDates.length} dates, total rows=${data?.length || 0}`)
     return { success: true, dates: uniqueDates }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to get upcoming dates" }

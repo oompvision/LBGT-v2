@@ -130,8 +130,6 @@ export async function addReservation(data: {
   playForMoney?: boolean[]
 }) {
   try {
-    console.log("Adding reservation with data:", data)
-
     // Ensure playForMoney is an array of the correct length
     const playForMoney = data.playForMoney || Array(Math.max(1, data.slots)).fill(false)
 
@@ -152,8 +150,6 @@ export async function addReservation(data: {
       return { success: false, error: error.message }
     }
 
-    console.log("SQL function result:", result)
-
     // The function returns a table with success, message, and id columns
     if (!result || result.length === 0) {
       return { success: false, error: "No result returned from reservation function" }
@@ -163,8 +159,6 @@ export async function addReservation(data: {
     if (!firstResult.success) {
       return { success: false, error: firstResult.message || "Reservation creation failed" }
     }
-
-    console.log("Successfully created reservation:", firstResult)
 
     // Revalidate relevant paths
     revalidatePath("/reservations")
@@ -186,8 +180,6 @@ export async function addReservation(data: {
 // Function to delete a reservation
 export async function deleteReservation(reservationId: string) {
   try {
-    console.log(`Attempting to delete reservation ${reservationId} using SQL function`)
-
     if (!reservationId || typeof reservationId !== "string" || reservationId.trim() === "") {
       return { success: false, error: "Invalid reservation ID provided" }
     }
@@ -207,8 +199,6 @@ export async function deleteReservation(reservationId: string) {
       console.error("Reservation deletion failed - reservation may not exist")
       return { success: false, error: "Reservation deletion failed - reservation may not exist" }
     }
-
-    console.log(`Successfully deleted reservation ${reservationId}`)
 
     // Revalidate relevant paths
     revalidatePath("/reservations")
@@ -283,8 +273,6 @@ export async function editPlayerScore(
 // Function to delete a round and all associated scores using our SQL function
 export async function deleteRound(roundId: string) {
   try {
-    console.log(`Attempting to delete round ${roundId} using SQL function`)
-
     if (!roundId || typeof roundId !== "string" || roundId.trim() === "") {
       return { success: false, error: "Invalid round ID provided" }
     }
@@ -304,8 +292,6 @@ export async function deleteRound(roundId: string) {
       console.error("Round deletion failed - round may not exist")
       return { success: false, error: "Round deletion failed - round may not exist" }
     }
-
-    console.log(`Successfully deleted round ${roundId} and all associated scores`)
 
     // Revalidate relevant paths
     revalidatePath("/scores/my-rounds")
@@ -331,13 +317,6 @@ export async function updateUser(userId: string, userData: { name?: string; emai
       // Force conversion to number and ensure it's not NaN
       const strokesGiven = Number(userData.strokes_given)
       dataToUpdate.strokes_given = isNaN(strokesGiven) ? 0 : strokesGiven
-
-      console.log(
-        `Updating user ${userId} with strokes_given:`,
-        dataToUpdate.strokes_given,
-        "Type:",
-        typeof dataToUpdate.strokes_given,
-      )
     }
 
     // Perform the update with explicit data
@@ -347,8 +326,6 @@ export async function updateUser(userId: string, userData: { name?: string; emai
       console.error("Error updating user:", error)
       return { success: false, error: error.message }
     }
-
-    console.log("Update result:", data)
 
     // Revalidate relevant paths
     revalidatePath("/admin/dashboard")
@@ -371,8 +348,6 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
       return { success: false, error: "Invalid strokes value" }
     }
 
-    console.log(`Attempting to update user ${userId} strokes_given to ${strokesValue} using direct SQL`)
-
     // Use the admin client to ensure we have full permissions
     const { data, error } = await supabaseAdmin.rpc("update_user_strokes", {
       user_id: userId,
@@ -383,8 +358,6 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
       console.error("Error in direct SQL update:", error)
       return { success: false, error: error.message }
     }
-
-    console.log("Direct SQL update result:", data)
 
     // Revalidate all relevant paths
     revalidatePath("/admin/dashboard")
@@ -421,8 +394,6 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
     const timestamp = Date.now()
     const fileName = `profile-${userId}-${timestamp}.${fileExt}`
 
-    console.log(`Uploading profile picture for user ${userId} with filename ${fileName}`)
-
     // Upload to Supabase Storage using admin client
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from("profile-pictures")
@@ -450,7 +421,6 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
       if (userData?.profile_picture_url) {
         const oldFileName = userData.profile_picture_url.split("/").pop()
         if (oldFileName && oldFileName !== fileName) {
-          console.log(`Removing old profile picture: ${oldFileName}`)
           await supabaseAdmin.storage.from("profile-pictures").remove([oldFileName])
         }
       }
@@ -471,8 +441,6 @@ export async function adminUploadProfilePicture(userId: string, formData: FormDa
       console.error("Error updating user profile:", updateError)
       return { success: false, error: "Failed to update profile" }
     }
-
-    console.log(`Successfully updated profile picture for user ${userId}`)
 
     // Revalidate relevant paths
     revalidatePath("/admin/users")
@@ -541,8 +509,6 @@ export async function adminRemoveProfilePicture(userId: string) {
 // Function to delete a user using our updated SQL function
 export async function deleteUser(userId: string) {
   try {
-    console.log(`Attempting to delete user ${userId} using SQL function`)
-
     // First check if user is an admin
     const { data: userData, error: userError } = await supabaseAdmin
       .from("users")
@@ -574,8 +540,6 @@ export async function deleteUser(userId: string) {
       console.error("User deletion failed - user may not exist")
       return { success: false, error: "User deletion failed - user may not exist" }
     }
-
-    console.log(`Successfully deleted user ${userId} and all associated data`)
 
     // Revalidate relevant paths
     revalidatePath("/admin/dashboard")

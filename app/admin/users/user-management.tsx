@@ -82,8 +82,6 @@ export function UserManagement({ users }: UserManagementProps) {
         return
       }
 
-      console.log("Submitting strokes_given update:", strokesGiven)
-
       // First update the name and email
       const nameEmailResult = await updateUser(selectedUser.id, {
         name: editedUser.name,

@@ -28,8 +28,6 @@ export default function SignInPage() {
     setErrorMessage(null)
 
     try {
-      console.log("Attempting sign in for:", email)
-
       const supabase = createClient()
       if (!supabase) {
         setErrorMessage("Authentication service unavailable")
@@ -53,13 +51,10 @@ export default function SignInPage() {
         return
       }
 
-      console.log("Sign in successful, user:", data.user?.id)
-
       // Ensure user exists in database
       if (data.user) {
         try {
           await createUserInDatabase(data.user.id, data.user.email || "", data.user.user_metadata.name || "Golfer")
-          console.log("User created/updated in database")
         } catch (dbError) {
           console.error("Database error:", dbError)
           // Continue anyway

@@ -19,8 +19,6 @@ export async function getAvailableTeeTimesByDate(date: string) {
     // Format the date to ensure consistency
     const formattedDate = formatDate(new Date(date)).split("T")[0]
 
-    console.log(`Getting available tee times for date: ${formattedDate}`)
-
     // IMPORTANT: Use the get_valid_tee_times function to get only valid tee times
     const { data: teeTimes, error: teeTimesError } = await supabase.rpc("get_valid_tee_times", {
       p_date: formattedDate,
@@ -30,8 +28,6 @@ export async function getAvailableTeeTimesByDate(date: string) {
       console.error("Error fetching tee times:", teeTimesError)
       return { success: false, error: teeTimesError.message }
     }
-
-    console.log(`Found ${teeTimes.length} tee times for date ${formattedDate}`)
 
     return { success: true, teeTimes }
   } catch (error: any) {
@@ -158,8 +154,6 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
   const supabase = await createClient()
 
   try {
-    console.log(`Updating tee time ${teeTimeId} availability to ${isAvailable}`)
-
     // First, check if there's an entry in tee_time_availability
     const { data: existingAvailability, error: checkError } = await supabase
       .from("tee_time_availability")
@@ -176,14 +170,12 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 
     // If there's an existing entry, update it
     if (existingAvailability) {
-      console.log(`Updating existing availability entry for tee time ${teeTimeId}`)
       updateResult = await supabase
         .from("tee_time_availability")
         .update({ is_available: isAvailable })
         .eq("tee_time_id", teeTimeId)
     } else {
       // Otherwise, insert a new entry
-      console.log(`Creating new availability entry for tee time ${teeTimeId}`)
       updateResult = await supabase.from("tee_time_availability").insert({
         tee_time_id: teeTimeId,
         is_available: isAvailable,
@@ -206,8 +198,6 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
       console.error("Error verifying tee time availability update:", verifyError)
       return { success: false, error: verifyError.message }
     }
-
-    console.log(`Verified tee time ${teeTimeId} availability is now ${verifyData.is_available}`)
 
     if (verifyData.is_available !== isAvailable) {
       console.error(`Verification failed: expected ${isAvailable}, got ${verifyData.is_available}`)
@@ -278,8 +268,6 @@ export async function createReservation(data: {
   const supabase = await createClient()
 
   try {
-    console.log(`Creating reservation for tee time ${data.teeTimeId}`)
-
     // First, check if the tee time is available in tee_time_availability
     const { data: availabilityData, error: availabilityError } = await supabase
       .from("tee_time_availability")
@@ -297,8 +285,6 @@ export async function createReservation(data: {
       console.error(`Tee time ${data.teeTimeId} is not available for booking`)
       return { success: false, error: "This tee time is not available for booking" }
     }
-
-    console.log(`Tee time ${data.teeTimeId} is available for booking`)
 
     // Check if the tee time exists and has enough available slots
     const { data: teeTime, error: teeTimeError } = await supabase
@@ -640,8 +626,6 @@ export async function checkTeeTimeAvailability(teeTimeId: string) {
   const supabase = await createClient()
 
   try {
-    console.log(`Checking availability for tee time ${teeTimeId}`)
-
     // First, check if the tee time is available in tee_time_availability
     const { data: availabilityData, error: availabilityError } = await supabase
       .from("tee_time_availability")
@@ -659,8 +643,6 @@ export async function checkTeeTimeAvailability(teeTimeId: string) {
       console.error(`Tee time ${teeTimeId} is not available for booking`)
       return { success: false, isAvailable: false, reason: "This tee time is not available for booking" }
     }
-
-    console.log(`Tee time ${teeTimeId} is available in tee_time_availability`)
 
     // Get the tee time details
     const { data: teeTime, error: teeTimeError } = await supabase
@@ -693,8 +675,6 @@ export async function checkTeeTimeAvailability(teeTimeId: string) {
       console.error(`Tee time ${teeTimeId} has no available slots`)
       return { success: false, isAvailable: false, reason: "No available slots" }
     }
-
-    console.log(`Tee time ${teeTimeId} has ${availableSlots} available slots`)
 
     return {
       success: true,

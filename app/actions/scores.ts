@@ -67,8 +67,6 @@ export async function submitScores(
 
     const currentSeason = activeSeason?.year || 2025
 
-    console.log("Creating new round with date:", date, "and season:", currentSeason)
-
     // Create a new round
     const { data: round, error: roundError } = await supabase
       .from("rounds")
@@ -84,8 +82,6 @@ export async function submitScores(
       console.error("Error creating round:", roundError)
       return { success: false, error: roundError.message }
     }
-
-    console.log("Round created successfully:", round.id)
 
     // Insert scores for each player
     for (const player of playerScores) {
@@ -103,8 +99,6 @@ export async function submitScores(
         const netTotalScore = player.netScores
           ? player.netScores.reduce((sum, score) => sum + (score || 0), 0)
           : totalScore - (player.strokesGiven || 0)
-
-        console.log(`Inserting scores for player ${player.userId} with total score ${totalScore}`)
 
         const scoreData = {
           round_id: round.id,
@@ -161,8 +155,6 @@ export async function submitScores(
         if (scoreError) {
           console.error(`Error inserting score for player ${player.userId}:`, scoreError)
           // Continue with other players instead of failing the entire operation
-        } else {
-          console.log(`Scores inserted successfully for player ${player.userId}`)
         }
       } catch (playerError) {
         console.error(`Error processing player ${player.userId}:`, playerError)

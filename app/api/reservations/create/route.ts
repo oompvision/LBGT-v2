@@ -55,8 +55,6 @@ export async function POST(request: NextRequest) {
     const reservedSlots = existingReservations?.reduce((sum, r) => sum + r.slots, 0) || 0
     const availableSlots = teeTimeData.max_slots - reservedSlots
 
-    console.log(`Tee time ${teeTimeId}: ${availableSlots} slots available, ${slots} requested`)
-
     if (availableSlots < slots) {
       return NextResponse.json(
         {
