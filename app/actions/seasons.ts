@@ -107,6 +107,31 @@ export async function setActiveSeason(seasonId: string) {
   }
 }
 
+// Update a season's dates
+export async function updateSeasonDates(seasonId: string, startDate: string, endDate: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from("seasons")
+      .update({ start_date: startDate, end_date: endDate, updated_at: new Date().toISOString() })
+      .eq("id", seasonId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Error updating season dates:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/seasons")
+    return { success: true, season: data }
+  } catch (error) {
+    console.error("Error in updateSeasonDates:", error)
+    return { success: false, error: "Failed to update season dates" }
+  }
+}
+
 // Delete a season (only if not active and has no data)
 export async function deleteSeason(seasonId: string) {
   try {
