@@ -22,17 +22,18 @@ export async function getAllUsersForAdmin() {
   }
 }
 
-export async function getAllRoundsWithDetails() {
+export async function getAllRoundsWithDetails(season?: number) {
   const supabase = await createClient()
 
   try {
-    const { data: rounds, error } = await supabase
+    let query = supabase
       .from("rounds")
       .select(
         `
         id,
         date,
         submitted_by,
+        season,
         users (
           name,
           email
@@ -48,7 +49,12 @@ export async function getAllRoundsWithDetails() {
       `,
       )
       .order("date", { ascending: false })
-      .limit(10)
+
+    if (season) {
+      query = query.eq("season", season)
+    }
+
+    const { data: rounds, error } = await query
 
     if (error) {
       console.error("Error fetching rounds:", error)
@@ -62,11 +68,11 @@ export async function getAllRoundsWithDetails() {
   }
 }
 
-export async function getAllReservationsWithDetails() {
+export async function getAllReservationsWithDetails(season?: number) {
   const supabase = await createClient()
 
   try {
-    const { data: reservations, error } = await supabase
+    let query = supabase
       .from("reservations")
       .select(
         `
@@ -76,6 +82,7 @@ export async function getAllReservationsWithDetails() {
         slots,
         player_names,
         play_for_money,
+        season,
         users (
           name,
           email
@@ -87,7 +94,12 @@ export async function getAllReservationsWithDetails() {
       `,
       )
       .order("created_at", { ascending: false })
-      .limit(10) // Limit to 10 most recent reservations
+
+    if (season) {
+      query = query.eq("season", season)
+    }
+
+    const { data: reservations, error } = await query
 
     if (error) {
       console.error("Error fetching reservations:", error)

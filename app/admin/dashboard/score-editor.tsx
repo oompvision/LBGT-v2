@@ -119,7 +119,7 @@ export function ScoreEditor({ score, onSave, isSubmitting }: ScoreEditorProps) {
           </thead>
           <tbody>
             <tr className="border-b">
-              <td className="px-2 py-2 font-medium">{score.users.name}</td>
+              <td className="px-2 py-2 font-medium">{score.users?.name || "Unknown"}</td>
               {scores.map((holeScore, index) => {
                 // Calculate if the score is under, over, or at par
                 const par = COURSE_DATA.pars[index]
