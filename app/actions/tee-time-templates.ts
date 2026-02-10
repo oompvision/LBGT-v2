@@ -168,13 +168,15 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
           .maybeSingle()
 
         if (existing) {
-          // Update booking window and max_slots on existing tee time
+          // Update existing tee time with current season, booking window, and settings
           await supabase
             .from("tee_times")
             .update({
               booking_opens_at: bookingOpensAt,
               booking_closes_at: bookingClosesAt,
               max_slots: template.max_slots,
+              is_available: true,
+              season: season.year,
             })
             .eq("id", existing.id)
           updatedCount++
