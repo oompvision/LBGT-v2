@@ -39,9 +39,6 @@ export const createAdminClient = () => {
     throw new Error("Missing Supabase service role key")
   }
 
-  console.log("Creating admin client with URL:", supabaseUrl.substring(0, 30) + "...")
-  console.log("Service role key available:", serviceRoleKey ? "Yes" : "No")
-
   return createSupabaseClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
