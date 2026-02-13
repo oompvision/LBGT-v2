@@ -13,9 +13,9 @@ export async function sendPasswordResetEmail(email: string) {
       return { success: false, error: "User not found" }
     }
 
-    // Send password reset email
+    // Send password reset email — route through auth callback so the code gets exchanged for a session
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?next=/reset-password`,
     })
 
     if (error) {
