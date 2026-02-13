@@ -53,6 +53,11 @@ export function AdminTabs({ className }: AdminTabsProps) {
       isActive: pathname === "/admin/seasons",
     },
     {
+      name: "Emails",
+      href: "/admin/emails",
+      isActive: pathname === "/admin/emails",
+    },
+    {
       name: "Reset Password",
       href: "/admin/reset-password",
       isActive: pathname === "/admin/reset-password",
