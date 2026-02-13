@@ -5,6 +5,11 @@ import { createServerClient } from "@supabase/ssr"
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
 
+  // Skip auth for webhook endpoints
+  if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
+    return res
+  }
+
   const publicRoutes = ["/", "/apply", "/mobile-signin", "/signin", "/signup"]
   const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
