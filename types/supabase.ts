@@ -521,6 +521,44 @@ export type Database = {
           updated_at?: string
         }
       }
+      email_campaigns: {
+        Row: {
+          id: string
+          subject: string
+          body: string
+          cta_text: string | null
+          cta_url: string | null
+          recipient_type: string
+          recipient_ids: string[] | null
+          recipient_count: number
+          sent_by: string
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          subject: string
+          body: string
+          cta_text?: string | null
+          cta_url?: string | null
+          recipient_type?: string
+          recipient_ids?: string[] | null
+          recipient_count?: number
+          sent_by: string
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          subject?: string
+          body?: string
+          cta_text?: string | null
+          cta_url?: string | null
+          recipient_type?: string
+          recipient_ids?: string[] | null
+          recipient_count?: number
+          sent_by?: string
+          sent_at?: string
+        }
+      }
     }
     Views: {
       available_tee_times: {
@@ -563,6 +601,7 @@ export type TeeTimeTemplate = Tables["tee_time_templates"]["Row"]
 export type TeeTimeLog = Tables["tee_time_logs"]["Row"]
 export type InfoBox = Tables["info_boxes"]["Row"]
 export type PlayoffResult = Tables["playoff_results"]["Row"]
+export type EmailCampaign = Tables["email_campaigns"]["Row"]
 export type AvailableTeeTime = Views["available_tee_times"]["Row"]
 
 // Common joined types used in components
