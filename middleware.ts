@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
     return res
   }
 
-  const publicRoutes = ["/", "/apply", "/mobile-signin", "/signin", "/signup"]
+  const publicRoutes = ["/", "/apply", "/mobile-signin", "/signin", "/signup", "/reset-password"]
   const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
 
