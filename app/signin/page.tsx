@@ -138,6 +138,11 @@ export default function SignInPage() {
                 </Button>
 
                 <div className="text-center text-sm">
+                  <Link href="/reset-password" className="text-muted-foreground underline">
+                    Forgot your password?
+                  </Link>
+                </div>
+                <div className="text-center text-sm">
                   Don&apos;t have an account?{" "}
                   <Link href="/signup" className="text-primary underline">
                     Sign up
