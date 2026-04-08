@@ -28,14 +28,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const { subject, body, ctaText, ctaUrl, recipientType, recipientIds } = await request.json()
+    const { subject, body, ctaText, ctaUrl, recipientType, recipientIds, additionalEmails } = await request.json()
 
     if (!subject || !body) {
       return NextResponse.json({ error: "Subject and body are required" }, { status: 400 })
     }
 
-    // Get recipients
-    let recipients: { id: string; email: string; name: string }[]
+    // Get member recipients
+    let recipients: { id?: string; email: string; name: string }[]
 
     if (recipientType === "selected" && recipientIds?.length > 0) {
       const { data, error } = await supabaseAdmin
@@ -45,13 +45,25 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error
       recipients = data || []
-    } else {
+    } else if (recipientType === "all") {
       const { data, error } = await supabaseAdmin
         .from("users")
         .select("id, email, name")
 
       if (error) throw error
       recipients = data || []
+    } else {
+      recipients = []
+    }
+
+    // Add additional non-member emails
+    if (additionalEmails?.length > 0) {
+      const memberEmails = new Set(recipients.map((r) => r.email.toLowerCase()))
+      for (const email of additionalEmails) {
+        if (!memberEmails.has(email.toLowerCase())) {
+          recipients.push({ email, name: email })
+        }
+      }
     }
 
     if (recipients.length === 0) {

@@ -49,6 +49,7 @@ export default function AdminEmailsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [memberSearch, setMemberSearch] = useState("")
+  const [additionalEmails, setAdditionalEmails] = useState("")
 
   // History expand state
   const [expandedCampaign, setExpandedCampaign] = useState<string | null>(null)
@@ -92,15 +93,23 @@ export default function AdminEmailsPage() {
       return
     }
 
-    if (recipientType === "selected" && selectedIds.length === 0) {
-      setMessage({ type: "error", text: "Please select at least one recipient." })
+    // Parse additional emails
+    const extraEmails = additionalEmails
+      .split(/[,\n]/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+
+    if (recipientType === "selected" && selectedIds.length === 0 && extraEmails.length === 0) {
+      setMessage({ type: "error", text: "Please select at least one recipient or enter additional emails." })
       return
     }
 
-    const recipientCount = recipientType === "all" ? members.length : selectedIds.length
-    const confirmed = window.confirm(
-      `Send this email to ${recipientCount} ${recipientCount === 1 ? "member" : "members"}?`
-    )
+    const memberCount = recipientType === "all" ? members.length : selectedIds.length
+    const totalCount = memberCount + extraEmails.length
+    const parts = []
+    if (memberCount > 0) parts.push(`${memberCount} ${memberCount === 1 ? "member" : "members"}`)
+    if (extraEmails.length > 0) parts.push(`${extraEmails.length} additional ${extraEmails.length === 1 ? "email" : "emails"}`)
+    const confirmed = window.confirm(`Send this email to ${parts.join(" and ")} (${totalCount} total)?`)
     if (!confirmed) return
 
     setIsSending(true)
@@ -117,6 +126,7 @@ export default function AdminEmailsPage() {
           ctaUrl: showCta ? ctaUrl.trim() : undefined,
           recipientType,
           recipientIds: recipientType === "selected" ? selectedIds : undefined,
+          additionalEmails: extraEmails.length > 0 ? extraEmails : undefined,
         }),
       })
 
@@ -136,6 +146,7 @@ export default function AdminEmailsPage() {
         setCtaUrl("")
         setShowCta(false)
         setSelectedIds([])
+        setAdditionalEmails("")
         // Refresh history
         const historyResult = await getEmailHistory()
         if (historyResult.success && historyResult.campaigns) {
@@ -406,6 +417,21 @@ export default function AdminEmailsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Additional Emails */}
+              <div className="space-y-2 border-t pt-4">
+                <Label htmlFor="additional-emails">Additional Emails</Label>
+                <textarea
+                  id="additional-emails"
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  placeholder={"email@example.com\nanother@example.com"}
+                  value={additionalEmails}
+                  onChange={(e) => setAdditionalEmails(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add non-member emails, one per line or comma-separated. These will receive the email in addition to any selected members.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
