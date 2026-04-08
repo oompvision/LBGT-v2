@@ -73,28 +73,24 @@ export default function SignUpPage() {
         }
       }
 
-      toast({
-        title: "Account created!",
-        description: "You have successfully signed up.",
-      })
-
-      // Sign in the user immediately after signup
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (signInError) {
+      // Check if email confirmation is required
+      // If signUp returns a session, the user is already confirmed (email confirmation disabled)
+      // If no session, email confirmation is pending
+      if (authData.session) {
+        // User is confirmed and signed in — redirect to home
         toast({
-          title: "Error signing in",
-          description: "Account created but couldn't sign in automatically. Please sign in manually.",
-          variant: "destructive",
+          title: "Account created!",
+          description: "You have successfully signed up.",
+        })
+        window.location.href = "/"
+      } else {
+        // Email confirmation required — tell user to check their inbox
+        toast({
+          title: "Check your email!",
+          description: "We've sent a confirmation link to your email. Please confirm your email to sign in.",
         })
         router.push("/signin")
-        return
       }
-
-      window.location.href = "/"
     } catch (error) {
       toast({
         title: "Error",

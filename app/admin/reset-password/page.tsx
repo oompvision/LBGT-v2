@@ -32,7 +32,6 @@ export default function ResetPasswordPage() {
       if (result.success && result.exists) {
         setUserInfo({
           user: result.user,
-          authUser: result.authUser,
         })
       } else if (result.success) {
         setMessage({
@@ -129,7 +128,7 @@ export default function ResetPasswordPage() {
                 <strong>Created:</strong> {new Date(userInfo.user?.created_at).toLocaleDateString()}
               </p>
               <p>
-                <strong>Auth Status:</strong> {userInfo.authUser ? "Active in auth system" : "Missing from auth"}
+                <strong>Status:</strong> Found in database
               </p>
             </div>
           )}

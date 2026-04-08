@@ -1,20 +1,15 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 
 export async function sendPasswordResetEmail(email: string) {
   try {
-    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
 
-    // Check if user exists first
-    const { data: user } = await supabase.from("users").select("email").eq("email", email).single()
-
-    if (!user) {
-      return { success: false, error: "User not found" }
-    }
-
-    // Send password reset email — route through auth callback so the code gets exchanged for a session
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    // Send password reset email directly via admin client
+    // Don't check user existence first — always show a generic success message
+    // to prevent email enumeration attacks
+    const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?next=/reset-password`,
     })
 
@@ -25,7 +20,7 @@ export async function sendPasswordResetEmail(email: string) {
 
     return {
       success: true,
-      message: `Password reset email sent to ${email}`,
+      message: "If an account exists with that email, a password reset link has been sent.",
     }
   } catch (error: any) {
     console.error("Error in sendPasswordResetEmail:", error)
@@ -38,10 +33,10 @@ export async function sendPasswordResetEmail(email: string) {
 
 export async function checkUserExists(email: string) {
   try {
-    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
 
-    // Check if user exists in our users table
-    const { data: user, error: userError } = await supabase
+    // Check if user exists in our users table using admin client to bypass RLS
+    const { data: user, error: userError } = await supabaseAdmin
       .from("users")
       .select("id, email, name, created_at")
       .eq("email", email)
@@ -52,18 +47,9 @@ export async function checkUserExists(email: string) {
       return { success: false, error: userError.message }
     }
 
-    // For auth system, we'll just check if we can get the user's session
-    // This is a simpler approach that doesn't require admin privileges
-    const { data: authData } = await supabase
-      .from("auth.users")
-      .select("email, created_at, last_sign_in_at")
-      .eq("email", email)
-      .single()
-
     return {
       success: true,
       user,
-      authUser: authData,
       exists: !!user,
     }
   } catch (error: any) {
