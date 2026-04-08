@@ -8,6 +8,7 @@ export type Database = {
           email: string
           strokes_given: number | null
           is_admin: boolean
+          is_confirmed: boolean
           created_at: string
           profile_picture_url: string | null
         }
@@ -17,6 +18,7 @@ export type Database = {
           email: string
           strokes_given?: number | null
           is_admin?: boolean
+          is_confirmed?: boolean
           created_at?: string
           profile_picture_url?: string | null
         }
@@ -26,6 +28,7 @@ export type Database = {
           email?: string
           strokes_given?: number | null
           is_admin?: boolean
+          is_confirmed?: boolean
           created_at?: string
           profile_picture_url?: string | null
         }

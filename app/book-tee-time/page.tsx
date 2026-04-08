@@ -378,6 +378,33 @@ export default function BookTeeTimePage() {
     )
   }
 
+  // Show pending approval message if member is not confirmed
+  if (userData && !userData.is_confirmed) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 py-8">
+          <div className="container max-w-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Pending Approval</CardTitle>
+                <CardDescription>
+                  Your account is awaiting confirmation from a league admin. Once confirmed, you'll be able to book tee times.
+                </CardDescription>
+              </CardHeader>
+              <CardFooter>
+                <Button asChild variant="outline">
+                  <Link href="/">Back to Home</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   // Show error if there was a problem loading data
   if (error) {
     return (

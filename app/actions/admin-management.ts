@@ -381,6 +381,48 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
   }
 }
 
+// Function to confirm a member (admin only)
+export async function confirmMember(userId: string) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ is_confirmed: true })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Error confirming member:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/users")
+    return { success: true, message: "Member confirmed successfully" }
+  } catch (error: any) {
+    console.error("Error in confirmMember:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
+// Function to unconfirm a member (admin only)
+export async function unconfirmMember(userId: string) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ is_confirmed: false })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Error unconfirming member:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/users")
+    return { success: true, message: "Member confirmation revoked" }
+  } catch (error: any) {
+    console.error("Error in unconfirmMember:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
 // Function to upload profile picture for any user (admin only)
 export async function adminUploadProfilePicture(userId: string, formData: FormData) {
   try {

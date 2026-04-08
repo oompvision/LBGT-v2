@@ -16,13 +16,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Loader2, Search, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Edit, Loader2, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
 import {
   updateUser,
   updateStrokesGivenDirectly,
   deleteUser,
   adminUploadProfilePicture,
   adminRemoveProfilePicture,
+  confirmMember,
+  unconfirmMember,
 } from "@/app/actions/admin-management"
 import type { User } from "@/types/supabase"
 import { MAX_STROKES_GIVEN } from "@/lib/constants"
@@ -48,6 +50,7 @@ export function UserManagement({ users }: UserManagementProps) {
   })
   const router = useRouter()
   const { toast } = useToast()
+  const [isConfirming, setIsConfirming] = useState<string | null>(null)
   const [isUploadingPicture, setIsUploadingPicture] = useState<string | null>(null)
   const [selectedPictureUser, setSelectedPictureUser] = useState<any>(null)
   const [isPictureDialogOpen, setIsPictureDialogOpen] = useState(false)
@@ -156,6 +159,33 @@ export function UserManagement({ users }: UserManagementProps) {
     }
   }
 
+  const handleToggleConfirm = async (user: User) => {
+    setIsConfirming(user.id)
+    try {
+      const result = user.is_confirmed
+        ? await unconfirmMember(user.id)
+        : await confirmMember(user.id)
+
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+
+      toast({
+        title: "Success",
+        description: result.message,
+      })
+      router.refresh()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update member status",
+        variant: "destructive",
+      })
+    } finally {
+      setIsConfirming(null)
+    }
+  }
+
   const handleProfilePictureUpload = async (userId: string, formData: FormData) => {
     setIsUploadingPicture(userId)
 
@@ -254,11 +284,33 @@ export function UserManagement({ users }: UserManagementProps) {
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-base">{user.name || "Unnamed User"}</CardTitle>
                         {user.is_admin && <Badge>Admin</Badge>}
+                        {user.is_confirmed ? (
+                          <Badge variant="outline" className="border-green-500 text-green-600">Confirmed</Badge>
+                        ) : (
+                          <Badge variant="destructive">Pending</Badge>
+                        )}
                       </div>
                       <CardDescription>{user.email || "No email"}</CardDescription>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {!user.is_admin && (
+                      <Button
+                        variant={user.is_confirmed ? "outline" : "default"}
+                        size="sm"
+                        onClick={() => handleToggleConfirm(user)}
+                        disabled={isConfirming === user.id}
+                      >
+                        {isConfirming === user.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : user.is_confirmed ? (
+                          <ShieldX className="mr-2 h-4 w-4" />
+                        ) : (
+                          <ShieldCheck className="mr-2 h-4 w-4" />
+                        )}
+                        {user.is_confirmed ? "Revoke" : "Confirm"}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

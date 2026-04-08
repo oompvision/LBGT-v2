@@ -25,6 +25,17 @@ export async function submitScores(
       return { success: false, error: "You must be logged in to submit scores" }
     }
 
+    // Check if user is confirmed
+    const { data: userData } = await supabase
+      .from("users")
+      .select("is_confirmed")
+      .eq("id", session.user.id)
+      .single()
+
+    if (!userData?.is_confirmed) {
+      return { success: false, error: "Your account is pending admin approval. You cannot submit scores yet." }
+    }
+
     // Validate input data
     if (!date) {
       return { success: false, error: "Date is required" }
