@@ -3,6 +3,46 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
+// Sign up a new user via the admin API so the email is auto-confirmed
+export async function signUpUser(email: string, password: string, name: string) {
+  try {
+    const supabaseAdmin = createAdminClient()
+
+    // Create the auth user with email pre-confirmed
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    })
+
+    if (authError) {
+      // Handle duplicate email
+      if (authError.message?.includes("already been registered") || authError.message?.includes("already exists")) {
+        return { success: false, error: "An account with this email already exists. Please sign in instead." }
+      }
+      console.error("Error creating auth user:", authError)
+      return { success: false, error: authError.message }
+    }
+
+    if (!authData.user) {
+      return { success: false, error: "Failed to create user" }
+    }
+
+    // Create the user profile in the database
+    const dbResult = await createUserInDatabase(authData.user.id, email, name)
+    if (!dbResult.success) {
+      console.error("Auth user created but DB insert failed:", dbResult.error)
+      // Don't fail the whole signup — user can still sign in, DB row will be created on sign-in
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in signUpUser:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
 // Function to create a user in the database
 export async function createUserInDatabase(userId: string, email: string, name: string) {
   try {

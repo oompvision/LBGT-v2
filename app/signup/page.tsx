@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { createUserInDatabase } from "../actions/auth"
+import { signUpUser } from "../actions/auth"
 import { useAuth } from "@/components/auth-provider"
 
 export default function SignUpPage() {
@@ -38,59 +38,39 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard`,
-        },
-      })
+      // Create the user server-side via admin API (auto-confirms email)
+      const result = await signUpUser(email, password, name)
 
-      if (authError) {
+      if (!result.success) {
         toast({
           title: "Error signing up",
-          description: authError.message,
+          description: result.error,
           variant: "destructive",
         })
         setIsLoading(false)
         return
       }
 
-      // Create the user profile in the database
-      if (authData.user) {
-        const result = await createUserInDatabase(authData.user.id, email, name)
+      // User is created and confirmed — sign in immediately
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-        if (!result.success) {
-          console.error("Error creating user:", result.error)
-          toast({
-            title: "Warning",
-            description: "Account created but profile setup had an issue. Please contact support if you have problems.",
-            variant: "destructive",
-          })
-        }
-      }
-
-      // Check if email confirmation is required
-      // If signUp returns a session, the user is already confirmed (email confirmation disabled)
-      // If no session, email confirmation is pending
-      if (authData.session) {
-        // User is confirmed and signed in — redirect to home
+      if (signInError) {
         toast({
           title: "Account created!",
-          description: "You have successfully signed up.",
-        })
-        window.location.href = "/"
-      } else {
-        // Email confirmation required — tell user to check their inbox
-        toast({
-          title: "Check your email!",
-          description: "We've sent a confirmation link to your email. Please confirm your email to sign in.",
+          description: "Please sign in with your new credentials.",
         })
         router.push("/signin")
+        return
       }
+
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      })
+      window.location.href = "/"
     } catch (error) {
       toast({
         title: "Error",
