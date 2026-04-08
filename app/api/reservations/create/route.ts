@@ -14,6 +14,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Please sign in to make a reservation." }, { status: 401 })
     }
 
+    // Check if user is confirmed
+    const { data: userData } = await supabase
+      .from("users")
+      .select("is_confirmed")
+      .eq("id", user.id)
+      .single()
+
+    if (!userData?.is_confirmed) {
+      return NextResponse.json(
+        { error: "Your account is pending admin approval. You cannot book tee times yet." },
+        { status: 403 },
+      )
+    }
+
     // Get the request body
     const body = await request.json()
     const { teeTimeId, userId, slots, playerNames, playForMoney } = body

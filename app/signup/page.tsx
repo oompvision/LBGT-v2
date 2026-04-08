@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { createUserInDatabase } from "../actions/auth"
+import { signUpUser } from "../actions/auth"
 import { useAuth } from "@/components/auth-provider"
 
 export default function SignUpPage() {
@@ -38,47 +38,20 @@ export default function SignUpPage() {
     setIsLoading(true)
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-          },
-          emailRedirectTo: `${window.location.origin}/api/auth/callback?next=/dashboard`,
-        },
-      })
+      // Create the user server-side via admin API (auto-confirms email)
+      const result = await signUpUser(email, password, name)
 
-      if (authError) {
+      if (!result.success) {
         toast({
           title: "Error signing up",
-          description: authError.message,
+          description: result.error,
           variant: "destructive",
         })
         setIsLoading(false)
         return
       }
 
-      // Create the user profile in the database
-      if (authData.user) {
-        const result = await createUserInDatabase(authData.user.id, email, name)
-
-        if (!result.success) {
-          console.error("Error creating user:", result.error)
-          toast({
-            title: "Warning",
-            description: "Account created but profile setup had an issue. Please contact support if you have problems.",
-            variant: "destructive",
-          })
-        }
-      }
-
-      toast({
-        title: "Account created!",
-        description: "You have successfully signed up.",
-      })
-
-      // Sign in the user immediately after signup
+      // User is created and confirmed — sign in immediately
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -86,14 +59,17 @@ export default function SignUpPage() {
 
       if (signInError) {
         toast({
-          title: "Error signing in",
-          description: "Account created but couldn't sign in automatically. Please sign in manually.",
-          variant: "destructive",
+          title: "Account created!",
+          description: "Please sign in with your new credentials.",
         })
         router.push("/signin")
         return
       }
 
+      toast({
+        title: "Welcome!",
+        description: "Your account has been created successfully.",
+      })
       window.location.href = "/"
     } catch (error) {
       toast({

@@ -22,6 +22,33 @@ export default async function SubmitScorePage() {
       redirect("/signin")
     }
 
+    // Check if user is confirmed
+    const { data: userData } = await supabase
+      .from("users")
+      .select("is_confirmed")
+      .eq("id", session.user.id)
+      .single()
+
+    if (!userData?.is_confirmed) {
+      return (
+        <div className="flex min-h-screen flex-col">
+          <Header />
+          <main className="flex-1 py-8">
+            <div className="container max-w-lg">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Account Pending Approval</AlertTitle>
+                <AlertDescription>
+                  Your account is awaiting confirmation from a league admin. Once confirmed, you'll be able to submit scores.
+                </AlertDescription>
+              </Alert>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      )
+    }
+
     // Get all users for the player selection dropdown
     const { users, error } = await getAllUsers()
 
