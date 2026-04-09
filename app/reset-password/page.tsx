@@ -25,13 +25,6 @@ export default function ResetPasswordPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      // If user has a session (came from recovery email link), show update form
-      // Otherwise show the request form
-      setMode(session ? "update" : "request")
-    }
-
     // Listen for PASSWORD_RECOVERY event from Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
@@ -39,7 +32,37 @@ export default function ResetPasswordPage() {
       }
     })
 
-    checkSession()
+    // Check if the URL hash contains a recovery token
+    // The SDK may not have processed it yet, so handle it explicitly
+    const hash = window.location.hash
+    if (hash && hash.includes("type=recovery")) {
+      const params = new URLSearchParams(hash.substring(1))
+      const accessToken = params.get("access_token")
+      const refreshToken = params.get("refresh_token")
+
+      if (accessToken && refreshToken) {
+        supabase.auth
+          .setSession({ access_token: accessToken, refresh_token: refreshToken })
+          .then(({ error }) => {
+            if (!error) {
+              setMode("update")
+              // Clean the hash from the URL
+              window.history.replaceState(null, "", window.location.pathname)
+            } else {
+              console.error("Error setting recovery session:", error)
+              setMode("request")
+            }
+          })
+      } else {
+        setMode("request")
+      }
+    } else {
+      // No recovery hash — check for an existing session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setMode(session ? "update" : "request")
+      })
+    }
+
     return () => subscription.unsubscribe()
   }, [])
 
