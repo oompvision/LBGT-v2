@@ -5,8 +5,11 @@ import { createServerClient } from "@supabase/ssr"
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
 
-  // Skip auth for webhook endpoints
-  if (request.nextUrl.pathname.startsWith("/api/webhooks/")) {
+  // Skip auth for webhook endpoints and auth callback
+  if (
+    request.nextUrl.pathname.startsWith("/api/webhooks/") ||
+    request.nextUrl.pathname.startsWith("/api/auth/")
+  ) {
     return res
   }
 
