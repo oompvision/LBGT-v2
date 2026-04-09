@@ -10,7 +10,7 @@ export async function sendPasswordResetEmail(email: string) {
     // Don't check user existence first — always show a generic success message
     // to prevent email enumeration attacks
     const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback?next=/reset-password`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/reset-password`,
     })
 
     if (error) {
