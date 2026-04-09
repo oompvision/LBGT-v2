@@ -136,7 +136,7 @@ export default function AdminEmailsPage() {
         setMessage({
           type: "success",
           text: `Email sent successfully to ${result.sent} of ${result.total} recipients.${
-            result.errors ? ` ${result.errors.length} failed.` : ""
+            result.failed ? ` ${result.failed} failed.` : ""
           }`,
         })
         // Reset form

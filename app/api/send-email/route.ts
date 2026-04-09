@@ -78,34 +78,39 @@ export async function POST(request: NextRequest) {
       ctaUrl: ctaUrl || undefined,
     })
 
-    // Send emails via Resend (batch up to 100 at a time)
+    // Send emails via Resend batch API (up to 100 per batch call)
     const batchSize = 100
     let totalSent = 0
-    const errors: string[] = []
+    let totalFailed = 0
+    const errorSamples: string[] = []
 
     for (let i = 0; i < recipients.length; i += batchSize) {
       const batch = recipients.slice(i, i + batchSize)
 
-      const results = await Promise.allSettled(
-        batch.map((recipient) =>
-          resend.emails.send({
-            from: "Long Beach Golf Tour <commissioner@updates.longbeachgolftour.com>",
-            to: recipient.email,
-            subject,
-            html,
-          })
-        )
-      )
+      const batchPayload = batch.map((recipient) => ({
+        from: "Long Beach Golf Tour <commissioner@updates.longbeachgolftour.com>",
+        to: recipient.email,
+        subject,
+        html,
+      }))
 
-      for (const result of results) {
-        if (result.status === "fulfilled" && !result.value.error) {
-          totalSent++
-        } else {
-          const errorMsg =
-            result.status === "rejected"
-              ? result.reason?.message
-              : result.value.error?.message
-          errors.push(errorMsg || "Unknown error")
+      try {
+        const { data, error } = await resend.batch.send(batchPayload)
+
+        if (error) {
+          // Entire batch failed
+          totalFailed += batch.length
+          if (errorSamples.length < 3) {
+            errorSamples.push(error.message || "Batch send failed")
+          }
+        } else if (data) {
+          // Batch succeeded — count individual results
+          totalSent += data.data.length
+        }
+      } catch (err: any) {
+        totalFailed += batch.length
+        if (errorSamples.length < 3) {
+          errorSamples.push(err.message || "Batch send error")
         }
       }
     }
@@ -126,7 +131,8 @@ export async function POST(request: NextRequest) {
       success: true,
       sent: totalSent,
       total: recipients.length,
-      errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
+      failed: totalFailed,
+      errors: errorSamples.length > 0 ? errorSamples : undefined,
     })
   } catch (error: any) {
     console.error("Send email error:", error)
