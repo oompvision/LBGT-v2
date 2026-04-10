@@ -82,7 +82,7 @@ export function MobileMenu() {
                 className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
                 aria-label="View reservations"
               >
-                Reservations
+                Tee Times
               </Link>
               <Link
                 href="/schedule"

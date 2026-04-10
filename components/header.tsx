@@ -107,7 +107,7 @@ export function Header() {
                     aria-label="Reservations menu"
                     onClick={() => toggleDropdown("reservations")}
                   >
-                    <span>Reservations</span>
+                    <span>Tee Times</span>
                     <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
                   </button>
 
@@ -119,7 +119,7 @@ export function Header() {
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setActiveDropdown(null)}
                         >
-                          Reserve Tee Time
+                          Book Tee Time
                         </Link>
                         <Link
                           href="/my-reservations"
@@ -149,7 +149,7 @@ export function Header() {
                     aria-label="Scores menu"
                     onClick={() => toggleDropdown("scores")}
                   >
-                    <span>Scores</span>
+                    <span>Scoring</span>
                     <ChevronDown className="h-3 w-3 ml-1" aria-hidden="true" />
                   </button>
 

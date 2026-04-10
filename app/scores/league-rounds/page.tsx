@@ -119,15 +119,15 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
-          <div className="mb-8 flex items-center justify-between">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Tour Leaderboard</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Tour Leaderboard</h1>
+              <p className="text-sm text-muted-foreground">
                 View player rankings and all golf rounds submitted by tour members
               </p>
             </div>
-            <Link href="/scores/submit">
-              <Button>
+            <Link href="/scores/submit" className="shrink-0">
+              <Button size="sm">
                 <ClipboardList className="mr-2 h-4 w-4" />
                 Submit New Scores
               </Button>
@@ -144,9 +144,9 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
           {/* Leaderboards */}
           {success && roundsWithScores.length > 0 && (
             <Tabs defaultValue="standard" className="mb-8">
-              <TabsList className="mb-4">
-                <TabsTrigger value="standard">Standard Leaderboard</TabsTrigger>
-                <TabsTrigger value="ringer">Ringer Pool Leaderboard</TabsTrigger>
+              <TabsList className="mb-4 h-8">
+                <TabsTrigger value="standard" className="text-xs sm:text-sm">Standard Leaderboard</TabsTrigger>
+                <TabsTrigger value="ringer" className="text-xs sm:text-sm">Ringer Pool Leaderboard</TabsTrigger>
               </TabsList>
 
               <TabsContent value="standard">

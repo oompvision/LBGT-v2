@@ -457,7 +457,7 @@ export default function BookTeeTimePage() {
               <Info className="h-4 w-4" />
               <AlertTitle>Booking Information</AlertTitle>
               <AlertDescription>
-                You can book tee times for {dayOfWeek}, {displayDate}. Each player can book up to 4 tee times per day.
+                Each player can book one tee time per week for up to 4 players.
               </AlertDescription>
             </Alert>
 

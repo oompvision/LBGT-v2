@@ -180,15 +180,15 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Tour Leaderboard</CardTitle>
-        <CardDescription>Player statistics across all rounds</CardDescription>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg sm:text-xl">Tour Leaderboard</CardTitle>
+        <CardDescription className="text-xs sm:text-sm">Player statistics across all rounds</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 sm:px-6">
         <Tabs defaultValue="net" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="net">Net Scores</TabsTrigger>
-            <TabsTrigger value="gross">Gross Scores</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-3 h-8">
+            <TabsTrigger value="net" className="text-xs sm:text-sm">Net Scores</TabsTrigger>
+            <TabsTrigger value="gross" className="text-xs sm:text-sm">Gross Scores</TabsTrigger>
           </TabsList>
 
           <TabsContent value="net">
@@ -197,54 +197,52 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
                 value={sortBy === "netAverage" || sortBy === "netBest" ? sortBy : "netAverage"}
                 onValueChange={(value) => setSortBy(value)}
               >
-                <TabsList>
-                  <TabsTrigger value="netAverage">Sort by Net Average</TabsTrigger>
-                  <TabsTrigger value="netBest">Sort by Net Best</TabsTrigger>
+                <TabsList className="h-7">
+                  <TabsTrigger value="netAverage" className="text-xs px-2 h-6">Net Average</TabsTrigger>
+                  <TabsTrigger value="netBest" className="text-xs px-2 h-6">Net Best</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
               <div className="rounded-md border min-w-full">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-2 sm:px-4 py-2 text-left font-medium">Rank</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-medium">Player</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium hidden sm:table-cell">Rounds</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Net Avg</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Strokes</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Best</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium hidden sm:table-cell">Worst</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium w-10">#</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium">Player</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Rnds</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Avg</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Hcp</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Best</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Worst</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPlayers
-                      .filter((player) => player.rounds > 0) // Only show players with rounds
+                      .filter((player) => player.rounds > 0)
                       .map((player, index) => (
                         <tr key={player.userId} className="border-b">
-                          <td className="px-2 sm:px-4 py-2">
+                          <td className="px-1.5 sm:px-4 py-1.5">
                             {index === 0 ? (
-                              <Badge className="bg-yellow-500 hover:bg-yellow-600 text-xs">
-                                <Trophy className="mr-1 h-3 w-3" />
+                              <Badge className="bg-yellow-500 hover:bg-yellow-600 text-[10px] px-1.5 py-0">
+                                <Trophy className="mr-0.5 h-2.5 w-2.5" />
                                 {index + 1}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs">
-                                {index + 1}
-                              </Badge>
+                              <span className="text-muted-foreground ml-1">{index + 1}</span>
                             )}
                           </td>
-                          <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">
+                          <td className="px-1.5 sm:px-4 py-1.5 font-medium text-xs">
                             <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
                               {player.name}
                             </Link>
                           </td>
-                          <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.rounds}</td>
-                          <td className="px-2 sm:px-4 py-2 text-center">{player.netAverageScore}</td>
-                          <td className="px-2 sm:px-4 py-2 text-center">{player.strokesGiven}</td>
-                          <td className="px-2 sm:px-4 py-2 text-center">{player.netBestScore}</td>
-                          <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.netWorstScore}</td>
+                          <td className="px-1.5 sm:px-4 py-1.5 text-center hidden sm:table-cell">{player.rounds}</td>
+                          <td className="px-1.5 sm:px-4 py-1.5 text-center font-medium">{player.netAverageScore}</td>
+                          <td className="px-1.5 sm:px-4 py-1.5 text-center">{player.strokesGiven}</td>
+                          <td className="px-1.5 sm:px-4 py-1.5 text-center">{player.netBestScore}</td>
+                          <td className="px-1.5 sm:px-4 py-1.5 text-center hidden sm:table-cell">{player.netWorstScore}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -259,52 +257,50 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
                 value={sortBy === "average" || sortBy === "best" ? sortBy : "average"}
                 onValueChange={(value) => setSortBy(value)}
               >
-                <TabsList>
-                  <TabsTrigger value="average">Sort by Average</TabsTrigger>
-                  <TabsTrigger value="best">Sort by Best Round</TabsTrigger>
+                <TabsList className="h-7">
+                  <TabsTrigger value="average" className="text-xs px-2 h-6">Average</TabsTrigger>
+                  <TabsTrigger value="best" className="text-xs px-2 h-6">Best Round</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-3 sm:mx-0">
               <div className="rounded-md border min-w-full">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="px-2 sm:px-4 py-2 text-left font-medium">Rank</th>
-                      <th className="px-2 sm:px-4 py-2 text-left font-medium">Player</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium hidden sm:table-cell">Rounds</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Avg Score</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Strokes</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium">Best</th>
-                      <th className="px-2 sm:px-4 py-2 text-center font-medium hidden sm:table-cell">Worst</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium w-10">#</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium">Player</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Rnds</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Avg</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Hcp</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Best</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Worst</th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedPlayers.map((player, index) => (
                       <tr key={player.userId} className="border-b">
-                        <td className="px-2 sm:px-4 py-2">
+                        <td className="px-1.5 sm:px-4 py-1.5">
                           {index === 0 ? (
-                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-xs">
-                              <Trophy className="mr-1 h-3 w-3" />
+                            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-[10px] px-1.5 py-0">
+                              <Trophy className="mr-0.5 h-2.5 w-2.5" />
                               {index + 1}
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-xs">
-                              {index + 1}
-                            </Badge>
+                            <span className="text-muted-foreground ml-1">{index + 1}</span>
                           )}
                         </td>
-                        <td className="px-2 sm:px-4 py-2 font-medium text-xs sm:text-sm">
+                        <td className="px-1.5 sm:px-4 py-1.5 font-medium text-xs">
                           <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
                             {player.name}
                           </Link>
                         </td>
-                        <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.rounds}</td>
-                        <td className="px-2 sm:px-4 py-2 text-center">{player.averageScore}</td>
-                        <td className="px-2 sm:px-4 py-2 text-center">{player.strokesGiven}</td>
-                        <td className="px-2 sm:px-4 py-2 text-center">{player.bestScore}</td>
-                        <td className="px-2 sm:px-4 py-2 text-center hidden sm:table-cell">{player.worstScore}</td>
+                        <td className="px-1.5 sm:px-4 py-1.5 text-center hidden sm:table-cell">{player.rounds}</td>
+                        <td className="px-1.5 sm:px-4 py-1.5 text-center font-medium">{player.averageScore}</td>
+                        <td className="px-1.5 sm:px-4 py-1.5 text-center">{player.strokesGiven}</td>
+                        <td className="px-1.5 sm:px-4 py-1.5 text-center">{player.bestScore}</td>
+                        <td className="px-1.5 sm:px-4 py-1.5 text-center hidden sm:table-cell">{player.worstScore}</td>
                       </tr>
                     ))}
                   </tbody>
