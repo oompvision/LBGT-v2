@@ -7,7 +7,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarIcon, Clock, Plus } from "lucide-react"
+import { CalendarIcon, Clock } from "lucide-react"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -102,17 +102,9 @@ export default async function MyReservationsPage() {
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">My Reservations</h1>
-              <p className="text-muted-foreground">View and manage your tee time reservations</p>
-            </div>
-            <Link href="/dashboard?tab=book">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Book Tee Time
-              </Button>
-            </Link>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">My Reservations</h1>
+            <p className="text-muted-foreground">View and manage your tee time reservations</p>
           </div>
 
           {Object.keys(reservationsByDate).length > 0 ? (
