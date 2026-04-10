@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { AlertCircle, CalendarIcon, Loader2 } from "lucide-react"
+import { AlertCircle, CalendarIcon, Loader2, X } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
@@ -86,6 +86,14 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const handlePlayerChange = (index: number, userId: string) => {
     const newPlayers = [...players]
     newPlayers[index].userId = userId
+    newPlayers[index].scores = Array(18).fill("")
+    newPlayers[index].netScores = Array(18).fill("")
+    setPlayers(newPlayers)
+  }
+
+  const clearPlayer = (index: number) => {
+    const newPlayers = [...players]
+    newPlayers[index].userId = ""
     newPlayers[index].scores = Array(18).fill("")
     newPlayers[index].netScores = Array(18).fill("")
     setPlayers(newPlayers)
@@ -227,25 +235,35 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <th className="px-2 sm:px-3 py-2 text-left font-medium text-muted-foreground w-12">Hole</th>
                   <th className="px-1 sm:px-2 py-2 text-center font-medium text-muted-foreground w-10">Par</th>
                   {activePlayers.map((player, pIdx) => (
-                    <th key={pIdx} className={"px-1 py-1 text-center w-12"}>
-                      <Select
-                        value={player.userId}
-                        onValueChange={(value) => handlePlayerChange(pIdx, value)}
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="h-7 text-xs px-1.5 w-full min-w-0">
-                          <SelectValue placeholder="Player">
-                            {player.userId ? toInitials(getUserName(player.userId)) : "Player"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name} {usersWithHandicap[user.id] ? `(${usersWithHandicap[user.id]})` : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <th key={pIdx} className="px-1 py-1 text-center w-12">
+                      {player.userId ? (
+                        <button
+                          type="button"
+                          onClick={() => clearPlayer(pIdx)}
+                          disabled={isSubmitting}
+                          className="flex items-center justify-between w-full h-7 rounded-md border border-input bg-background px-1.5 text-xs hover:bg-muted/50"
+                        >
+                          <span className="truncate font-medium">{toInitials(getUserName(player.userId))}</span>
+                          <X className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        </button>
+                      ) : (
+                        <Select
+                          value={player.userId}
+                          onValueChange={(value) => handlePlayerChange(pIdx, value)}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger className="h-7 text-xs px-1.5 w-full min-w-0">
+                            <SelectValue placeholder="Player" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {users.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>
+                                {user.name} {usersWithHandicap[user.id] ? `(${usersWithHandicap[user.id]})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
                     </th>
                   ))}
                 </tr>
