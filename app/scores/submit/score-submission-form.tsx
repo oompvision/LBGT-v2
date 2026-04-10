@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { AlertCircle, CalendarIcon, Loader2, Plus, X } from "lucide-react"
+import { AlertCircle, CalendarIcon, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
@@ -42,7 +42,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [playerCount, setPlayerCount] = useState(1)
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -54,7 +53,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") },
   ])
 
-  const activePlayers = players.slice(0, playerCount)
+  const activePlayers = players
 
   // Fetch user handicaps
   useEffect(() => {
@@ -132,22 +131,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     return filled.reduce((sum, score) => sum + Number.parseInt(score), 0)
   }
 
-  const addPlayer = () => {
-    if (playerCount < 4) setPlayerCount(playerCount + 1)
-  }
-
-  const removePlayer = (index: number) => {
-    if (playerCount <= 1) return
-    const newPlayers = [...players]
-    // Shift players down
-    for (let i = index; i < 3; i++) {
-      newPlayers[i] = { ...newPlayers[i + 1] }
-    }
-    newPlayers[3] = { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") }
-    setPlayers(newPlayers)
-    setPlayerCount(playerCount - 1)
-  }
-
   const handleSubmit = async () => {
     setError(null)
 
@@ -196,9 +179,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
   const getUserName = (userId: string) => users.find((u) => u.id === userId)?.name || ""
 
-  // Column width based on player count
-  const scoreColClass = playerCount <= 2 ? "w-16" : "w-12"
-
   return (
     <div className="space-y-6">
       {error && (
@@ -235,18 +215,8 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       {/* Scorecard */}
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Scorecard</CardTitle>
-              <CardDescription>Enter scores for each hole</CardDescription>
-            </div>
-            {playerCount < 4 && (
-              <Button variant="outline" size="sm" onClick={addPlayer}>
-                <Plus className="mr-1 h-3.5 w-3.5" />
-                Add Player
-              </Button>
-            )}
-          </div>
+          <CardTitle className="text-lg">Scorecard</CardTitle>
+          <CardDescription>Enter scores for each hole</CardDescription>
         </CardHeader>
         <CardContent className="px-0 sm:px-6">
           <div className="overflow-x-auto">
@@ -257,36 +227,25 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <th className="px-2 sm:px-3 py-2 text-left font-medium text-muted-foreground w-12">Hole</th>
                   <th className="px-1 sm:px-2 py-2 text-center font-medium text-muted-foreground w-10">Par</th>
                   {activePlayers.map((player, pIdx) => (
-                    <th key={pIdx} className={cn("px-1 py-1 text-center", scoreColClass)}>
-                      <div className="flex flex-col items-center gap-1">
-                        <Select
-                          value={player.userId}
-                          onValueChange={(value) => handlePlayerChange(pIdx, value)}
-                          disabled={isSubmitting}
-                        >
-                          <SelectTrigger className="h-7 text-xs px-1.5 w-full min-w-0">
-                            <SelectValue placeholder="Player">
-                              {player.userId ? toInitials(getUserName(player.userId)) : "Player"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {users.map((user) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                {user.name} {usersWithHandicap[user.id] ? `(${usersWithHandicap[user.id]})` : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {pIdx > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => removePlayer(pIdx)}
-                            className="text-muted-foreground hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
+                    <th key={pIdx} className={"px-1 py-1 text-center w-12"}>
+                      <Select
+                        value={player.userId}
+                        onValueChange={(value) => handlePlayerChange(pIdx, value)}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="h-7 text-xs px-1.5 w-full min-w-0">
+                          <SelectValue placeholder="Player">
+                            {player.userId ? toInitials(getUserName(player.userId)) : "Player"}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name} {usersWithHandicap[user.id] ? `(${usersWithHandicap[user.id]})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </th>
                   ))}
                 </tr>
