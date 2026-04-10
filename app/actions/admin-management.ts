@@ -316,12 +316,12 @@ export async function deleteRound(roundId: string) {
 }
 
 // Function to update a user
-export async function updateUser(userId: string, userData: { name?: string; email?: string; strokes_given?: number }) {
+export async function updateUser(userId: string, userData: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null }) {
   const supabase = await createClient()
 
   try {
     // Ensure strokes_given is properly converted to a number if it exists
-    const dataToUpdate: { name?: string; email?: string; strokes_given?: number } = { ...userData }
+    const dataToUpdate: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null } = { ...userData }
 
     if (userData.strokes_given !== undefined) {
       // Force conversion to number and ensure it's not NaN

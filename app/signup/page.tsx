@@ -15,11 +15,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useToast } from "@/components/ui/use-toast"
 import { signUpUser } from "../actions/auth"
 import { useAuth } from "@/components/auth-provider"
+import { formatPhone, stripPhone } from "@/lib/phone"
 
 export default function SignUpPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [phone, setPhone] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
@@ -39,7 +41,8 @@ export default function SignUpPage() {
 
     try {
       // Create the user server-side via admin API (auto-confirms email)
-      const result = await signUpUser(email, password, name)
+      const phoneDigits = stripPhone(phone)
+      const result = await signUpUser(email, password, name, phoneDigits.length === 10 ? phoneDigits : undefined)
 
       if (!result.success) {
         toast({
@@ -143,6 +146,16 @@ export default function SignUpPage() {
                     minLength={6}
                   />
                   <p className="text-xs text-muted-foreground">Password must be at least 6 characters long</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(555) 123 - 4567"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                  />
                 </div>
               </CardContent>
               <CardFooter className="flex flex-col space-y-4">
