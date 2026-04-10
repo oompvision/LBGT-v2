@@ -248,7 +248,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
       {/* Sticky header: Hole / Par / Player initials */}
       <thead className="sticky top-0 z-10">
         <tr className="border-b bg-white text-black">
-          <th className="px-2 py-1.5 text-center font-medium w-10 border-r border-gray-300">Hole</th>
+          <th className="px-2 py-1.5 text-center font-medium w-10 border-r border-gray-300 text-white" style={{ backgroundColor: "#2d4a2d" }}>Hole</th>
           <th className="px-1 py-1.5 text-center font-medium w-8 border-r border-gray-300" style={{ backgroundColor: "#2d4a2d", color: "white" }}>Par</th>
           {filteredScores.map((s) => (
             <th key={s.id} className="px-1 py-1.5 text-center font-medium text-[10px] border-r border-gray-300 last:border-r-0">
@@ -261,7 +261,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
         {/* Front 9 */}
         {COURSE_DATA.holes.slice(0, 9).map((hole, holeIdx) => (
           <tr key={holeIdx} className={`border-b ${holeIdx % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
-            <td className="px-2 py-1.5 text-center font-medium border-r border-gray-300">{hole}</td>
+            <td className="px-2 py-1.5 text-center font-medium text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{hole}</td>
             <td className="px-1 py-1.5 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.pars[holeIdx]}</td>
             {filteredScores.map((s) => (
               <td key={s.id} className="px-1 py-1 text-center border-r border-gray-300 last:border-r-0">
@@ -273,7 +273,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
 
         {/* Out subtotal */}
         <tr className="border-b-2 border-t bg-gray-200 font-semibold text-black">
-          <td className="px-2 py-2 text-center border-r border-gray-300">Out</td>
+          <td className="px-2 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>Out</td>
           <td className="px-1 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.frontNinePar}</td>
           {filteredScores.map((s) => (
             <td key={s.id} className="px-1 py-2 text-center border-r border-gray-300 last:border-r-0">
@@ -290,7 +290,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
           const holeIdx = i + 9
           return (
             <tr key={holeIdx} className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
-              <td className="px-2 py-1.5 text-center font-medium border-r border-gray-300">{hole}</td>
+              <td className="px-2 py-1.5 text-center font-medium text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{hole}</td>
               <td className="px-1 py-1.5 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.pars[holeIdx]}</td>
               {filteredScores.map((s) => (
                 <td key={s.id} className="px-1 py-1 text-center border-r border-gray-300 last:border-r-0">
@@ -303,7 +303,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
 
         {/* In subtotal */}
         <tr className="border-b-2 border-t bg-gray-200 font-semibold text-black">
-          <td className="px-2 py-2 text-center border-r border-gray-300">In</td>
+          <td className="px-2 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>In</td>
           <td className="px-1 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.backNinePar}</td>
           {filteredScores.map((s) => (
             <td key={s.id} className="px-1 py-2 text-center border-r border-gray-300 last:border-r-0">
@@ -314,7 +314,7 @@ function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross"
 
         {/* Total */}
         <tr className="bg-gray-300 font-bold text-black">
-          <td className="px-2 py-2.5 text-center border-r border-gray-400">Total</td>
+          <td className="px-2 py-2.5 text-center text-white border-r border-gray-400" style={{ backgroundColor: "#2d4a2d" }}>Total</td>
           <td className="px-1 py-2.5 text-center text-white border-r border-gray-400" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.totalPar}</td>
           {filteredScores.map((s) => {
             const all = getScores(s)
