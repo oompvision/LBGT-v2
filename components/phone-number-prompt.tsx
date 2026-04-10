@@ -95,7 +95,7 @@ export function PhoneNumberPrompt() {
         <div className="container flex items-center justify-between gap-3 py-2 text-sm">
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 shrink-0" />
-            <span>Please add your phone number so the commissioner can reach you.</span>
+            <span>Please add your phone number to streamline communication.</span>
           </div>
           <Button
             size="sm"
@@ -113,7 +113,7 @@ export function PhoneNumberPrompt() {
           <DialogHeader>
             <DialogTitle>Add Your Phone Number</DialogTitle>
             <DialogDescription>
-              Help the commissioner reach you about tee times and league updates.
+              Please add your phone number to streamline communication.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
