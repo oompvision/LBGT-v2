@@ -10,13 +10,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { updateUserProfile, uploadProfilePicture, removeProfilePicture } from "@/app/actions/auth"
-import { CalendarIcon, Mail, User, Camera, X } from "lucide-react"
+import { CalendarIcon, Mail, Phone, User, Camera, X } from "lucide-react"
+import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 import Image from "next/image"
 
 interface UserProfileProps {
   user: {
     name: string | null
     email: string | null
+    phone_number: string | null
     profile_picture_url: string | null
     created_at: string
     strokes_given: number | null
@@ -25,6 +27,7 @@ interface UserProfileProps {
 
 export function UserProfile({ user }: UserProfileProps) {
   const [name, setName] = useState(user.name || "")
+  const [phone, setPhone] = useState(user.phone_number ? formatPhone(user.phone_number) : "")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingPicture, setIsUploadingPicture] = useState(false)
   const [isRemovingPicture, setIsRemovingPicture] = useState(false)
@@ -35,8 +38,20 @@ export function UserProfile({ user }: UserProfileProps) {
     setIsSubmitting(true)
 
     try {
+      const phoneDigits = stripPhone(phone)
+      if (phone && !isValidPhone(phoneDigits)) {
+        toast({
+          title: "Invalid Phone Number",
+          description: "Please enter a valid 10-digit US phone number.",
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+
       const result = await updateUserProfile({
         name,
+        phone_number: phoneDigits || null,
       })
 
       if (!result.success) {
@@ -199,6 +214,19 @@ export function UserProfile({ user }: UserProfileProps) {
               <span>{user.email}</span>
             </div>
             <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number</Label>
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="(555) 123 - 4567"
+                value={phone}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Member Since</Label>

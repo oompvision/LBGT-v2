@@ -16,7 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Edit, Loader2, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Edit, Loader2, Phone, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
   updateUser,
   updateStrokesGivenDirectly,
@@ -42,10 +43,12 @@ export function UserManagement({ users }: UserManagementProps) {
   const [editedUser, setEditedUser] = useState<{
     name: string
     email: string
+    phone_number: string
     strokes_given: number
   }>({
     name: "",
     email: "",
+    phone_number: "",
     strokes_given: 0,
   })
   const router = useRouter()
@@ -66,6 +69,7 @@ export function UserManagement({ users }: UserManagementProps) {
     setEditedUser({
       name: user.name || "",
       email: user.email || "",
+      phone_number: user.phone_number ? formatPhone(user.phone_number) : "",
       strokes_given: user.strokes_given !== undefined ? user.strokes_given : 0,
     })
     setIsEditing(true)
@@ -87,10 +91,12 @@ export function UserManagement({ users }: UserManagementProps) {
         return
       }
 
-      // First update the name and email
+      // First update the name, email, and phone
+      const phoneDigits = stripPhone(editedUser.phone_number)
       const nameEmailResult = await updateUser(selectedUser.id, {
         name: editedUser.name,
         email: editedUser.email,
+        phone_number: phoneDigits || null,
       })
 
       if (!nameEmailResult.success) {
@@ -348,11 +354,17 @@ export function UserManagement({ users }: UserManagementProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <div>
                     <p className="text-sm font-medium">Joined</p>
                     <p className="text-sm text-muted-foreground">
                       {user.created_at ? new Date(user.created_at).toLocaleDateString() : "Unknown"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Phone</p>
+                    <p className="text-sm text-muted-foreground">
+                      {displayPhone(user.phone_number) || "Not set"}
                     </p>
                   </div>
                   <div>
@@ -406,6 +418,17 @@ export function UserManagement({ users }: UserManagementProps) {
                 type="email"
                 value={editedUser.email}
                 onChange={(e) => setEditedUser({ ...editedUser, email: e.target.value })}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone_number">Phone Number</Label>
+              <Input
+                id="phone_number"
+                type="tel"
+                placeholder="(555) 123 - 4567"
+                value={editedUser.phone_number}
+                onChange={(e) => setEditedUser({ ...editedUser, phone_number: formatPhone(e.target.value) })}
                 disabled={isSubmitting}
               />
             </div>

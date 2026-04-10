@@ -4,7 +4,7 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 
 // Sign up a new user via the admin API so the email is auto-confirmed
-export async function signUpUser(email: string, password: string, name: string) {
+export async function signUpUser(email: string, password: string, name: string, phoneNumber?: string) {
   try {
     const supabaseAdmin = createAdminClient()
 
@@ -30,7 +30,7 @@ export async function signUpUser(email: string, password: string, name: string) 
     }
 
     // Create the user profile in the database
-    const dbResult = await createUserInDatabase(authData.user.id, email, name)
+    const dbResult = await createUserInDatabase(authData.user.id, email, name, phoneNumber)
     if (!dbResult.success) {
       console.error("Auth user created but DB insert failed:", dbResult.error)
       // Don't fail the whole signup — user can still sign in, DB row will be created on sign-in
@@ -44,7 +44,7 @@ export async function signUpUser(email: string, password: string, name: string) 
 }
 
 // Function to create a user in the database
-export async function createUserInDatabase(userId: string, email: string, name: string) {
+export async function createUserInDatabase(userId: string, email: string, name: string, phoneNumber?: string) {
   try {
     // Use the admin client to bypass RLS
     const supabaseAdmin = createAdminClient()
@@ -72,6 +72,7 @@ export async function createUserInDatabase(userId: string, email: string, name: 
       id: userId,
       email,
       name,
+      ...(phoneNumber ? { phone_number: phoneNumber } : {}),
     })
 
     if (error) {
@@ -87,7 +88,7 @@ export async function createUserInDatabase(userId: string, email: string, name: 
 }
 
 // Function to update user profile
-export async function updateUserProfile(data: { name: string }) {
+export async function updateUserProfile(data: { name?: string; phone_number?: string | null }) {
   try {
     const supabase = await createClient()
 
@@ -100,12 +101,23 @@ export async function updateUserProfile(data: { name: string }) {
       return { success: false, error: "You must be logged in to update your profile" }
     }
 
+    // Build update payload — only include fields that were provided
+    const updateData: { name?: string; phone_number?: string | null } = {}
+    if (data.name !== undefined && data.name !== "") {
+      updateData.name = data.name
+    }
+    if (data.phone_number !== undefined) {
+      updateData.phone_number = data.phone_number || null
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { success: true }
+    }
+
     // Update the user in the database
     const { error } = await supabase
       .from("users")
-      .update({
-        name: data.name,
-      })
+      .update(updateData)
       .eq("id", session.user.id)
 
     if (error) {
