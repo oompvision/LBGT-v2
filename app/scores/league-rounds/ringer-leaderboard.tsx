@@ -287,119 +287,161 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
         <CardDescription>Best net score on each hole across all rounds played</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-          <table className="w-full text-sm border-collapse table-fixed">
-            <colgroup>
-              <col className="w-20" />
-              <col className="w-40" />
-              <col className="w-20" />
-              <col className="w-20" />
-              <col className="w-20" />
-              {Array.from({ length: 18 }, (_, i) => (
-                <col key={i} className="w-12" />
-              ))}
-            </colgroup>
-            <thead>
-              {/* First row - Logo and hole numbers */}
-              <tr className="border-b bg-white text-black h-16">
-                <td rowSpan={2} colSpan={4} className="px-4 py-2 text-center bg-transparent relative">
-                  <div className="flex items-center justify-center h-full bg-transparent">
-                    <Image
-                      src="/images/osprey-logo.png"
-                      alt="LBGT Logo"
-                      width={100}
-                      height={100}
-                      className="object-contain bg-transparent"
-                    />
-                  </div>
-                </td>
-                <th className="px-4 py-2 text-center font-medium border-l border-gray-300">Hole</th>
-                {COURSE_DATA.holes.map((hole, index) => (
-                  <th
-                    key={hole}
-                    className={`px-2 py-2 text-center font-medium ${index < 17 ? "border-r border-gray-300" : ""}`}
-                  >
-                    {hole}
-                  </th>
-                ))}
-              </tr>
-
-              {/* Second row - Par values */}
-              <tr className="border-b h-16">
-                <td
-                  className="px-4 py-2 text-center font-medium border-l border-gray-300 text-white"
-                  style={{ backgroundColor: "#2d4a2d" }}
-                >
-                  Par
-                </td>
-                {COURSE_DATA.pars.map((par, index) => (
-                  <td
-                    key={index}
-                    className={`px-2 py-2 text-center text-white ${index < 17 ? "border-r border-gray-300" : ""}`}
-                    style={{ backgroundColor: "#2d4a2d" }}
-                  >
-                    {par}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Third row - Column headers and handicap */}
-              <tr className="border-b bg-white text-black h-16">
-                <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Rank</th>
-                <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Player</th>
-                <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Score</th>
-                <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Rounds</th>
-                <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Hdcp</th>
-                {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
-                  <td key={index} className={`px-2 py-2 text-center ${index < 17 ? "border-r border-gray-300" : ""}`}>
-                    {hdcp}
-                  </td>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRingerLeaderboard.map((player, index) => (
-                <tr
-                  key={player.userId}
-                  className={`border-b h-16 ${index % 2 === 0 ? "bg-gray-100" : "bg-white"} text-black`}
-                >
-                  <td className="px-4 py-2 border-r border-gray-300">
-                    {index === 0 ? (
-                      <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                        <Trophy className="mr-1 h-3 w-3" />
-                        {index + 1}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-black">
-                        {index + 1}
-                      </Badge>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 font-medium border-r border-gray-300 overflow-hidden">
-                    <div className="truncate">
-                      <Link href={`/players/${player.userId}/stats`} className="hover:underline text-black">
-                        {formatPlayerName(player.name, player.strokesGiven)}
+        {/* Mobile view: simple Rank / Player / Score / Rounds table */}
+        <div className="block md:hidden">
+          <div className="rounded-md border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-1.5 py-1.5 text-left font-medium w-10">#</th>
+                  <th className="px-1.5 py-1.5 text-left font-medium">Player</th>
+                  <th className="px-1.5 py-1.5 text-center font-medium">Score</th>
+                  <th className="px-1.5 py-1.5 text-center font-medium">Rnds</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRingerLeaderboard.map((player, index) => (
+                  <tr key={player.userId} className="border-b">
+                    <td className="px-1.5 py-1.5">
+                      {index === 0 ? (
+                        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-[10px] px-1.5 py-0">
+                          <Trophy className="mr-0.5 h-2.5 w-2.5" />
+                          {index + 1}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground ml-1">{index + 1}</span>
+                      )}
+                    </td>
+                    <td className="px-1.5 py-1.5 font-medium text-xs">
+                      <Link href={`/players/${player.userId}/stats`} className="hover:underline text-primary">
+                        {player.name}
                       </Link>
+                    </td>
+                    <td className="px-1.5 py-1.5 text-center font-medium">{player.totalRingerScore}</td>
+                    <td className="px-1.5 py-1.5 text-center">{player.roundsPlayed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Desktop view: full hole-by-hole table */}
+        <div className="hidden md:block">
+          <div className="rounded-md border overflow-x-auto">
+            <table className="w-full text-sm border-collapse table-fixed">
+              <colgroup>
+                <col className="w-20" />
+                <col className="w-40" />
+                <col className="w-20" />
+                <col className="w-20" />
+                <col className="w-20" />
+                {Array.from({ length: 18 }, (_, i) => (
+                  <col key={i} className="w-12" />
+                ))}
+              </colgroup>
+              <thead>
+                {/* First row - Logo and hole numbers */}
+                <tr className="border-b bg-white text-black h-16">
+                  <td rowSpan={2} colSpan={4} className="px-4 py-2 text-center bg-transparent relative">
+                    <div className="flex items-center justify-center h-full bg-transparent">
+                      <Image
+                        src="/images/osprey-logo.png"
+                        alt="LBGT Logo"
+                        width={100}
+                        height={100}
+                        className="object-contain bg-transparent"
+                      />
                     </div>
                   </td>
-                  <td className="px-4 py-2 text-center border-r border-gray-300">{player.totalRingerScore}</td>
-                  <td className="px-4 py-2 text-center border-r border-gray-300">{player.roundsPlayed}</td>
-                  <td className="px-4 py-2 text-center border-r border-gray-300"></td>
-                  {player.holes.map((score, holeIndex) => {
-                    const par = COURSE_DATA.pars[holeIndex]
-                    return (
-                      <td
-                        key={holeIndex}
-                        className={`px-2 py-2 text-center ${holeIndex < 17 ? "border-r border-gray-300" : ""}`}
-                      >
-                        {score !== null ? <ScoreIndicator score={score} par={par} /> : "-"}
-                      </td>
-                    )
-                  })}
+                  <th className="px-4 py-2 text-center font-medium border-l border-gray-300">Hole</th>
+                  {COURSE_DATA.holes.map((hole, index) => (
+                    <th
+                      key={hole}
+                      className={`px-2 py-2 text-center font-medium ${index < 17 ? "border-r border-gray-300" : ""}`}
+                    >
+                      {hole}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+
+                {/* Second row - Par values */}
+                <tr className="border-b h-16">
+                  <td
+                    className="px-4 py-2 text-center font-medium border-l border-gray-300 text-white"
+                    style={{ backgroundColor: "#2d4a2d" }}
+                  >
+                    Par
+                  </td>
+                  {COURSE_DATA.pars.map((par, index) => (
+                    <td
+                      key={index}
+                      className={`px-2 py-2 text-center text-white ${index < 17 ? "border-r border-gray-300" : ""}`}
+                      style={{ backgroundColor: "#2d4a2d" }}
+                    >
+                      {par}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Third row - Column headers and handicap */}
+                <tr className="border-b bg-white text-black h-16">
+                  <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Rank</th>
+                  <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Player</th>
+                  <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Score</th>
+                  <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Rounds</th>
+                  <th className="px-4 py-2 text-center font-medium border-r border-gray-300">Hdcp</th>
+                  {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
+                    <td key={index} className={`px-2 py-2 text-center ${index < 17 ? "border-r border-gray-300" : ""}`}>
+                      {hdcp}
+                    </td>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRingerLeaderboard.map((player, index) => (
+                  <tr
+                    key={player.userId}
+                    className={`border-b h-16 ${index % 2 === 0 ? "bg-gray-100" : "bg-white"} text-black`}
+                  >
+                    <td className="px-4 py-2 border-r border-gray-300">
+                      {index === 0 ? (
+                        <Badge className="bg-yellow-500 hover:bg-yellow-600">
+                          <Trophy className="mr-1 h-3 w-3" />
+                          {index + 1}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-black">
+                          {index + 1}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 font-medium border-r border-gray-300 overflow-hidden">
+                      <div className="truncate">
+                        <Link href={`/players/${player.userId}/stats`} className="hover:underline text-black">
+                          {formatPlayerName(player.name, player.strokesGiven)}
+                        </Link>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-center border-r border-gray-300">{player.totalRingerScore}</td>
+                    <td className="px-4 py-2 text-center border-r border-gray-300">{player.roundsPlayed}</td>
+                    <td className="px-4 py-2 text-center border-r border-gray-300"></td>
+                    {player.holes.map((score, holeIndex) => {
+                      const par = COURSE_DATA.pars[holeIndex]
+                      return (
+                        <td
+                          key={holeIndex}
+                          className={`px-2 py-2 text-center ${holeIndex < 17 ? "border-r border-gray-300" : ""}`}
+                        >
+                          {score !== null ? <ScoreIndicator score={score} par={par} /> : "-"}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </CardContent>
     </Card>
