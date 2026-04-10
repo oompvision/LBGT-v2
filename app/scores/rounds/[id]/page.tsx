@@ -194,6 +194,143 @@ const NetScoreIndicator = ({ netScore, par }: { netScore: number; par: number })
   return <span className="text-black">{netScore}</span>
 }
 
+// Format player name as initials for mobile columns
+const toInitials = (name: string): string => {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return ""
+  if (parts.length === 1) return parts[0].slice(0, 5)
+  const first = parts[0][0].toUpperCase() + "."
+  const last = parts[parts.length - 1].slice(0, 3) + "."
+  return `${first} ${last}`
+}
+
+// Mobile vertical scorecard component
+function MobileScorecard({ scores, type }: { scores: RoundScore[]; type: "gross" | "net" }) {
+  const filteredScores = type === "net" ? scores.filter((s) => s.strokes_given > 0) : scores
+
+  if (filteredScores.length === 0) {
+    return (
+      <p className="px-4 py-6 text-center text-sm text-gray-600">
+        No players with handicap strokes in this round
+      </p>
+    )
+  }
+
+  const getScores = (score: RoundScore): number[] => {
+    if (type === "gross") {
+      return [
+        score.hole_1, score.hole_2, score.hole_3, score.hole_4, score.hole_5, score.hole_6,
+        score.hole_7, score.hole_8, score.hole_9, score.hole_10, score.hole_11, score.hole_12,
+        score.hole_13, score.hole_14, score.hole_15, score.hole_16, score.hole_17, score.hole_18,
+      ]
+    }
+    return [
+      score.net_hole_1 ?? score.hole_1, score.net_hole_2 ?? score.hole_2, score.net_hole_3 ?? score.hole_3,
+      score.net_hole_4 ?? score.hole_4, score.net_hole_5 ?? score.hole_5, score.net_hole_6 ?? score.hole_6,
+      score.net_hole_7 ?? score.hole_7, score.net_hole_8 ?? score.hole_8, score.net_hole_9 ?? score.hole_9,
+      score.net_hole_10 ?? score.hole_10, score.net_hole_11 ?? score.hole_11, score.net_hole_12 ?? score.hole_12,
+      score.net_hole_13 ?? score.hole_13, score.net_hole_14 ?? score.hole_14, score.net_hole_15 ?? score.hole_15,
+      score.net_hole_16 ?? score.hole_16, score.net_hole_17 ?? score.line_17, score.net_hole_18 ?? score.hole_18,
+    ]
+  }
+
+  const sum = (arr: number[], start: number, end: number) =>
+    arr.slice(start, end).reduce((s, v) => s + (v || 0), 0)
+
+  const renderScore = (val: number | null, par: number) => {
+    if (val == null) return <>-</>
+    if (type === "gross") return <ScoreIndicator score={val} par={par} />
+    return <NetScoreIndicator netScore={val} par={par} />
+  }
+
+  return (
+    <table className="w-full text-xs border-collapse">
+      {/* Sticky header: Hole / Par / Player initials */}
+      <thead className="sticky top-0 z-10">
+        <tr className="border-b bg-white text-black">
+          <th className="px-2 py-1.5 text-center font-medium w-10 border-r border-gray-300">Hole</th>
+          <th className="px-1 py-1.5 text-center font-medium w-8 border-r border-gray-300" style={{ backgroundColor: "#2d4a2d", color: "white" }}>Par</th>
+          {filteredScores.map((s) => (
+            <th key={s.id} className="px-1 py-1.5 text-center font-medium text-[10px] border-r border-gray-300 last:border-r-0">
+              {toInitials(s.users.name)}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {/* Front 9 */}
+        {COURSE_DATA.holes.slice(0, 9).map((hole, holeIdx) => (
+          <tr key={holeIdx} className={`border-b ${holeIdx % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
+            <td className="px-2 py-1.5 text-center font-medium border-r border-gray-300">{hole}</td>
+            <td className="px-1 py-1.5 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.pars[holeIdx]}</td>
+            {filteredScores.map((s) => (
+              <td key={s.id} className="px-1 py-1 text-center border-r border-gray-300 last:border-r-0">
+                {renderScore(getScores(s)[holeIdx], COURSE_DATA.pars[holeIdx])}
+              </td>
+            ))}
+          </tr>
+        ))}
+
+        {/* Out subtotal */}
+        <tr className="border-b-2 border-t bg-gray-200 font-semibold text-black">
+          <td className="px-2 py-2 text-center border-r border-gray-300">Out</td>
+          <td className="px-1 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.frontNinePar}</td>
+          {filteredScores.map((s) => (
+            <td key={s.id} className="px-1 py-2 text-center border-r border-gray-300 last:border-r-0">
+              {sum(getScores(s), 0, 9)}
+            </td>
+          ))}
+        </tr>
+
+        {/* Spacer */}
+        <tr className="h-2" />
+
+        {/* Back 9 */}
+        {COURSE_DATA.holes.slice(9, 18).map((hole, i) => {
+          const holeIdx = i + 9
+          return (
+            <tr key={holeIdx} className={`border-b ${i % 2 === 0 ? "bg-gray-50" : "bg-white"}`}>
+              <td className="px-2 py-1.5 text-center font-medium border-r border-gray-300">{hole}</td>
+              <td className="px-1 py-1.5 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.pars[holeIdx]}</td>
+              {filteredScores.map((s) => (
+                <td key={s.id} className="px-1 py-1 text-center border-r border-gray-300 last:border-r-0">
+                  {renderScore(getScores(s)[holeIdx], COURSE_DATA.pars[holeIdx])}
+                </td>
+              ))}
+            </tr>
+          )
+        })}
+
+        {/* In subtotal */}
+        <tr className="border-b-2 border-t bg-gray-200 font-semibold text-black">
+          <td className="px-2 py-2 text-center border-r border-gray-300">In</td>
+          <td className="px-1 py-2 text-center text-white border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.backNinePar}</td>
+          {filteredScores.map((s) => (
+            <td key={s.id} className="px-1 py-2 text-center border-r border-gray-300 last:border-r-0">
+              {sum(getScores(s), 9, 18)}
+            </td>
+          ))}
+        </tr>
+
+        {/* Total */}
+        <tr className="bg-gray-300 font-bold text-black">
+          <td className="px-2 py-2.5 text-center border-r border-gray-400">Total</td>
+          <td className="px-1 py-2.5 text-center text-white border-r border-gray-400" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.totalPar}</td>
+          {filteredScores.map((s) => {
+            const all = getScores(s)
+            const total = type === "gross" ? s.total_score : (s.net_total_score || sum(all, 0, 18))
+            return (
+              <td key={s.id} className="px-1 py-2.5 text-center text-sm border-r border-gray-400 last:border-r-0">
+                {total}
+              </td>
+            )
+          })}
+        </tr>
+      </tbody>
+    </table>
+  )
+}
+
 interface PageProps {
   params: Promise<{ id: string }>
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -261,7 +398,32 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
             </div>
           </div>
 
-          <Card>
+          {/* Mobile vertical scorecard */}
+          <Card className="block md:hidden">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Scorecard</CardTitle>
+            </CardHeader>
+            <CardContent className="px-0">
+              <Tabs defaultValue="gross" className="w-full">
+                <div className="px-3 pb-3">
+                  <TabsList className="grid w-full grid-cols-2 h-8">
+                    <TabsTrigger value="gross" className="text-xs">Gross</TabsTrigger>
+                    <TabsTrigger value="net" className="text-xs">Net</TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="gross" className="mt-0">
+                  <MobileScorecard scores={scores} type="gross" />
+                </TabsContent>
+                <TabsContent value="net" className="mt-0">
+                  <MobileScorecard scores={scores} type="net" />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Desktop horizontal scorecard (unchanged) */}
+          <Card className="hidden md:block">
             <CardHeader>
               <CardTitle>Scorecard</CardTitle>
               <CardDescription>Scores for all players in this round</CardDescription>
@@ -337,30 +499,12 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                       <tbody>
                         {scores.map((score, idx) => {
                           const playerScores = [
-                            score.hole_1,
-                            score.hole_2,
-                            score.hole_3,
-                            score.hole_4,
-                            score.hole_5,
-                            score.hole_6,
-                            score.hole_7,
-                            score.hole_8,
-                            score.hole_9,
-                            score.hole_10,
-                            score.hole_11,
-                            score.hole_12,
-                            score.hole_13,
-                            score.hole_14,
-                            score.hole_15,
-                            score.hole_16,
-                            score.hole_17,
-                            score.hole_18,
+                            score.hole_1, score.hole_2, score.hole_3, score.hole_4, score.hole_5, score.hole_6,
+                            score.hole_7, score.hole_8, score.hole_9, score.hole_10, score.hole_11, score.hole_12,
+                            score.hole_13, score.hole_14, score.hole_15, score.hole_16, score.hole_17, score.hole_18,
                           ]
-
-                          const frontNine = playerScores.slice(0, 9).reduce((sum, score) => sum + (score || 0), 0)
-                          const backNine = playerScores.slice(9, 18).reduce((sum, score) => sum + (score || 0), 0)
-
-                          // Alternate background colors for player rows
+                          const frontNine = playerScores.slice(0, 9).reduce((sum, s) => sum + (s || 0), 0)
+                          const backNine = playerScores.slice(9, 18).reduce((sum, s) => sum + (s || 0), 0)
                           const bgColor = idx % 2 === 0 ? "bg-gray-100" : "bg-white"
 
                           return (
@@ -371,20 +515,13 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                                   <span className="ml-1 text-xs text-gray-600">({score.strokes_given})</span>
                                 )}
                               </td>
-                              {playerScores.map((holeScore, index) => {
-                                const par = COURSE_DATA.pars[index]
-                                return (
-                                  <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
-                                    {holeScore !== null ? <ScoreIndicator score={holeScore} par={par} /> : "-"}
-                                  </td>
-                                )
-                              })}
-                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">
-                                {frontNine}
-                              </td>
-                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">
-                                {backNine}
-                              </td>
+                              {playerScores.map((holeScore, index) => (
+                                <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
+                                  {holeScore !== null ? <ScoreIndicator score={holeScore} par={COURSE_DATA.pars[index]} /> : "-"}
+                                </td>
+                              ))}
+                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">{frontNine}</td>
+                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">{backNine}</td>
                               <td className="px-2 py-2 text-center font-medium text-black">{score.total_score}</td>
                             </tr>
                           )
@@ -401,52 +538,25 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300 w-40">Hole</th>
                           {COURSE_DATA.holes.map((hole) => (
-                            <th key={hole} className="px-2 py-2 text-center font-medium border-r border-gray-300 w-12">
-                              {hole}
-                            </th>
+                            <th key={hole} className="px-2 py-2 text-center font-medium border-r border-gray-300 w-12">{hole}</th>
                           ))}
                           <th className="px-2 py-2 text-center font-medium border-r border-gray-300 w-16">Out</th>
                           <th className="px-2 py-2 text-center font-medium border-r border-gray-300 w-16">In</th>
                           <th className="px-2 py-2 text-center font-medium w-16">Total</th>
                         </tr>
                         <tr className="border-b text-white">
-                          <th
-                            className="px-4 py-2 text-left font-medium border-r border-gray-300"
-                            style={{ backgroundColor: "#2d4a2d" }}
-                          >
-                            Par
-                          </th>
+                          <th className="px-4 py-2 text-left font-medium border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>Par</th>
                           {COURSE_DATA.pars.map((par, index) => (
-                            <td
-                              key={index}
-                              className="px-2 py-2 text-center border-r border-gray-300 w-12"
-                              style={{ backgroundColor: "#2d4a2d" }}
-                            >
-                              {par}
-                            </td>
+                            <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12" style={{ backgroundColor: "#2d4a2d" }}>{par}</td>
                           ))}
-                          <td
-                            className="px-2 py-2 text-center font-medium border-r border-gray-300"
-                            style={{ backgroundColor: "#2d4a2d" }}
-                          >
-                            {COURSE_DATA.frontNinePar}
-                          </td>
-                          <td
-                            className="px-2 py-2 text-center font-medium border-r border-gray-300"
-                            style={{ backgroundColor: "#2d4a2d" }}
-                          >
-                            {COURSE_DATA.backNinePar}
-                          </td>
-                          <td className="px-2 py-2 text-center font-medium" style={{ backgroundColor: "#2d4a2d" }}>
-                            {COURSE_DATA.totalPar}
-                          </td>
+                          <td className="px-2 py-2 text-center font-medium border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.frontNinePar}</td>
+                          <td className="px-2 py-2 text-center font-medium border-r border-gray-300" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.backNinePar}</td>
+                          <td className="px-2 py-2 text-center font-medium" style={{ backgroundColor: "#2d4a2d" }}>{COURSE_DATA.totalPar}</td>
                         </tr>
                         <tr className="border-b bg-white text-black">
                           <th className="px-4 py-2 text-left font-medium border-r border-gray-300">Hdcp</th>
                           {COURSE_DATA.whiteHdcp.map((hdcp, index) => (
-                            <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
-                              {hdcp}
-                            </td>
+                            <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">{hdcp}</td>
                           ))}
                           <td className="px-2 py-2 text-center font-medium border-r border-gray-300">-</td>
                           <td className="px-2 py-2 text-center font-medium border-r border-gray-300">-</td>
@@ -455,37 +565,18 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                       </thead>
                       <tbody>
                         {scores.map((score, idx) => {
-                          // Only show net scores if strokes_given > 0
-                          if (score.strokes_given <= 0) {
-                            return null
-                          }
-
+                          if (score.strokes_given <= 0) return null
                           const netScores = [
-                            score.net_hole_1 !== null ? score.net_hole_1 : score.hole_1,
-                            score.net_hole_2 !== null ? score.net_hole_2 : score.hole_2,
-                            score.net_hole_3 !== null ? score.net_hole_3 : score.hole_3,
-                            score.net_hole_4 !== null ? score.net_hole_4 : score.hole_4,
-                            score.net_hole_5 !== null ? score.net_hole_5 : score.hole_5,
-                            score.net_hole_6 !== null ? score.net_hole_6 : score.hole_6,
-                            score.net_hole_7 !== null ? score.net_hole_7 : score.hole_7,
-                            score.net_hole_8 !== null ? score.net_hole_8 : score.hole_8,
-                            score.net_hole_9 !== null ? score.net_hole_9 : score.hole_9,
-                            score.net_hole_10 !== null ? score.net_hole_10 : score.hole_10,
-                            score.net_hole_11 !== null ? score.net_hole_11 : score.hole_11,
-                            score.net_hole_12 !== null ? score.net_hole_12 : score.hole_12,
-                            score.net_hole_13 !== null ? score.net_hole_13 : score.hole_13,
-                            score.net_hole_14 !== null ? score.net_hole_14 : score.hole_14,
-                            score.net_hole_15 !== null ? score.net_hole_15 : score.hole_15,
-                            score.net_hole_16 !== null ? score.net_hole_16 : score.hole_16,
-                            score.net_hole_17 !== null ? score.net_hole_17 : score.line_17,
-                            score.net_hole_18 !== null ? score.net_hole_18 : score.hole_18,
+                            score.net_hole_1 ?? score.hole_1, score.net_hole_2 ?? score.hole_2, score.net_hole_3 ?? score.hole_3,
+                            score.net_hole_4 ?? score.hole_4, score.net_hole_5 ?? score.hole_5, score.net_hole_6 ?? score.hole_6,
+                            score.net_hole_7 ?? score.hole_7, score.net_hole_8 ?? score.hole_8, score.net_hole_9 ?? score.hole_9,
+                            score.net_hole_10 ?? score.hole_10, score.net_hole_11 ?? score.hole_11, score.net_hole_12 ?? score.hole_12,
+                            score.net_hole_13 ?? score.hole_13, score.net_hole_14 ?? score.hole_14, score.net_hole_15 ?? score.hole_15,
+                            score.net_hole_16 ?? score.hole_16, score.net_hole_17 ?? score.line_17, score.net_hole_18 ?? score.hole_18,
                           ]
-
-                          const frontNine = netScores.slice(0, 9).reduce((sum, score) => sum + (score || 0), 0)
-                          const backNine = netScores.slice(9, 18).reduce((sum, score) => sum + (score || 0), 0)
+                          const frontNine = netScores.slice(0, 9).reduce((sum, s) => sum + (s || 0), 0)
+                          const backNine = netScores.slice(9, 18).reduce((sum, s) => sum + (s || 0), 0)
                           const totalNet = score.net_total_score || frontNine + backNine
-
-                          // Alternate background colors for player rows
                           const bgColor = idx % 2 === 0 ? "bg-gray-100" : "bg-white"
 
                           return (
@@ -494,25 +585,18 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
                                 {score.users.name}
                                 <span className="ml-1 text-xs text-gray-600">({score.strokes_given})</span>
                               </td>
-                              {netScores.map((netScore, index) => {
-                                const par = COURSE_DATA.pars[index]
-                                return (
-                                  <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
-                                    {netScore !== null ? <NetScoreIndicator netScore={netScore} par={par} /> : "-"}
-                                  </td>
-                                )
-                              })}
-                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">
-                                {frontNine}
-                              </td>
-                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">
-                                {backNine}
-                              </td>
+                              {netScores.map((netScore, index) => (
+                                <td key={index} className="px-2 py-2 text-center border-r border-gray-300 w-12">
+                                  {netScore !== null ? <NetScoreIndicator netScore={netScore} par={COURSE_DATA.pars[index]} /> : "-"}
+                                </td>
+                              ))}
+                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">{frontNine}</td>
+                              <td className="px-2 py-2 text-center font-medium text-black border-r border-gray-300">{backNine}</td>
                               <td className="px-2 py-2 text-center font-medium text-black">{totalNet}</td>
                             </tr>
                           )
                         })}
-                        {scores.filter((score) => score.strokes_given > 0).length === 0 && (
+                        {scores.filter((s) => s.strokes_given > 0).length === 0 && (
                           <tr>
                             <td colSpan={22} className="px-4 py-4 text-center text-gray-600">
                               No players with handicap strokes in this round
