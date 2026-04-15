@@ -66,6 +66,9 @@ export default function Home() {
                     <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
                       <Link href="/signin">Sign In</Link>
                     </Button>
+                    <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
+                      <Link href="/signup">Sign Up</Link>
+                    </Button>
                     <Button
                       asChild
                       size="lg"
