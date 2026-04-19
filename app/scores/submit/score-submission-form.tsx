@@ -35,10 +35,15 @@ function toInitials(name: string): string {
   return `${first} ${last}`
 }
 
-// Downscale a scorecard photo in the browser before upload.
-// 2400px on the long edge keeps plenty of resolution for OCR while typically
-// producing a 1–2 MB JPEG — well under the 10 MB server-action limit.
-async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<File> {
+// Preprocess a scorecard photo in the browser before upload. Three steps:
+//   1. Downscale to 2400px on the long edge (keeps it under the server-action
+//      body limit; that resolution is plenty for Vision OCR).
+//   2. Convert to grayscale so channel noise doesn't distract the OCR.
+//   3. Contrast-stretch using 2nd / 98th percentiles of the luminance
+//      histogram. Faint handwriting on a bright paper background gets pulled
+//      to pure black while background goes to white — dramatically improves
+//      detection on photos with fold shadows or uneven lighting.
+async function preprocessImage(file: File, maxEdge = 2400, quality = 0.9): Promise<File> {
   const blobUrl = URL.createObjectURL(file)
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -49,17 +54,53 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
     })
 
     const longest = Math.max(img.width, img.height)
-    // If the image is already small enough, send the original bytes — no need
-    // to re-encode (which can actually grow the file for some source formats).
-    if (longest <= maxEdge && file.size <= 5 * 1024 * 1024) return file
-
     const scale = Math.min(1, maxEdge / longest)
+    const w = Math.round(img.width * scale)
+    const h = Math.round(img.height * scale)
+
     const canvas = document.createElement("canvas")
-    canvas.width = Math.round(img.width * scale)
-    canvas.height = Math.round(img.height * scale)
+    canvas.width = w
+    canvas.height = h
     const ctx = canvas.getContext("2d")
     if (!ctx) return file
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    ctx.drawImage(img, 0, 0, w, h)
+
+    const imageData = ctx.getImageData(0, 0, w, h)
+    const data = imageData.data
+
+    // Build luminance histogram.
+    const histogram = new Array(256).fill(0)
+    for (let i = 0; i < data.length; i += 4) {
+      const l = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])
+      histogram[l]++
+    }
+
+    // Percentile bounds for the contrast stretch.
+    const total = w * h
+    const lowTarget = Math.round(total * 0.02)
+    const highTarget = Math.round(total * 0.98)
+    let acc = 0
+    let pLow = 0
+    let pHigh = 255
+    for (let v = 0; v < 256; v++) {
+      acc += histogram[v]
+      if (pLow === 0 && acc >= lowTarget) pLow = v
+      if (acc >= highTarget) {
+        pHigh = v
+        break
+      }
+    }
+    const range = Math.max(1, pHigh - pLow)
+
+    // Write back grayscale + contrast-stretched pixels.
+    for (let i = 0; i < data.length; i += 4) {
+      const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+      const stretched = Math.max(0, Math.min(255, Math.round(((l - pLow) * 255) / range)))
+      data[i] = stretched
+      data[i + 1] = stretched
+      data[i + 2] = stretched
+    }
+    ctx.putImageData(imageData, 0, 0)
 
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
@@ -68,7 +109,7 @@ async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promi
         quality,
       ),
     )
-    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + "-preprocessed.jpg", {
       type: "image/jpeg",
     })
   } finally {
@@ -168,10 +209,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     setOcrWarnings([])
     setIsOcring(true)
     try {
-      // Downscale so big phone photos fit under the server-action body limit
-      // and so OCR runs on a sensibly-sized image. Falls back to the original
-      // file if the browser can't decode it for any reason.
-      const uploadFile = await downscaleImage(file).catch(() => file)
+      // Preprocess: downscale, grayscale, contrast-stretch. Improves Vision
+      // OCR hit rate on faint handwriting and fold-shadowed cells. Falls back
+      // to the original file if the browser can't decode it for any reason.
+      const uploadFile = await preprocessImage(file).catch(() => file)
 
       const formData = new FormData()
       formData.append("scorecard", uploadFile)
