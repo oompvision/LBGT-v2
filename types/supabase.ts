@@ -109,6 +109,7 @@ export type Database = {
           date: string
           submitted_by: string
           season: number
+          scorecard_image_url: string | null
           created_at: string
         }
         Insert: {
@@ -116,6 +117,7 @@ export type Database = {
           date: string
           submitted_by: string
           season: number
+          scorecard_image_url?: string | null
           created_at?: string
         }
         Update: {
@@ -123,6 +125,7 @@ export type Database = {
           date?: string
           submitted_by?: string
           season?: number
+          scorecard_image_url?: string | null
           created_at?: string
         }
       }

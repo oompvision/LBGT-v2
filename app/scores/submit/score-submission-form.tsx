@@ -5,13 +5,13 @@ import React, { useRef } from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { submitScores } from "@/app/actions/scores"
+import { uploadAndParseScorecard } from "@/app/actions/ocr"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { AlertCircle, CalendarIcon, Loader2, X } from "lucide-react"
+import { AlertCircle, CalendarIcon, Camera, Loader2, X } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { Calendar } from "@/components/ui/calendar"
@@ -40,13 +40,19 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const { toast } = useToast()
   const [date, setDate] = useState<Date>(new Date())
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isOcring, setIsOcring] = useState(false)
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
+  const [ocrWarnings, setOcrWarnings] = useState<string[]>([])
+  const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  // Initialize player data
-  const [players, setPlayers] = useState([
+  // Initialize player data. `ocrName` is set when scores came from OCR and is
+  // shown as a hint so the user remembers which column was whose.
+  const [players, setPlayers] = useState<
+    { userId: string; scores: string[]; netScores: string[]; ocrName?: string }[]
+  >([
     { userId: currentUserId, scores: Array(18).fill(""), netScores: Array(18).fill("") },
     { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") },
     { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") },
@@ -83,11 +89,26 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     fetchUserHandicaps()
   }, [supabase, users])
 
+  const computeNetScores = (scores: string[], userId: string): string[] => {
+    if (!userId) return scores.map(() => "")
+    const strokesGiven = usersWithHandicap[userId] || 0
+    if (strokesGiven === 0) return [...scores]
+    const sortedHoleIndexes = [...Array(18).keys()].sort(
+      (a, b) => COURSE_DATA.whiteHdcp[a] - COURSE_DATA.whiteHdcp[b],
+    )
+    const strokeHoles = new Set(sortedHoleIndexes.slice(0, strokesGiven))
+    return scores.map((s, i) => {
+      if (s === "") return ""
+      const gross = Number.parseInt(s)
+      return (strokeHoles.has(i) ? gross - 1 : gross).toString()
+    })
+  }
+
   const handlePlayerChange = (index: number, userId: string) => {
     const newPlayers = [...players]
     newPlayers[index].userId = userId
-    newPlayers[index].scores = Array(18).fill("")
-    newPlayers[index].netScores = Array(18).fill("")
+    // Preserve any OCR-populated scores; just recompute net for the new player.
+    newPlayers[index].netScores = computeNetScores(newPlayers[index].scores, userId)
     setPlayers(newPlayers)
   }
 
@@ -96,7 +117,65 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     newPlayers[index].userId = ""
     newPlayers[index].scores = Array(18).fill("")
     newPlayers[index].netScores = Array(18).fill("")
+    newPlayers[index].ocrName = undefined
     setPlayers(newPlayers)
+  }
+
+  const handleScorecardUpload = async (file: File) => {
+    setError(null)
+    setOcrWarnings([])
+    setIsOcring(true)
+    try {
+      const formData = new FormData()
+      formData.append("scorecard", file)
+      const result = await uploadAndParseScorecard(formData)
+
+      if (!result.success) {
+        setError(result.error)
+        toast({ title: "Upload failed", description: result.error, variant: "destructive" })
+        return
+      }
+
+      if (result.players.length === 0) {
+        setError("We couldn't detect any player rows in that photo. Try a clearer shot.")
+        return
+      }
+
+      setScorecardImagePath(result.imagePath)
+
+      // Seed the form with up to 4 OCR'd rows; any remaining slots stay blank
+      // so the user can still add more manually if needed.
+      const newPlayers = Array.from({ length: 4 }, (_, i) => {
+        const ocr = result.players[i]
+        if (!ocr) {
+          return { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") }
+        }
+        const scores = ocr.scores.map((s) => (s === null ? "" : String(s)))
+        return {
+          userId: "",
+          scores,
+          netScores: scores.slice(), // no handicap until user picks a player
+          ocrName: ocr.name,
+        }
+      })
+      setPlayers(newPlayers)
+
+      const perPlayerWarnings = result.players.flatMap((p) =>
+        p.warnings.map((w) => `${p.name}: ${w}`),
+      )
+      setOcrWarnings([...result.warnings, ...perPlayerWarnings])
+
+      toast({
+        title: "Scorecard uploaded",
+        description:
+          "Match each column to the right player, then fill in any blank cells before submitting.",
+      })
+    } catch (err: any) {
+      console.error("OCR upload error:", err)
+      setError(err.message || "Failed to process scorecard")
+    } finally {
+      setIsOcring(false)
+    }
   }
 
   const handleScoreChange = (playerIndex: number, holeIndex: number, value: string) => {
@@ -167,7 +246,11 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
           strokesGiven: usersWithHandicap[player.userId] || 0,
         }))
 
-      const result = await submitScores(format(date, "yyyy-MM-dd"), playerScores)
+      const result = await submitScores(
+        format(date, "yyyy-MM-dd"),
+        playerScores,
+        scorecardImagePath,
+      )
 
       if (result.success) {
         toast({ title: "Success!", description: "Scores have been submitted successfully" })
@@ -220,6 +303,74 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
         </CardContent>
       </Card>
 
+      {/* Scorecard photo upload (optional shortcut) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Upload Scorecard Photo (optional)</CardTitle>
+          <CardDescription>
+            Snap a photo of the paper scorecard and we'll pre-fill the scores below. You can still edit any value, and unreadable cells will be left blank for you to fill in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <input
+              id="scorecard-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isOcring || isSubmitting}
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleScorecardUpload(file)
+                e.target.value = ""
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isOcring || isSubmitting}
+              onClick={() => document.getElementById("scorecard-upload")?.click()}
+            >
+              {isOcring ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Reading scorecard...
+                </>
+              ) : (
+                <>
+                  <Camera className="mr-2 h-4 w-4" />
+                  {scorecardImagePath ? "Replace scorecard photo" : "Upload scorecard photo"}
+                </>
+              )}
+            </Button>
+          </div>
+
+          {scorecardImagePath && !isOcring && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Match each column to the right player</AlertTitle>
+              <AlertDescription>
+                We've pre-filled scores from your photo. Pick the correct player for each column below — the OCR'd name is shown as a hint. Fill in any blank cells before submitting.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {ocrWarnings.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Double-check these</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-4 space-y-1">
+                  {ocrWarnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Scorecard */}
       <Card>
         <CardHeader className="pb-3">
@@ -235,7 +386,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <th className="px-2 sm:px-3 py-2 text-left font-medium text-muted-foreground w-12">Hole</th>
                   <th className="px-1 sm:px-2 py-2 text-center font-medium text-muted-foreground w-10">Par</th>
                   {activePlayers.map((player, pIdx) => (
-                    <th key={pIdx} className="px-1 py-1 text-center w-12">
+                    <th key={pIdx} className="px-1 py-1 text-center w-12 align-top">
                       {player.userId ? (
                         <button
                           type="button"
@@ -263,6 +414,11 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                             ))}
                           </SelectContent>
                         </Select>
+                      )}
+                      {player.ocrName && !player.userId && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground truncate" title={`OCR read: ${player.ocrName}`}>
+                          ~{player.ocrName}
+                        </div>
                       )}
                     </th>
                   ))}
