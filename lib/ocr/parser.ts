@@ -23,6 +23,15 @@ export type ParseDebug = {
   anchors: Array<{ label: string; x: number }>
   nameCandidates: Array<{ text: string; x: number; y: number }>
   mergedNames: Array<{ name: string; y: number; blacklisted: boolean }>
+  // Every digit-like token between the top of the card and the HOLES row,
+  // with which row (by name) it was assigned to. Helps diagnose column /
+  // row misalignment on a real photo without re-running OCR.
+  digitTokens: Array<{
+    text: string
+    x: number
+    y: number
+    assignedTo: string | null
+  }>
 }
 
 // The HOLES row on the scorecard has the printed labels:
@@ -101,6 +110,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
         anchors: [],
         nameCandidates: [],
         mergedNames: [],
+        digitTokens: [],
       },
     }
   }
@@ -115,13 +125,19 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
     anchors,
   )
 
-  // Estimate row height from the spacing between detected name rows, so we
-  // can set a sensible y-tolerance when pulling score tokens for each row.
-  const rowHeight = estimateRowHeight(playerRows)
+  // Partition digit tokens between the top of the card and HOLES row across
+  // the detected player rows by NEAREST rowY. This avoids both gaps and
+  // overlaps from a fixed y-tolerance window.
+  const { tokensByRow, debugTokens } = assignDigitsToRows(
+    response.words,
+    playerRows,
+    holesRowY,
+    anchors,
+  )
 
   const players: ParsedPlayer[] = []
   for (const row of playerRows) {
-    const parsed = parsePlayerRow(row, anchors, response.words, rowHeight, holesRowY)
+    const parsed = parsePlayerRow(row, anchors, tokensByRow.get(row.rowY) ?? [])
     if (parsed) players.push(parsed)
   }
 
@@ -131,6 +147,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
     anchors: anchors.map((a) => ({ label: a.label, x: Math.round(a.x) })),
     nameCandidates: rowsDebug.nameCandidates,
     mergedNames: rowsDebug.mergedNames,
+    digitTokens: debugTokens,
   }
 
   if (players.length === 0) {
@@ -291,22 +308,88 @@ function groupPlayerRows(
 
 // ---- per-row score extraction ------------------------------------------
 
-function estimateRowHeight(rows: PlayerRow[]): number {
-  if (rows.length < 2) return 45
-  const ys = rows.map((r) => r.rowY).sort((a, b) => a - b)
-  const gaps: number[] = []
-  for (let i = 1; i < ys.length; i++) gaps.push(ys[i] - ys[i - 1])
-  gaps.sort((a, b) => a - b)
-  const median = gaps[Math.floor(gaps.length / 2)]
-  return Math.max(30, Math.min(80, median))
+// Assign every digit-like token above the HOLES row to exactly one player
+// row using nearest-rowY boundaries. This fully partitions the card by
+// midpoints between adjacent name y-values, so a digit can never fall into
+// the "gap" between two rows (which a fixed yTol window was prone to).
+function assignDigitsToRows(
+  words: VisionWord[],
+  rows: PlayerRow[],
+  holesRowY: number,
+  anchors: AnchoredColumn[],
+): {
+  tokensByRow: Map<number, VisionWord[]>
+  debugTokens: ParseDebug["digitTokens"]
+} {
+  const tokensByRow = new Map<number, VisionWord[]>()
+  for (const r of rows) tokensByRow.set(r.rowY, [])
+  const debugTokens: ParseDebug["digitTokens"] = []
+
+  if (rows.length === 0) return { tokensByRow, debugTokens }
+
+  const sortedRows = [...rows].sort((a, b) => a.rowY - b.rowY)
+  const hole1 = anchors.find((a) => a.label === "1")
+  const totalAnchor = anchors.find((a) => a.label === "Total")
+  const leftX = hole1 ? hole1.x - 30 : 0
+  const rightX = totalAnchor ? totalAnchor.x + 40 : Number.POSITIVE_INFINITY
+
+  // Keep a tight buffer above HOLES row. The HOLES labels ("1"-"18") are
+  // numeric and visually close in y, so they'd otherwise be assigned to the
+  // bottom-most player row.
+  const holesGuard = holesRowY - 12
+
+  for (const w of words) {
+    if (!/^\d{1,3}$/.test(w.text)) continue
+    const { x, y } = wordCenter(w)
+    if (y >= holesGuard) continue
+    if (x < leftX || x > rightX) continue
+    // Also skip digits above the topmost row (printed yardages / par row).
+    if (y < sortedRows[0].rowY - 25) continue
+
+    // Find the row whose rowY is closest to this token's y.
+    let best = sortedRows[0]
+    let bestDist = Math.abs(best.rowY - y)
+    for (const r of sortedRows) {
+      const d = Math.abs(r.rowY - y)
+      if (d < bestDist) {
+        best = r
+        bestDist = d
+      }
+    }
+
+    // Guard against catching tokens that drift closer to HOLES than to the
+    // nearest row (e.g. HOLES labels slightly above the anchor line).
+    if (best.rowY < holesRowY && bestDist > holesRowY - best.rowY) continue
+
+    tokensByRow.get(best.rowY)!.push(w)
+    debugTokens.push({
+      text: w.text,
+      x: Math.round(x),
+      y: Math.round(y),
+      assignedTo: best.name,
+    })
+  }
+
+  // Include unassigned digit tokens in debug so we can see what got skipped.
+  for (const w of words) {
+    if (!/^\d{1,3}$/.test(w.text)) continue
+    const { x, y } = wordCenter(w)
+    if (debugTokens.some((d) => d.x === Math.round(x) && d.y === Math.round(y))) continue
+    debugTokens.push({
+      text: w.text,
+      x: Math.round(x),
+      y: Math.round(y),
+      assignedTo: null,
+    })
+  }
+
+  return { tokensByRow, debugTokens }
 }
 
 function parsePlayerRow(
   row: PlayerRow,
   anchors: AnchoredColumn[],
-  allWords: VisionWord[],
-  rowHeight: number,
-  holesRowY: number,
+  rowDigits: VisionWord[],
 ): ParsedPlayer | null {
   const hole1 = anchors.find((a) => a.label === "1")
   const hole2 = anchors.find((a) => a.label === "2")
@@ -315,23 +398,8 @@ function parsePlayerRow(
   // Half the inter-column distance = tolerance on either side of an anchor x.
   const colWidth = hole2.x - hole1.x
   const xTol = colWidth * 0.55
-  // y tolerance: keep it below half a row-height so we don't grab the next
-  // player's digits. Also clamp so the upper edge stays clear of the HOLES
-  // row — otherwise hole labels "15 16 17 18" leak in as scores.
-  const naturalYTol = Math.max(colWidth * 0.3, rowHeight * 0.45)
-  const yTolUpper = Math.max(4, holesRowY - row.rowY - 8)
-  const yTol = Math.min(naturalYTol, yTolUpper)
-  if (yTol < 5) return null // name is too close to HOLES row — skip
 
-  // Digits associated with this player row: within yTol of the name's y.
-  const rowDigits = allWords.filter((w) => {
-    const { y } = wordCenter(w)
-    if (y >= holesRowY - 6) return false // hard exclusion of HOLES row itself
-    if (Math.abs(y - row.rowY) > yTol) return false
-    return /^\d{1,3}$/.test(w.text)
-  })
-
-  if (rowDigits.length < 2) return null
+  if (rowDigits.length < 1) return null
 
   const scores: (number | null)[] = Array(18).fill(null)
   const warnings: string[] = []
