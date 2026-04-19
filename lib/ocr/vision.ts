@@ -49,13 +49,16 @@ type RawVisionResponse = {
 export async function detectDocumentText(
   imageBase64: string,
   apiKey: string,
+  options: { languageHints?: string[] } = {},
 ): Promise<VisionResponse> {
   const url = `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`
+  const languageHints = options.languageHints ?? ["en"]
   const body = {
     requests: [
       {
         image: { content: imageBase64 },
         features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+        imageContext: { languageHints },
       },
     ],
   }

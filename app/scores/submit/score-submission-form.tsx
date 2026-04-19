@@ -35,14 +35,12 @@ function toInitials(name: string): string {
   return `${first} ${last}`
 }
 
-// Preprocess a scorecard photo in the browser before upload:
-//   1. Downscale to 2400px on the long edge.
-//   2. Convert to grayscale (luminance weights).
-//   3. Apply a GENTLE contrast boost around the midpoint so faint pencil on
-//      shadow-lit paper gets pushed darker without creating stark-black edges
-//      that OCR struggles with.
-// Output is PNG (lossless) to avoid JPEG ringing on the newly-sharp edges.
-async function preprocessImage(file: File, maxEdge = 2400): Promise<File> {
+// Downscale the photo just enough to fit under the server-action body limit.
+// All real preprocessing (grayscale, denoise, adaptive threshold) happens
+// server-side in lib/ocr/preprocess.ts where sharp gives us proper image-
+// processing primitives. The browser's only job here is to avoid sending
+// 20 MB phone photos we'd have to reject.
+async function downscaleForUpload(file: File, maxEdge = 3000, quality = 0.92): Promise<File> {
   const blobUrl = URL.createObjectURL(file)
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -53,41 +51,27 @@ async function preprocessImage(file: File, maxEdge = 2400): Promise<File> {
     })
 
     const longest = Math.max(img.width, img.height)
-    const scale = Math.min(1, maxEdge / longest)
-    const w = Math.round(img.width * scale)
-    const h = Math.round(img.height * scale)
+    // If it's already a reasonable size AND file size, skip re-encoding —
+    // server-side preprocessing prefers to work on the original bytes.
+    if (longest <= maxEdge && file.size <= 8 * 1024 * 1024) return file
 
+    const scale = Math.min(1, maxEdge / longest)
     const canvas = document.createElement("canvas")
-    canvas.width = w
-    canvas.height = h
+    canvas.width = Math.round(img.width * scale)
+    canvas.height = Math.round(img.height * scale)
     const ctx = canvas.getContext("2d")
     if (!ctx) return file
-    ctx.drawImage(img, 0, 0, w, h)
-
-    const imageData = ctx.getImageData(0, 0, w, h)
-    const data = imageData.data
-
-    // Grayscale + gentle contrast (1.3x around 128). This is conservative
-    // enough that existing-good photos aren't over-processed but still
-    // enough to help faint pencil / shadowed regions.
-    const CONTRAST = 1.3
-    for (let i = 0; i < data.length; i += 4) {
-      const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-      const boosted = Math.max(0, Math.min(255, Math.round((l - 128) * CONTRAST + 128)))
-      data[i] = boosted
-      data[i + 1] = boosted
-      data[i + 2] = boosted
-    }
-    ctx.putImageData(imageData, 0, 0)
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
-        "image/png",
+        "image/jpeg",
+        quality,
       ),
     )
-    return new File([blob], file.name.replace(/\.[^.]+$/, "") + "-preprocessed.png", {
-      type: "image/png",
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+      type: "image/jpeg",
     })
   } finally {
     URL.revokeObjectURL(blobUrl)
@@ -104,7 +88,18 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [error, setError] = useState<string | null>(null)
   const [ocrWarnings, setOcrWarnings] = useState<string[]>([])
   const [ocrDebug, setOcrDebug] = useState<unknown>(null)
+  const [preprocessSteps, setPreprocessSteps] = useState<string[]>([])
   const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
+  // A/B toggles for the server-side OCR preprocessing pipeline. Defaults
+  // match the recommended "cv2/PIL" recipe; flip individually to test which
+  // stages help most on a given scorecard photo.
+  const [ocrOptions, setOcrOptions] = useState({
+    grayscale: true,
+    perspective: false,
+    upscale: true,
+    denoise: true,
+    threshold: true,
+  })
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -186,13 +181,20 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     setOcrWarnings([])
     setIsOcring(true)
     try {
-      // Preprocess: downscale, grayscale, contrast-stretch. Improves Vision
-      // OCR hit rate on faint handwriting and fold-shadowed cells. Falls back
-      // to the original file if the browser can't decode it for any reason.
-      const uploadFile = await preprocessImage(file).catch(() => file)
+      // Just downscale to keep the upload under the server-action body limit.
+      // Real preprocessing (grayscale, denoise, adaptive threshold) runs
+      // server-side now.
+      const uploadFile = await downscaleForUpload(file).catch(() => file)
 
       const formData = new FormData()
       formData.append("scorecard", uploadFile)
+      // A/B toggles: send each server-side preprocess stage as its own field
+      // so we can compare runs without redeploying.
+      formData.append("opt-grayscale", ocrOptions.grayscale ? "true" : "false")
+      formData.append("opt-perspective", ocrOptions.perspective ? "true" : "false")
+      formData.append("opt-upscale", ocrOptions.upscale ? "true" : "false")
+      formData.append("opt-denoise", ocrOptions.denoise ? "true" : "false")
+      formData.append("opt-threshold", ocrOptions.threshold ? "true" : "false")
       const result = await uploadAndParseScorecard(formData)
 
       if (!result.success) {
@@ -204,6 +206,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       // Always surface debug info from a successful OCR call, even on zero
       // players, so we can diagnose parser regressions from the UI.
       setOcrDebug(result.debug ?? null)
+      setPreprocessSteps(result.preprocessSteps ?? [])
 
       if (result.players.length === 0) {
         setError("We couldn't detect any player rows in that photo. Try a clearer shot.")
@@ -423,6 +426,43 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
               </AlertDescription>
             </Alert>
           )}
+
+          <details className="rounded-md border border-dashed p-3 text-xs">
+            <summary className="cursor-pointer text-muted-foreground">
+              OCR preprocessing options (A/B test)
+            </summary>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {(
+                [
+                  ["grayscale", "Grayscale"],
+                  ["perspective", "Perspective (N/A)"],
+                  ["upscale", "Upscale ≥2000px"],
+                  ["denoise", "Denoise (median 3)"],
+                  ["threshold", "Adaptive threshold"],
+                ] as const
+              ).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-2 text-xs text-muted-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    checked={ocrOptions[key]}
+                    disabled={key === "perspective" || isOcring}
+                    onChange={(e) =>
+                      setOcrOptions((prev) => ({ ...prev, [key]: e.target.checked }))
+                    }
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            {preprocessSteps.length > 0 && (
+              <div className="mt-3 text-[10px] text-muted-foreground">
+                Last run: {preprocessSteps.join(" → ")}
+              </div>
+            )}
+          </details>
 
           {ocrWarnings.length > 0 && (
             <Alert variant="destructive">

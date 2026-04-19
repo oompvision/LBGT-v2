@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { detectDocumentText } from "@/lib/ocr/vision"
 import { parseScorecard } from "@/lib/ocr/parser"
+import { preprocessImage, type PreprocessOptions } from "@/lib/ocr/preprocess"
 
 // TODO: drop back to 5 once the parser is dialed in. Tuning requires many
 // upload attempts per day, and we're well inside the 1000/month free tier.
@@ -20,11 +21,30 @@ export type OcrResult =
   | {
       success: true
       imagePath: string // storage path (not a URL) — we sign URLs on read
+      processedImagePath?: string
+      preprocessSteps: string[]
       players: OcrPlayerResult[]
       warnings: string[]
       debug?: unknown // parser diagnostic — shown in UI while the feature is new
     }
   | { success: false; error: string }
+
+// Parse form-data fields of the form `opt-<name>` into PreprocessOptions.
+// Anything not present falls back to module defaults.
+function parsePreprocessOptions(formData: FormData): PreprocessOptions {
+  const bool = (key: string): boolean | undefined => {
+    const v = formData.get(key)
+    if (v === null) return undefined
+    return v === "true" || v === "on" || v === "1"
+  }
+  return {
+    grayscale: bool("opt-grayscale"),
+    perspective: bool("opt-perspective"),
+    upscale: bool("opt-upscale"),
+    denoise: bool("opt-denoise"),
+    threshold: bool("opt-threshold"),
+  }
+}
 
 export async function uploadAndParseScorecard(formData: FormData): Promise<OcrResult> {
   try {
@@ -88,16 +108,16 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
 
     // Convert file to a base64 string for the Vision request and a Buffer for storage.
     const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-    const base64 = buffer.toString("base64")
+    const rawBuffer = Buffer.from(arrayBuffer)
 
-    // Upload to storage first so we always have the source image, even if OCR
-    // fails — makes debugging user-reported issues much easier.
+    // Upload the raw image first so we always have the source, even if OCR or
+    // preprocessing fails — makes debugging user-reported issues much easier.
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase()
-    const imagePath = `${session.user.id}/${Date.now()}.${ext}`
+    const timestamp = Date.now()
+    const imagePath = `${session.user.id}/${timestamp}.${ext}`
     const { error: uploadError } = await admin.storage
       .from(STORAGE_BUCKET)
-      .upload(imagePath, buffer, { contentType: file.type, upsert: false })
+      .upload(imagePath, rawBuffer, { contentType: file.type, upsert: false })
 
     if (uploadError) {
       console.error("scorecard upload failed:", uploadError)
@@ -108,23 +128,51 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
     // that a spam-retrying user burns their daily quota even if OCR throws.
     await admin.from("ocr_uploads").insert({ user_id: session.user.id })
 
+    // Preprocess. Any per-step toggles arrive as form fields so the client can
+    // A/B test stages without a redeploy.
+    const preprocessOptions = parsePreprocessOptions(formData)
+    let processed
+    try {
+      processed = await preprocessImage(rawBuffer, preprocessOptions)
+    } catch (err: any) {
+      console.error("preprocess error — falling back to raw image", err)
+      processed = {
+        buffer: rawBuffer,
+        steps: [`preprocess failed: ${err?.message ?? "unknown"}`],
+        width: 0,
+        height: 0,
+      }
+    }
+
+    // Save the processed image alongside the raw for side-by-side comparison.
+    // Failures here are non-fatal — worst case we can't diff, but OCR still runs.
+    const processedImagePath = `${session.user.id}/${timestamp}-processed.png`
+    const { error: processedUploadError } = await admin.storage
+      .from(STORAGE_BUCKET)
+      .upload(processedImagePath, processed.buffer, {
+        contentType: "image/png",
+        upsert: false,
+      })
+    if (processedUploadError) {
+      console.warn("processed image upload failed:", processedUploadError)
+    }
+
+    const base64 = processed.buffer.toString("base64")
+
     // Call Vision and parse.
     let parsed
     try {
-      const vision = await detectDocumentText(base64, apiKey)
+      const vision = await detectDocumentText(base64, apiKey, {
+        languageHints: ["en"],
+      })
       parsed = parseScorecard(vision)
 
       // Always log a compact diagnostic for now — easier to tune the parser
-      // against real photos than to ask users to reproduce issues. We log the
-      // first ~120 words with coordinates and the resulting parse summary.
-      const sample = vision.words.slice(0, 120).map((w) => ({
-        t: w.text,
-        x: Math.round((w.vertices[0].x + w.vertices[2].x) / 2),
-        y: Math.round((w.vertices[0].y + w.vertices[2].y) / 2),
-        c: Math.round(w.confidence * 100) / 100,
-      }))
+      // against real photos than to ask users to reproduce issues.
       console.log("[ocr] parse summary", {
-        imagePath,
+        rawImagePath: imagePath,
+        processedImagePath,
+        preprocessSteps: processed.steps,
         userId: session.user.id,
         totalWords: vision.words.length,
         playersFound: parsed.players.length,
@@ -134,7 +182,6 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
           scoresFilled: p.scores.filter((s) => s !== null).length,
           warnings: p.warnings,
         })),
-        firstWords: sample,
       })
     } catch (err: any) {
       console.error("Vision API / parser error:", err)
@@ -148,6 +195,8 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
     return {
       success: true,
       imagePath,
+      processedImagePath: processedUploadError ? undefined : processedImagePath,
+      preprocessSteps: processed.steps,
       players: parsed.players.map((p) => ({
         name: p.name,
         scores: p.scores,
