@@ -438,13 +438,22 @@ function parsePlayerRow(
   const totalAnchor = anchors.find((a) => a.label === "Total")
 
   const reportedOut = outAnchor
-    ? extractScoreInColumn(rowDigits, outAnchor.x, xTol, { maxValue: 200 })
+    ? extractScoreInColumn(rowDigits, outAnchor.x, xTol, {
+        maxValue: 200,
+        preferSplit: false,
+      })
     : null
   const reportedIn = inAnchor
-    ? extractScoreInColumn(rowDigits, inAnchor.x, xTol, { maxValue: 200 })
+    ? extractScoreInColumn(rowDigits, inAnchor.x, xTol, {
+        maxValue: 200,
+        preferSplit: false,
+      })
     : null
   const reportedTotal = totalAnchor
-    ? extractScoreInColumn(rowDigits, totalAnchor.x, xTol, { maxValue: 400 })
+    ? extractScoreInColumn(rowDigits, totalAnchor.x, xTol, {
+        maxValue: 400,
+        preferSplit: false,
+      })
     : null
 
   const frontSum = sumOrNull(scores.slice(0, 9))
@@ -478,9 +487,13 @@ function extractScoreInColumn(
   words: VisionWord[],
   centerX: number,
   tol: number,
-  opts: { maxValue?: number } = {},
+  opts: { maxValue?: number; preferSplit?: boolean } = {},
 ): number | null {
   const maxValue = opts.maxValue ?? 20 // single-hole scores are basically always ≤ 15
+  // Single-hole columns prefer per-character "split" tokens (because Vision
+  // likes to merge adjacent handwritten digits into one word). Out/In/Total
+  // columns prefer the original unsplit word (so "46" stays "46").
+  const preferSplit = opts.preferSplit ?? true
 
   // Candidates: numeric tokens inside the column's x-tolerance, sorted by confidence.
   const candidates = words
@@ -493,9 +506,19 @@ function extractScoreInColumn(
       if (IGNORE_TOKENS.some((ignore) => t.includes(ignore))) return false
       return /^\d{1,3}$/.test(w.text)
     })
-    .map((w) => ({ value: parseInt(w.text, 10), confidence: w.confidence }))
+    .map((w) => ({
+      value: parseInt(w.text, 10),
+      confidence: w.confidence,
+      split: w.split === true,
+    }))
     .filter((c) => c.value > 0 && c.value <= maxValue)
-    .sort((a, b) => b.confidence - a.confidence)
+    .filter((c) => (preferSplit ? true : !c.split))
+    .sort((a, b) => {
+      // When both types of tokens qualify, bias toward the preferred kind.
+      if (preferSplit && a.split !== b.split) return a.split ? -1 : 1
+      if (!preferSplit && a.split !== b.split) return a.split ? 1 : -1
+      return b.confidence - a.confidence
+    })
 
   if (candidates.length === 0) return null
   return candidates[0].value
