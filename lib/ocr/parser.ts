@@ -93,9 +93,13 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
   // player scores between the printed course info and the HOLES label row).
   const playerRows = groupPlayerRows(response.words, holesRowY, anchors)
 
+  // Estimate row height from the spacing between detected name rows, so we
+  // can set a sensible y-tolerance when pulling score tokens for each row.
+  const rowHeight = estimateRowHeight(playerRows)
+
   const players: ParsedPlayer[] = []
   for (const row of playerRows) {
-    const parsed = parsePlayerRow(row, anchors)
+    const parsed = parsePlayerRow(row, anchors, response.words, rowHeight)
     if (parsed) players.push(parsed)
   }
 
@@ -168,6 +172,7 @@ function averageY(words: VisionWord[]): number {
 type PlayerRow = {
   name: string
   words: VisionWord[]
+  rowY: number // anchored y of this player's name (used to filter scores by y)
 }
 
 function isBlacklisted(name: string): boolean {
@@ -177,75 +182,91 @@ function isBlacklisted(name: string): boolean {
     .some((w) => BLACKLIST_WORDS.has(w.replace(/[^a-z]/g, "")))
 }
 
+// Anchor rows on NAME tokens rather than clustering every word by y. This is
+// much more robust on folded/tilted photos where a player's left-side and
+// right-side scores sit at different y values — the name is the stable anchor
+// we associate scores with.
 function groupPlayerRows(
   words: VisionWord[],
   holesRowY: number,
   anchors: AnchoredColumn[],
 ): PlayerRow[] {
   const hole1 = anchors.find((a) => a.label === "1")
-  const hole18 = anchors.find((a) => a.label === "18")
-  if (!hole1 || !hole18) return []
+  if (!hole1) return []
 
-  // Cluster words above the HOLES row by y-proximity. 35px is loose enough to
-  // keep a single row's words together on a tilted / folded photo (the real
-  // scorecard can warp 20-30px across its width) and tight enough to keep
-  // adjacent player rows (~50-60px apart) in separate clusters.
-  const Y_CLUSTER_THRESHOLD = 35
-  const above = words
-    .filter((w) => wordCenter(w).y < holesRowY - 10)
-    .sort((a, b) => wordCenter(a).y - wordCenter(b).y)
+  // Candidate name tokens: any word sitting in the leftmost column above the
+  // HOLES row that looks like a name (letters, 2+ characters).
+  const nameCandidates = words.filter((w) => {
+    const { x, y } = wordCenter(w)
+    if (y >= holesRowY - 10) return false
+    if (x >= hole1.x - 5) return false
+    if (w.text.length < 2) return false
+    if (!/[a-zA-Z]/.test(w.text)) return false
+    if (/^\d+$/.test(w.text)) return false
+    return true
+  })
 
-  const clusters: VisionWord[][] = []
-  for (const w of above) {
-    const y = wordCenter(w).y
-    const last = clusters[clusters.length - 1]
-    if (last && Math.abs(averageY(last) - y) <= Y_CLUSTER_THRESHOLD) {
-      last.push(w)
+  // A name can be split across tokens (e.g. "J" + "Smith"). Merge adjacent
+  // name candidates that are close in both x and y into a single row-name.
+  const merged: { name: string; y: number }[] = []
+  const sorted = [...nameCandidates].sort((a, b) => wordCenter(a).y - wordCenter(b).y)
+  for (const w of sorted) {
+    const { y } = wordCenter(w)
+    const last = merged[merged.length - 1]
+    if (last && Math.abs(last.y - y) <= 20) {
+      last.name = `${last.name} ${w.text}`.trim()
+      last.y = (last.y + y) / 2
     } else {
-      clusters.push([w])
+      merged.push({ name: w.text, y })
     }
   }
 
   const rows: PlayerRow[] = []
-  for (const cluster of clusters) {
-    const sorted = [...cluster].sort((a, b) => wordCenter(a).x - wordCenter(b).x)
-
-    // Name: non-digit tokens positioned left of the hole-1 anchor. We allow
-    // a little slop (30px) because handwritten names sometimes extend
-    // slightly past the name-column divider.
-    const nameWords = sorted.filter(
-      (w) => wordCenter(w).x < hole1.x - 5 && !/^[-\d]+$/.test(w.text),
-    )
-    const name = nameWords.map((w) => w.text).join(" ").trim()
-    if (!name) continue
-    if (isBlacklisted(name)) continue
-
-    // Require at least 3 digit tokens inside the hole-columns area — otherwise
-    // this row isn't a scores row at all.
-    const scoreDigits = sorted.filter(
-      (w) =>
-        /^\d{1,3}$/.test(w.text) &&
-        wordCenter(w).x >= hole1.x - 20 &&
-        wordCenter(w).x <= hole18.x + 20,
-    )
-    if (scoreDigits.length < 3) continue
-
-    rows.push({ name, words: sorted })
+  for (const m of merged) {
+    if (isBlacklisted(m.name)) continue
+    rows.push({ name: m.name, words: [], rowY: m.y })
   }
-
   return rows
 }
 
 // ---- per-row score extraction ------------------------------------------
 
-function parsePlayerRow(row: PlayerRow, anchors: AnchoredColumn[]): ParsedPlayer | null {
+function estimateRowHeight(rows: PlayerRow[]): number {
+  if (rows.length < 2) return 45
+  const ys = rows.map((r) => r.rowY).sort((a, b) => a - b)
+  const gaps: number[] = []
+  for (let i = 1; i < ys.length; i++) gaps.push(ys[i] - ys[i - 1])
+  gaps.sort((a, b) => a - b)
+  const median = gaps[Math.floor(gaps.length / 2)]
+  return Math.max(30, Math.min(80, median))
+}
+
+function parsePlayerRow(
+  row: PlayerRow,
+  anchors: AnchoredColumn[],
+  allWords: VisionWord[],
+  rowHeight: number,
+): ParsedPlayer | null {
   const hole1 = anchors.find((a) => a.label === "1")
   const hole2 = anchors.find((a) => a.label === "2")
   if (!hole1 || !hole2) return null
 
   // Half the inter-column distance = tolerance on either side of an anchor x.
   const colWidth = hole2.x - hole1.x
-  const tol = colWidth * 0.55
+  const xTol = colWidth * 0.55
+  // y tolerance: keep it below half a row-height so we don't grab the next
+  // player's digits. If rowHeight is 50, tolerance is ~22px — enough to
+  // absorb fold-related y drift within a single row.
+  const yTol = Math.max(15, rowHeight * 0.45)
+
+  // Digits associated with this player row: within yTol of the name's y.
+  const rowDigits = allWords.filter((w) => {
+    const { y } = wordCenter(w)
+    if (Math.abs(y - row.rowY) > yTol) return false
+    return /^\d{1,3}$/.test(w.text)
+  })
+
+  if (rowDigits.length < 2) return null
 
   const scores: (number | null)[] = Array(18).fill(null)
   const warnings: string[] = []
@@ -274,7 +295,7 @@ function parsePlayerRow(row: PlayerRow, anchors: AnchoredColumn[]): ParsedPlayer
   for (let i = 0; i < 18; i++) {
     const anchor = anchors.find((a) => a.label === holeLabels[i])
     if (!anchor) continue
-    const value = extractScoreInColumn(row.words, anchor.x, tol)
+    const value = extractScoreInColumn(rowDigits, anchor.x, xTol)
     if (value !== null) scores[i] = value
   }
 
@@ -284,13 +305,13 @@ function parsePlayerRow(row: PlayerRow, anchors: AnchoredColumn[]): ParsedPlayer
   const totalAnchor = anchors.find((a) => a.label === "Total")
 
   const reportedOut = outAnchor
-    ? extractScoreInColumn(row.words, outAnchor.x, tol, { maxValue: 200 })
+    ? extractScoreInColumn(rowDigits, outAnchor.x, xTol, { maxValue: 200 })
     : null
   const reportedIn = inAnchor
-    ? extractScoreInColumn(row.words, inAnchor.x, tol, { maxValue: 200 })
+    ? extractScoreInColumn(rowDigits, inAnchor.x, xTol, { maxValue: 200 })
     : null
   const reportedTotal = totalAnchor
-    ? extractScoreInColumn(row.words, totalAnchor.x, tol, { maxValue: 400 })
+    ? extractScoreInColumn(rowDigits, totalAnchor.x, xTol, { maxValue: 400 })
     : null
 
   const frontSum = sumOrNull(scores.slice(0, 9))
