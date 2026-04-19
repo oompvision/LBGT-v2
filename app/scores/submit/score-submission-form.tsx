@@ -35,6 +35,47 @@ function toInitials(name: string): string {
   return `${first} ${last}`
 }
 
+// Downscale a scorecard photo in the browser before upload.
+// 2400px on the long edge keeps plenty of resolution for OCR while typically
+// producing a 1–2 MB JPEG — well under the 10 MB server-action limit.
+async function downscaleImage(file: File, maxEdge = 2400, quality = 0.85): Promise<File> {
+  const blobUrl = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error("Could not decode image"))
+      el.src = blobUrl
+    })
+
+    const longest = Math.max(img.width, img.height)
+    // If the image is already small enough, send the original bytes — no need
+    // to re-encode (which can actually grow the file for some source formats).
+    if (longest <= maxEdge && file.size <= 5 * 1024 * 1024) return file
+
+    const scale = Math.min(1, maxEdge / longest)
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.round(img.width * scale)
+    canvas.height = Math.round(img.height * scale)
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return file
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    const blob: Blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+        "image/jpeg",
+        quality,
+      ),
+    )
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", {
+      type: "image/jpeg",
+    })
+  } finally {
+    URL.revokeObjectURL(blobUrl)
+  }
+}
+
 export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFormProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -126,8 +167,13 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     setOcrWarnings([])
     setIsOcring(true)
     try {
+      // Downscale so big phone photos fit under the server-action body limit
+      // and so OCR runs on a sensibly-sized image. Falls back to the original
+      // file if the browser can't decode it for any reason.
+      const uploadFile = await downscaleImage(file).catch(() => file)
+
       const formData = new FormData()
-      formData.append("scorecard", file)
+      formData.append("scorecard", uploadFile)
       const result = await uploadAndParseScorecard(formData)
 
       if (!result.success) {
