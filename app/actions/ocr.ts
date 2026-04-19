@@ -4,7 +4,9 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { detectDocumentText } from "@/lib/ocr/vision"
 import { parseScorecard } from "@/lib/ocr/parser"
 
-const DAILY_LIMIT = 5 // per user, per 24h — protects the Vision free tier
+// TODO: drop back to 5 once the parser is dialed in. Tuning requires many
+// upload attempts per day, and we're well inside the 1000/month free tier.
+const DAILY_LIMIT = 100
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB (phone photos can be big)
 const STORAGE_BUCKET = "scorecards"
 
