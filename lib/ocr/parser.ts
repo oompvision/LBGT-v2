@@ -12,6 +12,17 @@ export type ParsedPlayer = {
 export type ParsedScorecard = {
   players: ParsedPlayer[]
   warnings: string[] // scorecard-level warnings (e.g. "Couldn't find HOLES row")
+  debug?: ParseDebug
+}
+
+// Diagnostic info surfaced in the UI and logs so we can tune the parser on
+// real photos without asking users to reproduce issues.
+export type ParseDebug = {
+  totalWords: number
+  holesRowY: number | null
+  anchors: Array<{ label: string; x: number }>
+  nameCandidates: Array<{ text: string; x: number; y: number }>
+  mergedNames: Array<{ name: string; y: number; blacklisted: boolean }>
 }
 
 // The HOLES row on the scorecard has the printed labels:
@@ -84,6 +95,13 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
       warnings: [
         "Couldn't find the HOLES row on the scorecard. Make sure the whole card is in frame and the photo is well-lit.",
       ],
+      debug: {
+        totalWords: response.words.length,
+        holesRowY: null,
+        anchors: [],
+        nameCandidates: [],
+        mergedNames: [],
+      },
     }
   }
 
@@ -91,7 +109,11 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
 
   // Player rows sit ABOVE the HOLES row (the photo orientation puts handwritten
   // player scores between the printed course info and the HOLES label row).
-  const playerRows = groupPlayerRows(response.words, holesRowY, anchors)
+  const { rows: playerRows, debug: rowsDebug } = groupPlayerRows(
+    response.words,
+    holesRowY,
+    anchors,
+  )
 
   // Estimate row height from the spacing between detected name rows, so we
   // can set a sensible y-tolerance when pulling score tokens for each row.
@@ -99,8 +121,16 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
 
   const players: ParsedPlayer[] = []
   for (const row of playerRows) {
-    const parsed = parsePlayerRow(row, anchors, response.words, rowHeight)
+    const parsed = parsePlayerRow(row, anchors, response.words, rowHeight, holesRowY)
     if (parsed) players.push(parsed)
+  }
+
+  const debug: ParseDebug = {
+    totalWords: response.words.length,
+    holesRowY: Math.round(holesRowY),
+    anchors: anchors.map((a) => ({ label: a.label, x: Math.round(a.x) })),
+    nameCandidates: rowsDebug.nameCandidates,
+    mergedNames: rowsDebug.mergedNames,
   }
 
   if (players.length === 0) {
@@ -109,7 +139,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
     )
   }
 
-  return { players, warnings }
+  return { players, warnings, debug }
 }
 
 // ---- anchor detection ---------------------------------------------------
@@ -190,30 +220,46 @@ function groupPlayerRows(
   words: VisionWord[],
   holesRowY: number,
   anchors: AnchoredColumn[],
-): PlayerRow[] {
+): {
+  rows: PlayerRow[]
+  debug: {
+    nameCandidates: Array<{ text: string; x: number; y: number }>
+    mergedNames: Array<{ name: string; y: number; blacklisted: boolean }>
+  }
+} {
   const hole1 = anchors.find((a) => a.label === "1")
-  if (!hole1) return []
+  const hole2 = anchors.find((a) => a.label === "2")
+  if (!hole1 || !hole2) {
+    return { rows: [], debug: { nameCandidates: [], mergedNames: [] } }
+  }
 
-  // Candidate name tokens: any word sitting in the leftmost column above the
-  // HOLES row that looks like a name (letters, 2+ characters).
+  // Scale y-thresholds to image resolution. A column is one "unit" wide;
+  // player rows are ~0.8-1.0 units tall. This lets the parser work on
+  // 800px thumbnails and 4000px high-res phone photos equally.
+  const colWidth = hole2.x - hole1.x
+  const mergeY = colWidth * 0.4 // merge name tokens within this y-distance
+
+  // Candidate name tokens: any word sitting LEFT of hole 1 and above HOLES,
+  // with some letters in it. Kept intentionally permissive — the blacklist
+  // filters out printed course-info rows later.
   const nameCandidates = words.filter((w) => {
     const { x, y } = wordCenter(w)
-    if (y >= holesRowY - 10) return false
-    if (x >= hole1.x - 5) return false
-    if (w.text.length < 2) return false
+    if (y >= holesRowY - 8) return false
+    if (x >= hole1.x) return false
+    if (w.text.length < 1) return false
     if (!/[a-zA-Z]/.test(w.text)) return false
     if (/^\d+$/.test(w.text)) return false
     return true
   })
 
   // A name can be split across tokens (e.g. "J" + "Smith"). Merge adjacent
-  // name candidates that are close in both x and y into a single row-name.
+  // candidates that share a y-band into a single row-name.
   const merged: { name: string; y: number }[] = []
   const sorted = [...nameCandidates].sort((a, b) => wordCenter(a).y - wordCenter(b).y)
   for (const w of sorted) {
     const { y } = wordCenter(w)
     const last = merged[merged.length - 1]
-    if (last && Math.abs(last.y - y) <= 20) {
+    if (last && Math.abs(last.y - y) <= mergeY) {
       last.name = `${last.name} ${w.text}`.trim()
       last.y = (last.y + y) / 2
     } else {
@@ -222,11 +268,25 @@ function groupPlayerRows(
   }
 
   const rows: PlayerRow[] = []
+  const mergedDebug: Array<{ name: string; y: number; blacklisted: boolean }> = []
   for (const m of merged) {
-    if (isBlacklisted(m.name)) continue
+    const blacklisted = isBlacklisted(m.name)
+    mergedDebug.push({ name: m.name, y: Math.round(m.y), blacklisted })
+    if (blacklisted) continue
     rows.push({ name: m.name, words: [], rowY: m.y })
   }
-  return rows
+
+  return {
+    rows,
+    debug: {
+      nameCandidates: nameCandidates.map((w) => ({
+        text: w.text,
+        x: Math.round(wordCenter(w).x),
+        y: Math.round(wordCenter(w).y),
+      })),
+      mergedNames: mergedDebug,
+    },
+  }
 }
 
 // ---- per-row score extraction ------------------------------------------
@@ -246,6 +306,7 @@ function parsePlayerRow(
   anchors: AnchoredColumn[],
   allWords: VisionWord[],
   rowHeight: number,
+  holesRowY: number,
 ): ParsedPlayer | null {
   const hole1 = anchors.find((a) => a.label === "1")
   const hole2 = anchors.find((a) => a.label === "2")
@@ -255,13 +316,17 @@ function parsePlayerRow(
   const colWidth = hole2.x - hole1.x
   const xTol = colWidth * 0.55
   // y tolerance: keep it below half a row-height so we don't grab the next
-  // player's digits. If rowHeight is 50, tolerance is ~22px — enough to
-  // absorb fold-related y drift within a single row.
-  const yTol = Math.max(15, rowHeight * 0.45)
+  // player's digits. Also clamp so the upper edge stays clear of the HOLES
+  // row — otherwise hole labels "15 16 17 18" leak in as scores.
+  const naturalYTol = Math.max(colWidth * 0.3, rowHeight * 0.45)
+  const yTolUpper = Math.max(4, holesRowY - row.rowY - 8)
+  const yTol = Math.min(naturalYTol, yTolUpper)
+  if (yTol < 5) return null // name is too close to HOLES row — skip
 
   // Digits associated with this player row: within yTol of the name's y.
   const rowDigits = allWords.filter((w) => {
     const { y } = wordCenter(w)
+    if (y >= holesRowY - 6) return false // hard exclusion of HOLES row itself
     if (Math.abs(y - row.rowY) > yTol) return false
     return /^\d{1,3}$/.test(w.text)
   })

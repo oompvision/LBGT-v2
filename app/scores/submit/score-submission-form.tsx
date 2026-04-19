@@ -85,6 +85,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
   const [ocrWarnings, setOcrWarnings] = useState<string[]>([])
+  const [ocrDebug, setOcrDebug] = useState<unknown>(null)
   const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -188,6 +189,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       }
 
       setScorecardImagePath(result.imagePath)
+      setOcrDebug(result.debug ?? null)
 
       // Seed the form with up to 4 OCR'd rows; any remaining slots stay blank
       // so the user can still add more manually if needed.
@@ -413,6 +415,17 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                 </ul>
               </AlertDescription>
             </Alert>
+          )}
+
+          {ocrDebug !== null && (
+            <details className="rounded-md border border-dashed p-3 text-xs">
+              <summary className="cursor-pointer text-muted-foreground">
+                OCR debug info (tap to expand)
+              </summary>
+              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-[10px] leading-tight">
+                {JSON.stringify(ocrDebug, null, 2)}
+              </pre>
+            </details>
           )}
         </CardContent>
       </Card>

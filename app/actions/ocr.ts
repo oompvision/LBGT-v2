@@ -20,6 +20,7 @@ export type OcrResult =
       imagePath: string // storage path (not a URL) — we sign URLs on read
       players: OcrPlayerResult[]
       warnings: string[]
+      debug?: unknown // parser diagnostic — shown in UI while the feature is new
     }
   | { success: false; error: string }
 
@@ -151,6 +152,7 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
         warnings: p.warnings,
       })),
       warnings: parsed.warnings,
+      debug: parsed.debug,
     }
   } catch (error: any) {
     console.error("Error in uploadAndParseScorecard:", error)
