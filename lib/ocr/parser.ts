@@ -164,12 +164,13 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
 function findColumnAnchors(
   words: VisionWord[],
 ): { anchors: AnchoredColumn[]; holesRowY: number } | null {
-  // Candidates are any word whose text matches one of the HOLES labels.
-  // Note: numeric labels ("1"-"18") can appear elsewhere on the card (printed
-  // handicap rows, yardages), so we locate the HOLES row by finding the
-  // y-band that contains the MOST of these candidates at once.
+  // Candidates are any ORIGINAL (non-split) word whose text matches one of the
+  // HOLES labels. Excluding split tokens here is critical: without it, a row
+  // like Blue Hcp ("13 9 15 1 3 17 5 11 7") contributes single-digit splits
+  // that outvote the real HOLES row (which has genuine singletons for each
+  // label). Real HOLES labels always come through as unsplit Vision words.
   const HOLES_SET = new Set<string>(HOLES_ANCHOR_LABELS)
-  const candidates = words.filter((w) => HOLES_SET.has(w.text))
+  const candidates = words.filter((w) => HOLES_SET.has(w.text) && !w.split)
   if (candidates.length < 8) return null
 
   // Sliding window over each candidate's y: count how many candidates fall
