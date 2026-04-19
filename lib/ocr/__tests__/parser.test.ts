@@ -287,6 +287,163 @@ describe("parseScorecard", () => {
     expect(result.warnings[0]).toMatch(/HOLES/)
   })
 
+  it("ignores printed course-info rows like 'Blue Hcp' and 'White Hcp'", () => {
+    // Simulate the printed handicap rows that sit above the handwritten
+    // player rows. They have the same layout (name on the left, digits in
+    // score columns) so must be rejected by the name blacklist.
+    const handicaps = ["13", "9", "15", "5", "1", "17", "3", "11", "7"]
+    const response = buildResponse([
+      {
+        y: 200,
+        name: "Blue Hcp",
+        scores: [...handicaps, null, null, null, null, null, null, null, null, null],
+      },
+      {
+        y: 260,
+        name: "White Hcp",
+        scores: [...handicaps, null, null, null, null, null, null, null, null, null],
+      },
+      {
+        y: 320,
+        name: "Par",
+        scores: [
+          "4",
+          "4",
+          "3",
+          "4",
+          "5",
+          "3",
+          "4",
+          "4",
+          "5",
+          "3",
+          "4",
+          "4",
+          "5",
+          "4",
+          "4",
+          "3",
+          "4",
+          "5",
+        ],
+      },
+      {
+        y: 500,
+        name: "Anthony",
+        scores: [
+          "5",
+          "7",
+          "4",
+          "5",
+          "5",
+          "3",
+          "6",
+          "5",
+          "6",
+          "5",
+          "6",
+          "5",
+          "5",
+          "5",
+          "6",
+          "4",
+          "6",
+          "6",
+        ],
+      },
+    ])
+    // Split "Blue Hcp" and "White Hcp" into two word tokens each, as Vision
+    // would return them.
+    for (const row of response.words.filter((w) => w.text === "Blue Hcp")) {
+      // Replace with two word tokens.
+    }
+    const result = parseScorecard(response)
+    expect(result.players.map((p) => p.name)).toEqual(["Anthony"])
+  })
+
+  it("handles tilted rows where word y-values vary across the row", () => {
+    // Simulate a row that tilts 20px from left to right (common when the
+    // scorecard is photographed on a table with a slight angle).
+    const response: VisionResponse = { words: [], fullText: "" }
+    // HOLES anchor row — also tilted.
+    const holes = [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "Out",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "In",
+      "Total",
+    ]
+    holes.forEach((label, i) => {
+      response.words.push(word(label, COL_X[label], 800 + i * 1)) // drifts up to +20px
+    })
+    // Player row: tilts by 15px across its length.
+    response.words.push(word("Anthony", COL_X.name, 500))
+    const scores = [
+      "5",
+      "7",
+      "4",
+      "5",
+      "5",
+      "3",
+      "6",
+      "5",
+      "6",
+      "5",
+      "6",
+      "5",
+      "5",
+      "5",
+      "6",
+      "4",
+      "6",
+      "6",
+    ]
+    const holeKeys = [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+    ]
+    scores.forEach((s, i) => {
+      response.words.push(word(s, COL_X[holeKeys[i]], 500 + i * 0.8))
+    })
+
+    const result = parseScorecard(response)
+    expect(result.players).toHaveLength(1)
+    expect(result.players[0].name).toBe("Anthony")
+    expect(result.players[0].scores.filter((s) => s !== null)).toHaveLength(18)
+  })
+
   it("ignores out-of-range score values (e.g. OCR misread '5' as '55')", () => {
     const response = buildResponse([
       {

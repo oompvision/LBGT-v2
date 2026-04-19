@@ -1,4 +1,4 @@
-import type { VisionResponse, VisionWord, Vertex } from "./vision"
+import type { VisionResponse, VisionWord } from "./vision"
 import { wordCenter } from "./vision"
 
 // Parsed output for one handwritten player row on the scorecard.
@@ -45,6 +45,30 @@ const HOLES_ANCHOR_LABELS = [
 // If the OCR text starts with any of these we treat the cell as unreadable.
 const IGNORE_TOKENS = ["CART", "PATH", "ONLY", "GIR", "GR", "CR"]
 
+// Any row whose name column contains ONE OF these words is a printed course-
+// info row (Blue, Blue Hcp, White Hcp, Par, etc.), not a player row.
+const BLACKLIST_WORDS = new Set([
+  "par",
+  "blue",
+  "white",
+  "gold",
+  "red",
+  "hcp",
+  "pace",
+  "holes",
+  "out",
+  "in",
+  "total",
+  "yard",
+  "yards",
+  "yardage",
+  "scorer",
+  "attest",
+  "initial",
+  "play",
+  "ard", // partial OCR of "yard"
+])
+
 type AnchoredColumn = {
   label: (typeof HOLES_ANCHOR_LABELS)[number]
   x: number // center x of the HOLES-row label
@@ -89,55 +113,48 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
 function findColumnAnchors(
   words: VisionWord[],
 ): { anchors: AnchoredColumn[]; holesRowY: number } | null {
-  // Group words by rough y-bands, then find the band that contains the most
-  // HOLES_ANCHOR_LABELS tokens — that's the HOLES row.
-  const candidates: Map<number, VisionWord[]> = new Map()
-  for (const w of words) {
-    const y = Math.round(wordCenter(w).y / 10) * 10 // 10-px bucket
-    if (!candidates.has(y)) candidates.set(y, [])
-    candidates.get(y)!.push(w)
-  }
+  // Candidates are any word whose text matches one of the HOLES labels.
+  // Note: numeric labels ("1"-"18") can appear elsewhere on the card (printed
+  // handicap rows, yardages), so we locate the HOLES row by finding the
+  // y-band that contains the MOST of these candidates at once.
+  const HOLES_SET = new Set<string>(HOLES_ANCHOR_LABELS)
+  const candidates = words.filter((w) => HOLES_SET.has(w.text))
+  if (candidates.length < 8) return null
 
+  // Sliding window over each candidate's y: count how many candidates fall
+  // within ±BAND_RADIUS of that y. Handles tilted / slightly warped photos
+  // where the HOLES row spans 20-40px of y-range.
+  const BAND_RADIUS = 25
   let bestBand: VisionWord[] = []
-  let bestScore = 0
-  for (const [, band] of candidates) {
-    const hits = band.filter((w) =>
-      HOLES_ANCHOR_LABELS.includes(w.text as (typeof HOLES_ANCHOR_LABELS)[number]),
+  for (const c of candidates) {
+    const centerY = wordCenter(c).y
+    const band = candidates.filter(
+      (other) => Math.abs(wordCenter(other).y - centerY) <= BAND_RADIUS,
     )
-    if (hits.length > bestScore) {
-      bestScore = hits.length
-      bestBand = band
-    }
+    if (band.length > bestBand.length) bestBand = band
   }
 
-  // Need at least most of the 21 labels to trust the anchor.
-  if (bestScore < 10) return null
+  // Need at least 8 of the 21 labels to trust the anchor.
+  if (bestBand.length < 8) return null
 
-  // Build one anchor per label; for duplicate labels ("1" appears in hole 1 AND
-  // hole 10/11/12/... as a digit of the two-digit number — but Vision tokenizes
-  // "10" as a single word), we pick the leftmost-to-rightmost match order.
+  // Build anchors in left-to-right order, consuming expected labels one at a
+  // time. This prevents a stray duplicate (e.g. a printed "1" at the far
+  // right) from stealing the anchor for hole 1.
   const labelled = bestBand
-    .filter((w) =>
-      HOLES_ANCHOR_LABELS.includes(w.text as (typeof HOLES_ANCHOR_LABELS)[number]),
-    )
     .map((w) => ({ text: w.text, x: wordCenter(w).x }))
     .sort((a, b) => a.x - b.x)
 
-  // Map labels to anchors in left-to-right order.
   const anchors: AnchoredColumn[] = []
-  const remaining = [...HOLES_ANCHOR_LABELS]
+  const remaining: string[] = [...HOLES_ANCHOR_LABELS]
   for (const item of labelled) {
-    const idx = remaining.findIndex((label) => label === item.text)
-    if (idx === -1) continue
-    // Consume this label only if it's the next expected one (prevents a stray
-    // "1" elsewhere in the card from stealing the anchor for hole 1).
-    if (idx === 0) {
-      anchors.push({ label: remaining[0], x: item.x })
+    if (remaining.length === 0) break
+    if (item.text === remaining[0]) {
+      anchors.push({ label: remaining[0] as AnchoredColumn["label"], x: item.x })
       remaining.shift()
     }
   }
 
-  if (anchors.length < 10) return null
+  if (anchors.length < 8) return null
   return { anchors, holesRowY: averageY(bestBand) }
 }
 
@@ -153,9 +170,12 @@ type PlayerRow = {
   words: VisionWord[]
 }
 
-// Anything whose name matches one of these is a printed course-info row, not
-// a player — we skip it even though it shares the player-row layout.
-const PRINTED_ROW_LABELS = /^(par|blue|white|gold|red|hcp|pace|holes|out|in|total|yard|yards|yardage|scorer|attest|initial|a\/e|p\/k|ard)$/i
+function isBlacklisted(name: string): boolean {
+  return name
+    .toLowerCase()
+    .split(/\s+/)
+    .some((w) => BLACKLIST_WORDS.has(w.replace(/[^a-z]/g, "")))
+}
 
 function groupPlayerRows(
   words: VisionWord[],
@@ -166,10 +186,11 @@ function groupPlayerRows(
   const hole18 = anchors.find((a) => a.label === "18")
   if (!hole1 || !hole18) return []
 
-  // Cluster words above the HOLES row by y-proximity. Threshold: 20px is tight
-  // enough to separate typical golf-scorecard rows (~30–50px tall each) and
-  // loose enough to keep a single row's words together even if it's tilted.
-  const Y_CLUSTER_THRESHOLD = 20
+  // Cluster words above the HOLES row by y-proximity. 35px is loose enough to
+  // keep a single row's words together on a tilted / folded photo (the real
+  // scorecard can warp 20-30px across its width) and tight enough to keep
+  // adjacent player rows (~50-60px apart) in separate clusters.
+  const Y_CLUSTER_THRESHOLD = 35
   const above = words
     .filter((w) => wordCenter(w).y < holesRowY - 10)
     .sort((a, b) => wordCenter(a).y - wordCenter(b).y)
@@ -189,19 +210,23 @@ function groupPlayerRows(
   for (const cluster of clusters) {
     const sorted = [...cluster].sort((a, b) => wordCenter(a).x - wordCenter(b).x)
 
-    // Name is everything in the leftmost column (x < hole-1 anchor).
-    const nameWords = sorted.filter((w) => wordCenter(w).x < hole1.x - 10 && !/^\d+$/.test(w.text))
+    // Name: non-digit tokens positioned left of the hole-1 anchor. We allow
+    // a little slop (30px) because handwritten names sometimes extend
+    // slightly past the name-column divider.
+    const nameWords = sorted.filter(
+      (w) => wordCenter(w).x < hole1.x - 5 && !/^[-\d]+$/.test(w.text),
+    )
     const name = nameWords.map((w) => w.text).join(" ").trim()
     if (!name) continue
-    if (PRINTED_ROW_LABELS.test(name)) continue
+    if (isBlacklisted(name)) continue
 
     // Require at least 3 digit tokens inside the hole-columns area — otherwise
     // this row isn't a scores row at all.
     const scoreDigits = sorted.filter(
       (w) =>
         /^\d{1,3}$/.test(w.text) &&
-        wordCenter(w).x >= hole1.x - 15 &&
-        wordCenter(w).x <= hole18.x + 15,
+        wordCenter(w).x >= hole1.x - 20 &&
+        wordCenter(w).x <= hole18.x + 20,
     )
     if (scoreDigits.length < 3) continue
 

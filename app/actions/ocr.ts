@@ -107,9 +107,29 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
 
     // Call Vision and parse.
     let parsed
+    let visionWordCount = 0
     try {
       const vision = await detectDocumentText(base64, apiKey)
+      visionWordCount = vision.words.length
       parsed = parseScorecard(vision)
+
+      // If parsing produced nothing, log a compact diagnostic so we can see
+      // what Vision actually returned for this photo in the Vercel logs.
+      // Helps tune the parser without needing the user to reproduce.
+      if (parsed.players.length === 0) {
+        const sample = vision.words.slice(0, 40).map((w) => ({
+          t: w.text,
+          x: Math.round((w.vertices[0].x + w.vertices[2].x) / 2),
+          y: Math.round((w.vertices[0].y + w.vertices[2].y) / 2),
+        }))
+        console.warn("[ocr] no players detected", {
+          imagePath,
+          userId: session.user.id,
+          words: visionWordCount,
+          warnings: parsed.warnings,
+          firstWords: sample,
+        })
+      }
     } catch (err: any) {
       console.error("Vision API / parser error:", err)
       return {
