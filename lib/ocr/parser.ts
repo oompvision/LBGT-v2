@@ -27,6 +27,12 @@ export type ParseDebug = {
   // anchor detection fails — tells us whether Vision is returning HOLES
   // labels as literal strings or mangling them into something unexpected.
   sampleWords?: Array<{ text: string; x: number; y: number }>
+  // Every unsplit word whose text exactly matches a HOLES label, anywhere
+  // in the image. When anchor detection fails, this is the single most
+  // useful diagnostic: it shows whether Vision picked up the HOLES row at
+  // all, and if not, which rows it mistakenly matched (printed hcp rows,
+  // pace-of-play rows, etc.) so we can tune the anchor scorer.
+  holesLabelMatches?: Array<{ text: string; x: number; y: number }>
   // Every digit-like token between the top of the card and the HOLES row,
   // with which row (by name) it was assigned to. Helps diagnose column /
   // row misalignment on a real photo without re-running OCR.
@@ -106,7 +112,20 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
   // re-running the API.
   const rawSample = response.words
     .filter((w) => !w.split)
-    .slice(0, 60)
+    .slice(0, 150)
+    .map((w) => ({
+      text: w.text,
+      x: Math.round(wordCenter(w).x),
+      y: Math.round(wordCenter(w).y),
+    }))
+
+  // Every unsplit word that exactly matches a HOLES label, anywhere in the
+  // image. Crucial for diagnosing anchor-detection failures — if this is
+  // empty or only contains stray matches (e.g. Blue Hcp numerics), we know
+  // the actual HOLES row wasn't detected by Vision.
+  const HOLES_SET = new Set<string>(HOLES_ANCHOR_LABELS)
+  const holesLabelMatches = response.words
+    .filter((w) => !w.split && HOLES_SET.has(w.text))
     .map((w) => ({
       text: w.text,
       x: Math.round(wordCenter(w).x),
@@ -127,6 +146,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
         nameCandidates: [],
         mergedNames: [],
         sampleWords: rawSample,
+        holesLabelMatches,
         digitTokens: [],
       },
     }
@@ -168,6 +188,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
     holesRowY: Math.round(holesRowY),
     anchors: anchors.map((a) => ({ label: a.label, x: Math.round(a.x) })),
     sampleWords: rawSample,
+    holesLabelMatches,
     nameCandidates: rowsDebug.nameCandidates,
     mergedNames: rowsDebug.mergedNames,
     digitTokens: debugTokens,
