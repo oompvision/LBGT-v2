@@ -183,13 +183,16 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
         return
       }
 
+      // Always surface debug info from a successful OCR call, even on zero
+      // players, so we can diagnose parser regressions from the UI.
+      setOcrDebug(result.debug ?? null)
+
       if (result.players.length === 0) {
         setError("We couldn't detect any player rows in that photo. Try a clearer shot.")
         return
       }
 
       setScorecardImagePath(result.imagePath)
-      setOcrDebug(result.debug ?? null)
 
       // Seed the form with up to 4 OCR'd rows; any remaining slots stay blank
       // so the user can still add more manually if needed.
