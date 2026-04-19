@@ -137,7 +137,12 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
 
   const players: ParsedPlayer[] = []
   for (const row of playerRows) {
-    const parsed = parsePlayerRow(row, anchors, tokensByRow.get(row.rowY) ?? [])
+    const parsed = parsePlayerRow(
+      row,
+      anchors,
+      tokensByRow.get(row.rowY) ?? [],
+      response.words,
+    )
     if (parsed) players.push(parsed)
   }
 
@@ -391,6 +396,7 @@ function parsePlayerRow(
   row: PlayerRow,
   anchors: AnchoredColumn[],
   rowDigits: VisionWord[],
+  allWords: VisionWord[],
 ): ParsedPlayer | null {
   const hole1 = anchors.find((a) => a.label === "1")
   const hole2 = anchors.find((a) => a.label === "2")
@@ -404,6 +410,11 @@ function parsePlayerRow(
 
   const scores: (number | null)[] = Array(18).fill(null)
   const warnings: string[] = []
+
+  // Identify hole columns covered by a CART PATH ONLY stamp (or similar text
+  // feature) on this row's y-band. Those cells stay null regardless of any
+  // digits Vision extracted from the stamp shape.
+  const stampedHoles = detectStampedHoles(allWords, row.rowY, anchors)
 
   const holeLabels = [
     "1",
@@ -427,9 +438,13 @@ function parsePlayerRow(
   ] as const
 
   for (let i = 0; i < 18; i++) {
+    if (stampedHoles.has(i)) continue // CART PATH ONLY — user fills it in
     const anchor = anchors.find((a) => a.label === holeLabels[i])
     if (!anchor) continue
-    const value = extractScoreInColumn(rowDigits, anchor.x, xTol)
+    // Per-hole scores are capped at 12. Golf rarely produces 13+ on a single
+    // hole, and stamp fragments / smudges tend to OCR as "13"/"15"/"17" which
+    // would otherwise sneak through.
+    const value = extractScoreInColumn(rowDigits, anchor.x, xTol, { maxValue: 12 })
     if (value !== null) scores[i] = value
   }
 
@@ -482,6 +497,73 @@ function parsePlayerRow(
   }
 
   return { name: row.name, scores, warnings }
+}
+
+// Find hole columns covered by a CART PATH ONLY (or similar) stamp on this
+// row. Returns a set of hole indexes (0-17) where the cell should be forced
+// blank so the user fills it in manually.
+function detectStampedHoles(
+  words: VisionWord[],
+  rowY: number,
+  anchors: AnchoredColumn[],
+): Set<number> {
+  const stamped = new Set<number>()
+  const hole1 = anchors.find((a) => a.label === "1")
+  const hole2 = anchors.find((a) => a.label === "2")
+  if (!hole1 || !hole2) return stamped
+  const colWidth = hole2.x - hole1.x
+
+  // A stamp word is any non-digit OCR token matching a known stamp keyword.
+  const stampWords = words.filter((w) => {
+    const t = w.text.toUpperCase()
+    if (!/CART|PATH|ONLY/.test(t)) return false
+    const { y } = wordCenter(w)
+    return Math.abs(y - rowY) <= colWidth * 0.8
+  })
+
+  if (stampWords.length === 0) return stamped
+
+  const holeLabels: Array<AnchoredColumn["label"]> = [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+  ]
+
+  for (const w of stampWords) {
+    // Use the full x-extent of the stamp word so a wide "CART PATH ONLY" stamp
+    // that crosses several cells marks all of them.
+    const xs = w.vertices.map((v) => v.x)
+    const stampLeft = Math.min(...xs)
+    const stampRight = Math.max(...xs)
+
+    for (let i = 0; i < holeLabels.length; i++) {
+      const anchor = anchors.find((a) => a.label === holeLabels[i])
+      if (!anchor) continue
+      const colLeft = anchor.x - colWidth * 0.5
+      const colRight = anchor.x + colWidth * 0.5
+      // Mark the cell stamped if the stamp word overlaps the column's x-range.
+      if (stampRight >= colLeft && stampLeft <= colRight) {
+        stamped.add(i)
+      }
+    }
+  }
+
+  return stamped
 }
 
 function extractScoreInColumn(
