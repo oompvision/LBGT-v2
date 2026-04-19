@@ -23,6 +23,10 @@ export type ParseDebug = {
   anchors: Array<{ label: string; x: number }>
   nameCandidates: Array<{ text: string; x: number; y: number }>
   mergedNames: Array<{ name: string; y: number; blacklisted: boolean }>
+  // Sample of raw Vision words (first ~40 non-split tokens). Useful when
+  // anchor detection fails — tells us whether Vision is returning HOLES
+  // labels as literal strings or mangling them into something unexpected.
+  sampleWords?: Array<{ text: string; x: number; y: number }>
   // Every digit-like token between the top of the card and the HOLES row,
   // with which row (by name) it was assigned to. Helps diagnose column /
   // row misalignment on a real photo without re-running OCR.
@@ -97,6 +101,18 @@ type AnchoredColumn = {
 export function parseScorecard(response: VisionResponse): ParsedScorecard {
   const warnings: string[] = []
 
+  // Sample of raw Vision words (originals only) for debugging — populated
+  // into debug.sampleWords so we can see what Vision returned without
+  // re-running the API.
+  const rawSample = response.words
+    .filter((w) => !w.split)
+    .slice(0, 60)
+    .map((w) => ({
+      text: w.text,
+      x: Math.round(wordCenter(w).x),
+      y: Math.round(wordCenter(w).y),
+    }))
+
   const anchorResult = findColumnAnchors(response.words)
   if (!anchorResult) {
     return {
@@ -110,6 +126,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
         anchors: [],
         nameCandidates: [],
         mergedNames: [],
+        sampleWords: rawSample,
         digitTokens: [],
       },
     }
@@ -150,6 +167,7 @@ export function parseScorecard(response: VisionResponse): ParsedScorecard {
     totalWords: response.words.length,
     holesRowY: Math.round(holesRowY),
     anchors: anchors.map((a) => ({ label: a.label, x: Math.round(a.x) })),
+    sampleWords: rawSample,
     nameCandidates: rowsDebug.nameCandidates,
     mergedNames: rowsDebug.mergedNames,
     digitTokens: debugTokens,

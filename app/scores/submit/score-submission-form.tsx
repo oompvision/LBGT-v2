@@ -35,15 +35,14 @@ function toInitials(name: string): string {
   return `${first} ${last}`
 }
 
-// Preprocess a scorecard photo in the browser before upload. Three steps:
-//   1. Downscale to 2400px on the long edge (keeps it under the server-action
-//      body limit; that resolution is plenty for Vision OCR).
-//   2. Convert to grayscale so channel noise doesn't distract the OCR.
-//   3. Contrast-stretch using 2nd / 98th percentiles of the luminance
-//      histogram. Faint handwriting on a bright paper background gets pulled
-//      to pure black while background goes to white — dramatically improves
-//      detection on photos with fold shadows or uneven lighting.
-async function preprocessImage(file: File, maxEdge = 2400, quality = 0.9): Promise<File> {
+// Preprocess a scorecard photo in the browser before upload:
+//   1. Downscale to 2400px on the long edge.
+//   2. Convert to grayscale (luminance weights).
+//   3. Apply a GENTLE contrast boost around the midpoint so faint pencil on
+//      shadow-lit paper gets pushed darker without creating stark-black edges
+//      that OCR struggles with.
+// Output is PNG (lossless) to avoid JPEG ringing on the newly-sharp edges.
+async function preprocessImage(file: File, maxEdge = 2400): Promise<File> {
   const blobUrl = URL.createObjectURL(file)
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -68,49 +67,27 @@ async function preprocessImage(file: File, maxEdge = 2400, quality = 0.9): Promi
     const imageData = ctx.getImageData(0, 0, w, h)
     const data = imageData.data
 
-    // Build luminance histogram.
-    const histogram = new Array(256).fill(0)
-    for (let i = 0; i < data.length; i += 4) {
-      const l = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])
-      histogram[l]++
-    }
-
-    // Percentile bounds for the contrast stretch.
-    const total = w * h
-    const lowTarget = Math.round(total * 0.02)
-    const highTarget = Math.round(total * 0.98)
-    let acc = 0
-    let pLow = 0
-    let pHigh = 255
-    for (let v = 0; v < 256; v++) {
-      acc += histogram[v]
-      if (pLow === 0 && acc >= lowTarget) pLow = v
-      if (acc >= highTarget) {
-        pHigh = v
-        break
-      }
-    }
-    const range = Math.max(1, pHigh - pLow)
-
-    // Write back grayscale + contrast-stretched pixels.
+    // Grayscale + gentle contrast (1.3x around 128). This is conservative
+    // enough that existing-good photos aren't over-processed but still
+    // enough to help faint pencil / shadowed regions.
+    const CONTRAST = 1.3
     for (let i = 0; i < data.length; i += 4) {
       const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-      const stretched = Math.max(0, Math.min(255, Math.round(((l - pLow) * 255) / range)))
-      data[i] = stretched
-      data[i + 1] = stretched
-      data[i + 2] = stretched
+      const boosted = Math.max(0, Math.min(255, Math.round((l - 128) * CONTRAST + 128)))
+      data[i] = boosted
+      data[i + 1] = boosted
+      data[i + 2] = boosted
     }
     ctx.putImageData(imageData, 0, 0)
 
     const blob: Blob = await new Promise((resolve, reject) =>
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
-        "image/jpeg",
-        quality,
+        "image/png",
       ),
     )
-    return new File([blob], file.name.replace(/\.[^.]+$/, "") + "-preprocessed.jpg", {
-      type: "image/jpeg",
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + "-preprocessed.png", {
+      type: "image/png",
     })
   } finally {
     URL.revokeObjectURL(blobUrl)
