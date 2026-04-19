@@ -90,16 +90,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [ocrDebug, setOcrDebug] = useState<unknown>(null)
   const [preprocessSteps, setPreprocessSteps] = useState<string[]>([])
   const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
-  // A/B toggles for the server-side OCR preprocessing pipeline. Defaults
-  // match the recommended "cv2/PIL" recipe; flip individually to test which
-  // stages help most on a given scorecard photo.
-  const [ocrOptions, setOcrOptions] = useState({
-    grayscale: true,
-    perspective: false,
-    upscale: true,
-    denoise: true,
-    threshold: true,
-  })
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -182,19 +172,12 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     setIsOcring(true)
     try {
       // Just downscale to keep the upload under the server-action body limit.
-      // Real preprocessing (grayscale, denoise, adaptive threshold) runs
-      // server-side now.
+      // Server-side preprocessing is minimal now (EXIF rotation + upscale if
+      // tiny); Gemini handles the hard work from the original color image.
       const uploadFile = await downscaleForUpload(file).catch(() => file)
 
       const formData = new FormData()
       formData.append("scorecard", uploadFile)
-      // A/B toggles: send each server-side preprocess stage as its own field
-      // so we can compare runs without redeploying.
-      formData.append("opt-grayscale", ocrOptions.grayscale ? "true" : "false")
-      formData.append("opt-perspective", ocrOptions.perspective ? "true" : "false")
-      formData.append("opt-upscale", ocrOptions.upscale ? "true" : "false")
-      formData.append("opt-denoise", ocrOptions.denoise ? "true" : "false")
-      formData.append("opt-threshold", ocrOptions.threshold ? "true" : "false")
       const result = await uploadAndParseScorecard(formData)
 
       if (!result.success) {
@@ -427,42 +410,11 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
             </Alert>
           )}
 
-          <details className="rounded-md border border-dashed p-3 text-xs">
-            <summary className="cursor-pointer text-muted-foreground">
-              OCR preprocessing options (A/B test)
-            </summary>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {(
-                [
-                  ["grayscale", "Grayscale"],
-                  ["perspective", "Perspective (N/A)"],
-                  ["upscale", "Upscale ≥2000px"],
-                  ["denoise", "Denoise (median 3)"],
-                  ["threshold", "Adaptive threshold"],
-                ] as const
-              ).map(([key, label]) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-2 text-xs text-muted-foreground"
-                >
-                  <input
-                    type="checkbox"
-                    checked={ocrOptions[key]}
-                    disabled={key === "perspective" || isOcring}
-                    onChange={(e) =>
-                      setOcrOptions((prev) => ({ ...prev, [key]: e.target.checked }))
-                    }
-                  />
-                  {label}
-                </label>
-              ))}
+          {preprocessSteps.length > 0 && (
+            <div className="text-[10px] text-muted-foreground">
+              Preprocessing: {preprocessSteps.join(" → ")}
             </div>
-            {preprocessSteps.length > 0 && (
-              <div className="mt-3 text-[10px] text-muted-foreground">
-                Last run: {preprocessSteps.join(" → ")}
-              </div>
-            )}
-          </details>
+          )}
 
           {ocrWarnings.length > 0 && (
             <Alert variant="destructive">

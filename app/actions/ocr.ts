@@ -1,18 +1,17 @@
 "use server"
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { detectDocumentText } from "@/lib/ocr/vision"
-import { parseScorecard } from "@/lib/ocr/parser"
-import { preprocessImage, type PreprocessOptions } from "@/lib/ocr/preprocess"
+import { extractScorecardWithGemini } from "@/lib/ocr/gemini"
+import { preprocessImage, type PreprocessResult } from "@/lib/ocr/preprocess"
 
-// TODO: drop back to 5 once the parser is dialed in. Tuning requires many
-// upload attempts per day, and we're well inside the 1000/month free tier.
+// TODO: drop back to 5 once the Gemini pipeline is dialed in. Free tier is
+// 1500 requests/day so we're nowhere near it even at 100/user/day.
 const DAILY_LIMIT = 100
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB (phone photos can be big)
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const STORAGE_BUCKET = "scorecards"
 
 export type OcrPlayerResult = {
-  name: string // raw OCR'd name — user picks the matching player manually
+  name: string // raw name as OCR'd — user picks the matching player manually
   scores: (number | null)[] // length 18; null = couldn't read
   warnings: string[]
 }
@@ -20,31 +19,15 @@ export type OcrPlayerResult = {
 export type OcrResult =
   | {
       success: true
-      imagePath: string // storage path (not a URL) — we sign URLs on read
+      imagePath: string
       processedImagePath?: string
       preprocessSteps: string[]
       players: OcrPlayerResult[]
       warnings: string[]
-      debug?: unknown // parser diagnostic — shown in UI while the feature is new
+      // Raw Gemini JSON output, kept for UI debug panel while we evaluate.
+      debug?: unknown
     }
   | { success: false; error: string }
-
-// Parse form-data fields of the form `opt-<name>` into PreprocessOptions.
-// Anything not present falls back to module defaults.
-function parsePreprocessOptions(formData: FormData): PreprocessOptions {
-  const bool = (key: string): boolean | undefined => {
-    const v = formData.get(key)
-    if (v === null) return undefined
-    return v === "true" || v === "on" || v === "1"
-  }
-  return {
-    grayscale: bool("opt-grayscale"),
-    perspective: bool("opt-perspective"),
-    upscale: bool("opt-upscale"),
-    denoise: bool("opt-denoise"),
-    threshold: bool("opt-threshold"),
-  }
-}
 
 export async function uploadAndParseScorecard(formData: FormData): Promise<OcrResult> {
   try {
@@ -100,18 +83,17 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       }
     }
 
-    const apiKey = process.env.GOOGLE_VISION_API_KEY
+    const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      console.error("GOOGLE_VISION_API_KEY is not set")
+      console.error("GEMINI_API_KEY is not set")
       return { success: false, error: "Scorecard OCR is not configured on the server." }
     }
 
-    // Convert file to a base64 string for the Vision request and a Buffer for storage.
     const arrayBuffer = await file.arrayBuffer()
     const rawBuffer = Buffer.from(arrayBuffer)
 
-    // Upload the raw image first so we always have the source, even if OCR or
-    // preprocessing fails — makes debugging user-reported issues much easier.
+    // Save the raw image first so we always have the source, even if OCR
+    // fails — helps debug user-reported issues later.
     const ext = (file.name.split(".").pop() || "jpg").toLowerCase()
     const timestamp = Date.now()
     const imagePath = `${session.user.id}/${timestamp}.${ext}`
@@ -124,67 +106,47 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       return { success: false, error: `Failed to save image: ${uploadError.message}` }
     }
 
-    // Record the rate-limit event AFTER successful upload but BEFORE OCR, so
-    // that a spam-retrying user burns their daily quota even if OCR throws.
+    // Record the rate-limit event AFTER successful upload but BEFORE Gemini,
+    // so spam retries burn their daily quota even if extraction throws.
     await admin.from("ocr_uploads").insert({ user_id: session.user.id })
 
-    // Preprocess. Any per-step toggles arrive as form fields so the client can
-    // A/B test stages without a redeploy.
-    const preprocessOptions = parsePreprocessOptions(formData)
-    let processed
+    // Preprocess (just EXIF rotation + upscale-if-small; no grayscale/denoise).
+    let processed: PreprocessResult
     try {
-      processed = await preprocessImage(rawBuffer, preprocessOptions)
+      processed = await preprocessImage(rawBuffer)
     } catch (err: any) {
       console.error("preprocess error — falling back to raw image", err)
       processed = {
         buffer: rawBuffer,
         steps: [`preprocess failed: ${err?.message ?? "unknown"}`],
+        mimeType: file.type,
         width: 0,
         height: 0,
       }
     }
 
-    // Save the processed image alongside the raw for side-by-side comparison.
-    // Failures here are non-fatal — worst case we can't diff, but OCR still runs.
-    const processedImagePath = `${session.user.id}/${timestamp}-processed.png`
+    // Save the processed image alongside the raw for side-by-side eval.
+    // Failures here are non-fatal.
+    const processedImagePath = `${session.user.id}/${timestamp}-processed.jpg`
     const { error: processedUploadError } = await admin.storage
       .from(STORAGE_BUCKET)
       .upload(processedImagePath, processed.buffer, {
-        contentType: "image/png",
+        contentType: processed.mimeType,
         upsert: false,
       })
     if (processedUploadError) {
       console.warn("processed image upload failed:", processedUploadError)
     }
 
-    const base64 = processed.buffer.toString("base64")
-
-    // Call Vision and parse.
-    let parsed
+    // Call Gemini with a single retry on transient errors. Gemini's free tier
+    // occasionally 503s under load; one retry is usually enough.
+    let result
     try {
-      const vision = await detectDocumentText(base64, apiKey, {
-        languageHints: ["en"],
-      })
-      parsed = parseScorecard(vision)
-
-      // Always log a compact diagnostic for now — easier to tune the parser
-      // against real photos than to ask users to reproduce issues.
-      console.log("[ocr] parse summary", {
-        rawImagePath: imagePath,
-        processedImagePath,
-        preprocessSteps: processed.steps,
-        userId: session.user.id,
-        totalWords: vision.words.length,
-        playersFound: parsed.players.length,
-        warnings: parsed.warnings,
-        playerSummary: parsed.players.map((p) => ({
-          name: p.name,
-          scoresFilled: p.scores.filter((s) => s !== null).length,
-          warnings: p.warnings,
-        })),
-      })
+      result = await withRetry(() =>
+        extractScorecardWithGemini(processed.buffer, processed.mimeType, apiKey),
+      )
     } catch (err: any) {
-      console.error("Vision API / parser error:", err)
+      console.error("Gemini extraction failed:", err)
       return {
         success: false,
         error:
@@ -192,18 +154,32 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       }
     }
 
+    console.log("[ocr] gemini result", {
+      rawImagePath: imagePath,
+      processedImagePath,
+      preprocessSteps: processed.steps,
+      userId: session.user.id,
+      playersFound: result.players.length,
+      warnings: result.warnings,
+      playerSummary: result.players.map((p) => ({
+        name: p.name,
+        scoresFilled: p.scores.filter((s) => s !== null).length,
+        warnings: p.warnings,
+      })),
+    })
+
     return {
       success: true,
       imagePath,
       processedImagePath: processedUploadError ? undefined : processedImagePath,
       preprocessSteps: processed.steps,
-      players: parsed.players.map((p) => ({
+      players: result.players.map((p) => ({
         name: p.name,
         scores: p.scores,
         warnings: p.warnings,
       })),
-      warnings: parsed.warnings,
-      debug: parsed.debug,
+      warnings: result.warnings,
+      debug: result,
     }
   } catch (error: any) {
     console.error("Error in uploadAndParseScorecard:", error)
@@ -212,8 +188,6 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
 }
 
 // Produce a short-lived signed URL for a previously-uploaded scorecard image.
-// Used by the submit flow so the final saved round URL is accessible to
-// admins later; never exposes raw bucket paths.
 export async function getScorecardSignedUrl(
   imagePath: string,
 ): Promise<{ url: string } | { error: string }> {
@@ -228,5 +202,16 @@ export async function getScorecardSignedUrl(
     return { url: data.signedUrl }
   } catch (error: any) {
     return { error: error.message || "Unexpected error" }
+  }
+}
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    // One retry, no backoff — Gemini latency is already multi-second and
+    // exponential backoff would blow the server-action timeout budget.
+    console.warn("[ocr] gemini retry after first failure:", err)
+    return await fn()
   }
 }
