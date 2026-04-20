@@ -129,6 +129,15 @@ export async function extractScorecardWithGemini(
       },
     ])
   } catch (err: any) {
+    // Log everything we can about the SDK error — users see only the
+    // classified category, but Vercel logs should have the full diagnostic.
+    console.error("[ocr] Gemini SDK raw error:", {
+      name: err?.name,
+      message: err?.message,
+      status: err?.status ?? err?.code ?? err?.response?.status,
+      cause: err?.cause?.message ?? err?.cause,
+      stack: err?.stack?.split("\n").slice(0, 5).join("\n"),
+    })
     throw classifyGeminiError(err)
   }
 
@@ -199,34 +208,39 @@ export class GeminiError extends Error {
 }
 
 function classifyGeminiError(err: any): GeminiError {
+  // Pull every bit of information the SDK exposes. Different SDK versions put
+  // the actual status in different places (message, status, code, cause).
   const message = err?.message ?? String(err)
-  // SDK surfaces the HTTP status as part of the error message; fall back to
-  // pattern matching on the text since the shape isn't stable across versions.
-  if (/429|RESOURCE_EXHAUSTED|rate limit|quota/i.test(message)) {
+  const causeMessage = err?.cause?.message ?? ""
+  const status = err?.status ?? err?.code ?? err?.response?.status ?? err?.cause?.status
+  const haystack = `${message} ${causeMessage} ${status ?? ""}`
+
+  if (/429|RESOURCE_EXHAUSTED|rate limit|quota/i.test(haystack)) {
     return new GeminiError(
       "rate-limit",
-      "Gemini rate limit reached. Free tier allows a few requests per minute — wait a minute and try again.",
+      "Gemini rate limit reached. Free tier allows ~10 requests per minute — wait a minute and try again.",
     )
   }
-  if (/401|403|API key|unauthorized|permission/i.test(message)) {
+  if (/401|403|API key|unauthorized|permission/i.test(haystack)) {
     return new GeminiError(
       "auth",
       "Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel environment variables.",
     )
   }
-  if (/500|502|503|504|UNAVAILABLE|internal/i.test(message)) {
-    return new GeminiError(
-      "server",
-      `Gemini server error (${message.slice(0, 120)}). Usually transient — try again in a few seconds.`,
-    )
-  }
-  // Fetch-level network errors (timeout, connection reset, aborted). Gemini
-  // 2.5 Flash on a full scorecard image can take 10+ seconds — often what
-  // trips this on Vercel.
-  if (/fetch|network|ETIMEDOUT|ECONNRESET|aborted|timeout|Error fetching/i.test(message)) {
+  // Fetch-level failures show up as "Error fetching from ..." from the SDK,
+  // with the real HTTP status (if any) hidden in cause/response. Check the
+  // fetch-failure pattern BEFORE the 5xx regex so the user gets the more
+  // accurate "timeout — try again" message for those cases.
+  if (/fetch|network|ETIMEDOUT|ECONNRESET|aborted|timeout|Error fetching/i.test(haystack)) {
     return new GeminiError(
       "timeout",
-      "Request to Gemini timed out. Try again — this usually resolves on the second attempt.",
+      `Couldn't reach Gemini (${message.slice(0, 140)}). Gemini's free tier can be flaky — wait 30 seconds and try again.`,
+    )
+  }
+  if (/500|502|503|504|UNAVAILABLE|internal/i.test(haystack)) {
+    return new GeminiError(
+      "server",
+      `Gemini server error (${message.slice(0, 140)}). Usually transient — try again in a few seconds.`,
     )
   }
   return new GeminiError("unknown", message)
