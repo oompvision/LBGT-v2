@@ -86,13 +86,20 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [isOcring, setIsOcring] = useState(false)
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [ocrWarnings, setOcrWarnings] = useState<string[]>([])
   const [ocrDebug, setOcrDebug] = useState<unknown>(null)
   const [preprocessSteps, setPreprocessSteps] = useState<string[]>([])
   const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
   const [scorecardImageUrl, setScorecardImageUrl] = useState<string | null>(null)
+  // Whether the scorecard photo is expanded in a full-viewport overlay.
+  // We deliberately AVOID opening the image in a new tab — on mobile that
+  // wipes the current page history entry, and back-navigating loses all
+  // form input. An in-page overlay preserves state.
+  const [isImageZoomed, setIsImageZoomed] = useState(false)
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  // Pending auto-advance timer. Cleared on each keystroke so typing "1"
+  // then "0" merges into "10" instead of auto-advancing after "1".
+  const autoAdvanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Initialize player data. `ocrName` is set when scores came from OCR and is
   // shown as a hint so the user remembers which column was whose.
@@ -189,7 +196,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
   const handleScorecardUpload = async (file: File) => {
     setError(null)
-    setOcrWarnings([])
     setIsOcring(true)
     try {
       // Just downscale to keep the upload under the server-action body limit.
@@ -248,11 +254,6 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       })
       setPlayers(newPlayers)
 
-      const perPlayerWarnings = result.players.flatMap((p) =>
-        p.warnings.map((w) => `${p.name}: ${w}`),
-      )
-      setOcrWarnings([...result.warnings, ...perPlayerWarnings])
-
       toast({
         title: "Scorecard uploaded",
         description:
@@ -297,10 +298,24 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
         newPlayers[playerIndex].netScores[holeIndex] = value
       }
 
-      // Auto-advance to next hole (same player)
-      if (value.length >= 1 && holeIndex < 17) {
+      // Auto-advance to the next hole (same player). A bare "1" might be
+      // the start of "10"-"15" — wait ~750ms before advancing so the user
+      // can type the second digit. Any other single digit ("2"-"9") is
+      // unambiguous and advances immediately; "10"-"15" (already 2 chars)
+      // also advances immediately.
+      if (autoAdvanceTimer.current) clearTimeout(autoAdvanceTimer.current)
+      if (holeIndex < 17) {
+        const currentKey = `${playerIndex}-${holeIndex}`
         const nextKey = `${playerIndex}-${holeIndex + 1}`
-        setTimeout(() => inputRefs.current[nextKey]?.focus(), 50)
+        const delay = value === "1" ? 750 : 50
+        autoAdvanceTimer.current = setTimeout(() => {
+          // Only advance if the user is still on this cell — prevents
+          // stealing focus if they Tab'd or clicked away.
+          if (document.activeElement === inputRefs.current[currentKey]) {
+            inputRefs.current[nextKey]?.focus()
+          }
+          autoAdvanceTimer.current = null
+        }, delay)
       }
     } else {
       newPlayers[playerIndex].netScores[holeIndex] = ""
@@ -411,6 +426,34 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
   return (
     <div className="space-y-6">
+      {/* Fullscreen scorecard photo overlay. In-page (not a link) so tapping
+          the preview, viewing the photo, and dismissing doesn't wipe form
+          inputs via navigation. */}
+      {isImageZoomed && scorecardImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setIsImageZoomed(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            onClick={() => setIsImageZoomed(false)}
+            className="absolute top-4 right-4 rounded-full bg-white/20 p-2 text-white hover:bg-white/30"
+            aria-label="Close preview"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={scorecardImageUrl}
+            alt="Uploaded scorecard"
+            className="max-h-[95vh] max-w-[98vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -489,20 +532,19 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Review scores against the photo</AlertTitle>
               <AlertDescription>
-                Yellow cells are scores the OCR wasn't fully confident about — the value shown is its best guess. Double-check each one against the photo below and edit as needed. Pick the correct player for each column.
+                Double-check highlighted scores — they're the OCR's best guesses. Totals shown in parentheses are read from the card photo; if they don't match your computed sum, one of the scores in that row needs correcting. Pick the correct player for each column.
               </AlertDescription>
             </Alert>
           )}
 
           {scorecardImageUrl && !isOcring && (
-            // Reference image so the user can verify scores without
-            // toggling back to their camera roll. Zoom-on-click for
-            // readability on smaller screens.
-            <a
-              href={scorecardImageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block overflow-hidden rounded-md border"
+            // Reference image so the user can verify scores without toggling
+            // back to their camera roll. Tapping opens an in-page overlay
+            // (no new tab / no route change) so form inputs are preserved.
+            <button
+              type="button"
+              onClick={() => setIsImageZoomed(true)}
+              className="block w-full overflow-hidden rounded-md border"
               title="Tap to view full size"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -511,27 +553,13 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                 alt="Uploaded scorecard"
                 className="w-full max-h-[320px] object-contain bg-muted"
               />
-            </a>
+            </button>
           )}
 
           {preprocessSteps.length > 0 && (
             <div className="text-[10px] text-muted-foreground">
               Preprocessing: {preprocessSteps.join(" → ")}
             </div>
-          )}
-
-          {ocrWarnings.length > 0 && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Double-check these</AlertTitle>
-              <AlertDescription>
-                <ul className="list-disc pl-4 space-y-1">
-                  {ocrWarnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
           )}
 
           {ocrDebug !== null && (
