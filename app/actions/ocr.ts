@@ -25,6 +25,9 @@ export type OcrResult =
       success: true
       imagePath: string
       processedImagePath?: string
+      /** Short-lived signed URL for the uploaded image so the UI can show
+       *  the photo alongside the scorecard form for reference. */
+      imageUrl?: string
       preprocessSteps: string[]
       players: OcrPlayerResult[]
       warnings: string[]
@@ -190,24 +193,41 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       })),
     })
 
+    // Signed URL for the raw image so the UI can show it next to the form
+    // while the user verifies OCR results. 2-hour expiry is plenty for one
+    // scoring session.
+    const { data: signed } = await admin.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(imagePath, 60 * 60 * 2)
+
     return {
       success: true,
       imagePath,
       processedImagePath: processedUploadError ? undefined : processedImagePath,
+      imageUrl: signed?.signedUrl,
       preprocessSteps: processed.steps,
       players: result.players.map((p) => ({
         name: p.name,
         scores: p.scores,
         uncertainHoles: p.uncertainHoles,
-        warnings: p.warnings,
+        warnings: filterNoisyWarnings(p.warnings),
       })),
-      warnings: result.warnings,
+      warnings: filterNoisyWarnings(result.warnings),
       debug: result,
     }
   } catch (error: any) {
     console.error("Error in uploadAndParseScorecard:", error)
     return { success: false, error: error.message || "An unexpected error occurred" }
   }
+}
+
+// Drop warnings that don't help the user — mainly the per-player Out/In/Total
+// sum-mismatch notes Gemini emits when stamp-covered holes leave the sum
+// incomplete. The live totals at the bottom of the form already surface this
+// info in a much cleaner way; duplicating it as wall-of-text warnings buries
+// the warnings that DO matter (legitimately uncertain reads, illegible cells).
+function filterNoisyWarnings(warnings: string[]): string[] {
+  return (warnings ?? []).filter((w) => !/sum|total|sums? (match|to)/i.test(w))
 }
 
 // Produce a short-lived signed URL for a previously-uploaded scorecard image.

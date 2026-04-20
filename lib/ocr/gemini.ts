@@ -250,7 +250,7 @@ async function callModel(
             .map((h) => h - 1),
         ),
       )
-      const scores = normalizeScores(p.scores, uncertainHoles)
+      const scores = normalizeScores(p.scores)
       return {
         name: p.name,
         scores,
@@ -362,17 +362,14 @@ function classifyGeminiError(err: any): GeminiError {
 }
 
 // Coerce Gemini's scores array to exactly 18 entries of (number | null).
-// - Out-of-range integers (<1 or >15) are nulled defensively.
-// - Any slot Gemini flagged as low-confidence is nulled so the UI shows it
-//   blank. We keep the flag (in uncertainHoles) so the cell can be styled.
-function normalizeScores(
-  scores: Array<number | null>,
-  uncertainHoles: number[],
-): (number | null)[] {
-  const uncertain = new Set(uncertainHoles)
+// Out-of-range integers (<1 or >15) are nulled defensively — a real per-hole
+// score is 1-15; anything else is almost certainly a model error. We do NOT
+// null out low-confidence holes here: we keep Gemini's best guess so the UI
+// can pre-fill the cell (in yellow) and let the user verify, rather than
+// making them re-read the card from scratch.
+function normalizeScores(scores: Array<number | null>): (number | null)[] {
   const out: (number | null)[] = Array(18).fill(null)
   for (let i = 0; i < 18; i++) {
-    if (uncertain.has(i)) continue
     const v = scores[i]
     if (typeof v !== "number") continue
     if (v < 1 || v > 15) continue

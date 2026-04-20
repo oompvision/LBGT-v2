@@ -377,6 +377,7 @@ export async function getRoundDetails(roundId: string) {
         id,
         date,
         submitted_by,
+        scorecard_image_url,
         users (
           name
         )

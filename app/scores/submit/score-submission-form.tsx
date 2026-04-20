@@ -90,6 +90,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
   const [ocrDebug, setOcrDebug] = useState<unknown>(null)
   const [preprocessSteps, setPreprocessSteps] = useState<string[]>([])
   const [scorecardImagePath, setScorecardImagePath] = useState<string | null>(null)
+  const [scorecardImageUrl, setScorecardImageUrl] = useState<string | null>(null)
   const supabase = createClient()
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -207,6 +208,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       }
 
       setScorecardImagePath(result.imagePath)
+      setScorecardImageUrl(result.imageUrl ?? null)
 
       // Seed the form with up to 4 OCR'd rows; any remaining slots stay blank
       // so the user can still add more manually if needed.
@@ -293,17 +295,34 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     return filled.reduce((sum, score) => sum + Number.parseInt(score), 0)
   }
 
+  // A column "has scores" if ANY of its 18 inputs are filled. For every such
+  // column, the form is only valid if:
+  //   - a player has been selected for it, AND
+  //   - all 18 holes have a score entered.
+  // Empty columns are ignored (you don't have to use all 4 slots).
+  const validation = (() => {
+    const scored = activePlayers.filter((p) => p.scores.some((s) => s !== ""))
+    if (scored.length === 0) {
+      return { ok: false as const, reason: "Enter scores for at least one player." }
+    }
+    const missingPlayer = scored.some((p) => !p.userId)
+    if (missingPlayer) {
+      return { ok: false as const, reason: "Pick a player for every column that has scores." }
+    }
+    const incomplete = scored.some((p) => p.scores.some((s) => s === ""))
+    if (incomplete) {
+      return { ok: false as const, reason: "Fill in every hole for each scored player (18 scores each)." }
+    }
+    return { ok: true as const, reason: "" }
+  })()
+
   const handleSubmit = async () => {
     setError(null)
 
-    const hasScores = activePlayers.some(
-      (player) => player.userId && player.scores.some((score) => score !== ""),
-    )
-
-    if (!hasScores) {
+    if (!validation.ok) {
       toast({
         title: "Validation Error",
-        description: "Please enter scores for at least one player",
+        description: validation.reason,
         variant: "destructive",
       })
       return
@@ -423,11 +442,31 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
           {scorecardImagePath && !isOcring && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Match each column to the right player</AlertTitle>
+              <AlertTitle>Review scores against the photo</AlertTitle>
               <AlertDescription>
-                We've pre-filled scores from your photo. Pick the correct player for each column below — the OCR'd name is shown as a hint. Blank cells and yellow-highlighted cells need your input (yellow means the OCR wasn't confident; double-check those).
+                Yellow cells are scores the OCR wasn't fully confident about — the value shown is its best guess. Double-check each one against the photo below and edit as needed. Pick the correct player for each column.
               </AlertDescription>
             </Alert>
+          )}
+
+          {scorecardImageUrl && !isOcring && (
+            // Reference image so the user can verify scores without
+            // toggling back to their camera roll. Zoom-on-click for
+            // readability on smaller screens.
+            <a
+              href={scorecardImageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block overflow-hidden rounded-md border"
+              title="Tap to view full size"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={scorecardImageUrl}
+                alt="Uploaded scorecard"
+                className="w-full max-h-[320px] object-contain bg-muted"
+              />
+            </a>
           )}
 
           {preprocessSteps.length > 0 && (
@@ -626,16 +665,25 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
           <Button variant="outline" onClick={() => router.push("/dashboard")} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="text-white">
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit Scores"
+          <div className="flex flex-col items-end gap-1">
+            {!validation.ok && (
+              <span className="text-xs text-muted-foreground">{validation.reason}</span>
             )}
-          </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !validation.ok}
+              className="text-white"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Scores"
+              )}
+            </Button>
+          </div>
         </CardFooter>
       </Card>
     </div>
