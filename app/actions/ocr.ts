@@ -1,11 +1,11 @@
 "use server"
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { extractScorecardWithGemini, GeminiError } from "@/lib/ocr/gemini"
+import { extractScorecardWithClaude, ClaudeError } from "@/lib/ocr/claude"
 import { preprocessImage, type PreprocessResult } from "@/lib/ocr/preprocess"
 
-// TODO: drop back to 5 once the Gemini pipeline is dialed in. Free tier is
-// 1500 requests/day so we're nowhere near it even at 100/user/day.
+// TODO: drop back to 5 once the pipeline is dialed in. At ~$0.01/call on
+// Sonnet 4.6, 100/user/day is still pennies even if someone goes wild.
 const DAILY_LIMIT = 100
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const STORAGE_BUCKET = "scorecards"
@@ -90,9 +90,9 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       }
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      console.error("GEMINI_API_KEY is not set")
+      console.error("ANTHROPIC_API_KEY is not set")
       return { success: false, error: "Scorecard OCR is not configured on the server." }
     }
 
@@ -145,32 +145,24 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       console.warn("processed image upload failed:", processedUploadError)
     }
 
-    // Call Gemini. The library already falls through a chain of models
-    // (flash → flash-lite → pro) on server/timeout/not-available errors,
-    // so an outer retry loop on top would just multiply latency without
-    // helping. Any error that reaches us here means all three models
-    // failed — retrying the whole chain 4 seconds later won't change that.
+    // Call Claude Sonnet 4.6. The Anthropic SDK auto-retries 429s and 5xx
+    // errors with exponential backoff (max_retries=2 default) — we don't
+    // need our own retry loop.
     let result
     try {
-      result = await extractScorecardWithGemini(
+      result = await extractScorecardWithClaude(
         processed.buffer,
         processed.mimeType,
         apiKey,
       )
     } catch (err: any) {
-      console.error("Gemini extraction failed:", {
+      console.error("Claude extraction failed:", {
         name: err?.name,
         category: err?.category,
         message: err?.message,
       })
-      if (err instanceof GeminiError) {
-        // Overload seen on every model at once is rare but real. Tell the
-        // user something actionable rather than the raw SDK message.
-        const userMessage =
-          err.category === "server" || err.category === "timeout"
-            ? "Gemini is overloaded right now (we tried 3 model tiers). Please wait a few minutes and try again, or fill out the form manually."
-            : err.message
-        return { success: false, error: userMessage }
+      if (err instanceof ClaudeError) {
+        return { success: false, error: err.message }
       }
       return {
         success: false,
@@ -179,11 +171,13 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       }
     }
 
-    console.log("[ocr] gemini result", {
+    console.log("[ocr] claude result", {
       rawImagePath: imagePath,
       processedImagePath,
       preprocessSteps: processed.steps,
       userId: session.user.id,
+      modelUsed: result.modelUsed,
+      tokenUsage: result.tokenUsage,
       playersFound: result.players.length,
       warnings: result.warnings,
       playerSummary: result.players.map((p) => ({
