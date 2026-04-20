@@ -228,7 +228,8 @@ async function extractWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
     } catch (err) {
       lastErr = err
       const shouldRetry =
-        err instanceof GeminiError && (err.category === "server" || err.category === "rate-limit")
+        err instanceof GeminiError &&
+        (err.category === "server" || err.category === "rate-limit" || err.category === "timeout")
       if (!shouldRetry || attempt === delays.length) throw err
       console.warn(
         `[ocr] gemini attempt ${attempt + 1} failed (${err.category}), retrying in ${delays[attempt]}ms`,

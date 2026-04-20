@@ -1,5 +1,10 @@
 export const dynamic = "force-dynamic"
 
+// Server action on this page calls Gemini 2.5 Flash, which typically takes
+// 5–15s for a full scorecard image. Default server action timeout is 10s,
+// so we need to bump this. 60s is the max on Vercel Hobby tier.
+export const maxDuration = 60
+
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { getAllUsers } from "@/app/actions/scores"

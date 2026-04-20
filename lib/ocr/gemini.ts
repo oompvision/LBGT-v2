@@ -179,7 +179,14 @@ export async function extractScorecardWithGemini(
 
 // Categorize errors from the Gemini SDK so the caller can translate each
 // category into a useful user-facing message and decide whether to retry.
-export type GeminiErrorCategory = "rate-limit" | "auth" | "server" | "parse" | "empty" | "unknown"
+export type GeminiErrorCategory =
+  | "rate-limit"
+  | "auth"
+  | "server"
+  | "timeout"
+  | "parse"
+  | "empty"
+  | "unknown"
 
 export class GeminiError extends Error {
   constructor(
@@ -211,6 +218,15 @@ function classifyGeminiError(err: any): GeminiError {
     return new GeminiError(
       "server",
       `Gemini server error (${message.slice(0, 120)}). Usually transient — try again in a few seconds.`,
+    )
+  }
+  // Fetch-level network errors (timeout, connection reset, aborted). Gemini
+  // 2.5 Flash on a full scorecard image can take 10+ seconds — often what
+  // trips this on Vercel.
+  if (/fetch|network|ETIMEDOUT|ECONNRESET|aborted|timeout|Error fetching/i.test(message)) {
+    return new GeminiError(
+      "timeout",
+      "Request to Gemini timed out. Try again — this usually resolves on the second attempt.",
     )
   }
   return new GeminiError("unknown", message)
