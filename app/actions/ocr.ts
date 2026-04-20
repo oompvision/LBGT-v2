@@ -13,6 +13,10 @@ const STORAGE_BUCKET = "scorecards"
 export type OcrPlayerResult = {
   name: string // raw name as OCR'd — user picks the matching player manually
   scores: (number | null)[] // length 18; null = couldn't read
+  // 0-indexed hole positions the OCR model flagged as low-confidence. These
+  // are always null in `scores`; the UI highlights the cell so the user knows
+  // to fill it in / double-check rather than silently accepting a guess.
+  uncertainHoles: number[]
   warnings: string[]
 }
 
@@ -176,6 +180,7 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       players: result.players.map((p) => ({
         name: p.name,
         scores: p.scores,
+        uncertainHoles: p.uncertainHoles,
         warnings: p.warnings,
       })),
       warnings: result.warnings,

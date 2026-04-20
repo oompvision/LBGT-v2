@@ -22,10 +22,18 @@ CRITICAL — when to return null for a hole:
 Never guess. A wrong number is worse than null. If you are even a little unsure,
 return null and add a warning. The user will fill in blanks manually.
 
+For each player, ALSO return a "lowConfidenceHoles" array listing the hole
+numbers (1-18) where your confidence in the score is below ~90% — i.e., you
+had to look carefully, the digit is ambiguous (e.g. could be 4 or 9, 6 or 0,
+3 or 8), or the writing is partially smudged. Be honest about this — the UI
+will highlight those cells so the user can verify them. Only include holes
+where you DID return a number; don't list nulls.
+
 If the card shows Out (holes 1-9), In (holes 10-18), or Total, verify your
 per-hole numbers sum correctly and flag mismatches in the warnings array.
 A sum mismatch usually means one of your per-hole numbers is wrong — double
-check before returning it.
+check before returning it, and if you're still uncertain, return null for the
+ambiguous hole.
 
 The scorecard has up to 4 player rows. Each row has a handwritten name on
 the left and 18 hole scores across. Output the players in the order they
@@ -38,6 +46,10 @@ export type GeminiScorecardResult = {
   players: Array<{
     name: string
     scores: (number | null)[] // exactly length 18
+    // 0-indexed hole positions Gemini flagged as low-confidence. The score
+    // value is always null for these — we drop Gemini's best guess and let
+    // the user fill in manually, with the cell highlighted in the UI.
+    uncertainHoles: number[]
     warnings: string[]
   }>
   warnings: string[] // scorecard-level warnings
@@ -64,12 +76,19 @@ const RESPONSE_SCHEMA: Schema = {
               nullable: true,
             },
           },
+          lowConfidenceHoles: {
+            type: SchemaType.ARRAY,
+            // 1-indexed hole numbers (1-18) where Gemini's confidence is
+            // <~90%. We null those scores in the adapter and highlight them
+            // in the UI so the user verifies / re-enters them.
+            items: { type: SchemaType.INTEGER },
+          },
           warnings: {
             type: SchemaType.ARRAY,
             items: { type: SchemaType.STRING },
           },
         },
-        required: ["name", "scores", "warnings"],
+        required: ["name", "scores", "lowConfidenceHoles", "warnings"],
       },
     },
     warnings: {
@@ -113,27 +132,47 @@ export async function extractScorecardWithGemini(
     players: Array<{
       name: string
       scores: Array<number | null>
+      lowConfidenceHoles?: number[]
       warnings: string[]
     }>
     warnings: string[]
   }
 
   return {
-    players: parsed.players.map((p) => ({
-      name: p.name,
-      scores: normalizeScores(p.scores),
-      warnings: Array.isArray(p.warnings) ? p.warnings : [],
-    })),
+    players: parsed.players.map((p) => {
+      // Convert 1-indexed hole numbers from Gemini into 0-indexed slot
+      // positions for the UI, and drop any that are out of range.
+      const uncertainHoles = Array.from(
+        new Set(
+          (p.lowConfidenceHoles ?? [])
+            .filter((h): h is number => typeof h === "number" && h >= 1 && h <= 18)
+            .map((h) => h - 1),
+        ),
+      )
+      const scores = normalizeScores(p.scores, uncertainHoles)
+      return {
+        name: p.name,
+        scores,
+        uncertainHoles,
+        warnings: Array.isArray(p.warnings) ? p.warnings : [],
+      }
+    }),
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
   }
 }
 
 // Coerce Gemini's scores array to exactly 18 entries of (number | null).
-// Clamps out-of-range integers to null defensively — a real per-hole score
-// is 1-15; anything else is almost certainly a model error.
-function normalizeScores(scores: Array<number | null>): (number | null)[] {
+// - Out-of-range integers (<1 or >15) are nulled defensively.
+// - Any slot Gemini flagged as low-confidence is nulled so the UI shows it
+//   blank. We keep the flag (in uncertainHoles) so the cell can be styled.
+function normalizeScores(
+  scores: Array<number | null>,
+  uncertainHoles: number[],
+): (number | null)[] {
+  const uncertain = new Set(uncertainHoles)
   const out: (number | null)[] = Array(18).fill(null)
   for (let i = 0; i < 18; i++) {
+    if (uncertain.has(i)) continue
     const v = scores[i]
     if (typeof v !== "number") continue
     if (v < 1 || v > 15) continue

@@ -95,8 +95,17 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
   // Initialize player data. `ocrName` is set when scores came from OCR and is
   // shown as a hint so the user remembers which column was whose.
+  // `uncertainHoles` is the set of 0-indexed holes the OCR model flagged as
+  // low-confidence — those cells stay blank and get a yellow border so the
+  // user fills them in manually rather than accepting a shaky guess.
   const [players, setPlayers] = useState<
-    { userId: string; scores: string[]; netScores: string[]; ocrName?: string }[]
+    {
+      userId: string
+      scores: string[]
+      netScores: string[]
+      ocrName?: string
+      uncertainHoles?: Set<number>
+    }[]
   >([
     { userId: currentUserId, scores: Array(18).fill(""), netScores: Array(18).fill("") },
     { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") },
@@ -163,6 +172,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     newPlayers[index].scores = Array(18).fill("")
     newPlayers[index].netScores = Array(18).fill("")
     newPlayers[index].ocrName = undefined
+    newPlayers[index].uncertainHoles = undefined
     setPlayers(newPlayers)
   }
 
@@ -211,6 +221,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
           scores,
           netScores: scores.slice(), // no handicap until user picks a player
           ocrName: ocr.name,
+          uncertainHoles: new Set(ocr.uncertainHoles ?? []),
         }
       })
       setPlayers(newPlayers)
@@ -238,6 +249,15 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
     const newPlayers = [...players]
     newPlayers[playerIndex].scores[holeIndex] = value
+
+    // Once the user types into a cell the OCR flagged as uncertain, it's no
+    // longer uncertain — clear the highlight.
+    const uncertain = newPlayers[playerIndex].uncertainHoles
+    if (uncertain?.has(holeIndex)) {
+      const next = new Set(uncertain)
+      next.delete(holeIndex)
+      newPlayers[playerIndex].uncertainHoles = next
+    }
 
     if (value !== "") {
       const userId = newPlayers[playerIndex].userId
@@ -405,7 +425,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Match each column to the right player</AlertTitle>
               <AlertDescription>
-                We've pre-filled scores from your photo. Pick the correct player for each column below — the OCR'd name is shown as a hint. Fill in any blank cells before submitting.
+                We've pre-filled scores from your photo. Pick the correct player for each column below — the OCR'd name is shown as a hint. Blank cells and yellow-highlighted cells need your input (yellow means the OCR wasn't confident; double-check those).
               </AlertDescription>
             </Alert>
           )}
@@ -505,19 +525,27 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                     <td className="px-1 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
                       {COURSE_DATA.pars[holeIndex]}
                     </td>
-                    {activePlayers.map((player, pIdx) => (
-                      <td key={pIdx} className="px-0.5 py-0.5 text-center">
-                        <Input
-                          ref={(el) => { inputRefs.current[`${pIdx}-${holeIndex}`] = el }}
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={player.scores[holeIndex]}
-                          onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
-                          className="h-9 w-full text-center text-sm px-0"
-                          disabled={!player.userId || isSubmitting}
-                        />
-                      </td>
-                    ))}
+                    {activePlayers.map((player, pIdx) => {
+                      const uncertain = player.uncertainHoles?.has(holeIndex) ?? false
+                      return (
+                        <td key={pIdx} className="px-0.5 py-0.5 text-center">
+                          <Input
+                            ref={(el) => { inputRefs.current[`${pIdx}-${holeIndex}`] = el }}
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={player.scores[holeIndex]}
+                            onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
+                            className={cn(
+                              "h-9 w-full text-center text-sm px-0",
+                              uncertain &&
+                                "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
+                            )}
+                            title={uncertain ? "OCR wasn't confident — please enter manually" : undefined}
+                            disabled={!player.userId || isSubmitting}
+                          />
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
 
@@ -544,19 +572,27 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                       <td className="px-1 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
                         {COURSE_DATA.pars[holeIndex]}
                       </td>
-                      {activePlayers.map((player, pIdx) => (
-                        <td key={pIdx} className="px-0.5 py-0.5 text-center">
-                          <Input
-                            ref={(el) => { inputRefs.current[`${pIdx}-${holeIndex}`] = el }}
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={player.scores[holeIndex]}
-                            onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
-                            className="h-9 w-full text-center text-sm px-0"
-                            disabled={!player.userId || isSubmitting}
-                          />
-                        </td>
-                      ))}
+                      {activePlayers.map((player, pIdx) => {
+                        const uncertain = player.uncertainHoles?.has(holeIndex) ?? false
+                        return (
+                          <td key={pIdx} className="px-0.5 py-0.5 text-center">
+                            <Input
+                              ref={(el) => { inputRefs.current[`${pIdx}-${holeIndex}`] = el }}
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={player.scores[holeIndex]}
+                              onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
+                              className={cn(
+                                "h-9 w-full text-center text-sm px-0",
+                                uncertain &&
+                                  "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
+                              )}
+                              title={uncertain ? "OCR wasn't confident — please enter manually" : undefined}
+                              disabled={!player.userId || isSubmitting}
+                            />
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                 })}
