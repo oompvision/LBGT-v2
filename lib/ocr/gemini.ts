@@ -8,18 +8,18 @@
 
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai"
 
-// Try the best model first; if it's overloaded or otherwise unavailable,
-// fall through to the next. Each model lives on separate infrastructure, so
-// an overload on 2.5-flash doesn't imply 2.5-flash-lite is also struggling.
-// - gemini-2.5-flash: primary. Best accuracy, most commonly overloaded.
-// - gemini-2.5-flash-lite: cheaper/lighter variant of 2.5 flash. Good fallback.
-// - gemini-2.5-pro: last resort. Higher quality, higher cost, almost always
-//   available — only used if both flash tiers are down.
-const MODEL_FALLBACK_ORDER = [
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-pro",
-] as const
+// Try the best model first; if it's overloaded, deprecated, or returns
+// garbage, fall through to the next. Each model lives on separate
+// infrastructure, so an overload on 2.5-flash doesn't imply 2.5-pro is
+// also struggling.
+// - gemini-2.5-flash: primary. Best price/performance for this task.
+// - gemini-2.5-pro: fallback. Higher quality and almost always available,
+//   at ~3-4x the cost per call (still pennies at our volume).
+// NOTE: gemini-2.5-flash-lite is intentionally NOT in this chain. In
+// testing it accepted the image but returned every score as null with
+// fabricated sum-mismatch warnings — too small a model for handwritten
+// table OCR.
+const MODEL_FALLBACK_ORDER = ["gemini-2.5-flash", "gemini-2.5-pro"] as const
 type ModelId = (typeof MODEL_FALLBACK_ORDER)[number]
 
 const SYSTEM_PROMPT = `You are extracting data from a handwritten golf scorecard photo.
@@ -121,13 +121,25 @@ export async function extractScorecardWithGemini(
 ): Promise<GeminiScorecardResult> {
   const client = new GoogleGenerativeAI(apiKey)
 
-  // Try each model in order. On "server" (overloaded), "timeout", or
-  // "not-available" (model deprecated/404), fall through to the next model.
+  // Try each model in order. On "server" (overloaded), "timeout",
+  // "not-available" (404), or a schema-valid-but-useless response (all
+  // scores null across every player), fall through to the next model.
   // Rate-limit / auth / parse errors are fatal — another model won't help.
   let lastError: GeminiError | undefined
   for (const modelId of MODEL_FALLBACK_ORDER) {
     try {
-      return await callModel(client, modelId, imageBuffer, mimeType)
+      const result = await callModel(client, modelId, imageBuffer, mimeType)
+      if (isAllNullResult(result)) {
+        console.warn(
+          `[ocr] model ${modelId} returned schema-valid but empty result (all scores null), falling back`,
+        )
+        lastError = new GeminiError(
+          "empty",
+          `${modelId} returned no readable scores`,
+        )
+        continue
+      }
+      return result
     } catch (err) {
       const geminiErr = err instanceof GeminiError ? err : classifyGeminiError(err)
       lastError = geminiErr
@@ -143,6 +155,15 @@ export async function extractScorecardWithGemini(
   }
 
   throw lastError ?? new GeminiError("unknown", "All Gemini models failed")
+}
+
+// A schema-valid response with zero filled-in scores almost certainly means
+// the model couldn't actually read the card (e.g. Flash-Lite on a handwritten
+// table). We prefer to try a stronger model rather than showing the user a
+// completely-blank form with confusing warnings.
+function isAllNullResult(result: GeminiScorecardResult): boolean {
+  if (result.players.length === 0) return true
+  return result.players.every((p) => p.scores.every((s) => s === null))
 }
 
 async function callModel(
