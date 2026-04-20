@@ -351,7 +351,10 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   }
 
   // Get round details
-  const { scores } = (await getRoundDetails(resolvedParams.id)) as { scores: RoundScore[] }
+  const { scores, round } = (await getRoundDetails(resolvedParams.id)) as {
+    scores: RoundScore[]
+    round: { scorecard_image_url?: string | null } | null
+  }
 
   if (!scores || scores.length === 0) {
     return notFound()
@@ -360,6 +363,7 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   // Get round date and submitter from the first score
   const roundDate = scores[0].rounds.date
   const submittedBy = scores[0].rounds.users.name
+  const scorecardImageUrl = round?.scorecard_image_url ?? null
 
   // Check if we came from a player stats page
   const fromPlayer = resolvedSearchParams?.from === "player"
@@ -397,6 +401,32 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
               </div>
             </div>
           </div>
+
+          {scorecardImageUrl && (
+            // The photo the round was submitted with — useful for settling
+            // disputes or verifying unusual scores.
+            <Card className="mb-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Original Scorecard Photo</CardTitle>
+                <CardDescription>Tap to view full size</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <a
+                  href={scorecardImageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block overflow-hidden rounded-md border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={scorecardImageUrl}
+                    alt="Original scorecard photo"
+                    className="w-full max-h-[480px] object-contain bg-muted"
+                  />
+                </a>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Mobile vertical scorecard */}
           <Card className="block md:hidden">

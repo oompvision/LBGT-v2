@@ -12,6 +12,7 @@ export async function submitScores(
     netScores?: number[]
     strokesGiven?: number
   }[],
+  scorecardImagePath?: string | null,
 ) {
   try {
     const supabase = await createClient()
@@ -78,6 +79,18 @@ export async function submitScores(
 
     const currentSeason = activeSeason?.year || 2025
 
+    // Resolve a signed URL for the uploaded scorecard image (if any) so we
+    // store a ready-to-use link rather than a bucket path.
+    let scorecardImageUrl: string | null = null
+    if (scorecardImagePath) {
+      const { createAdminClient } = await import("@/lib/supabase/server")
+      const admin = createAdminClient()
+      const { data: signed } = await admin.storage
+        .from("scorecards")
+        .createSignedUrl(scorecardImagePath, 60 * 60 * 24 * 365) // 1 year
+      scorecardImageUrl = signed?.signedUrl ?? null
+    }
+
     // Create a new round
     const { data: round, error: roundError } = await supabase
       .from("rounds")
@@ -85,6 +98,7 @@ export async function submitScores(
         date,
         submitted_by: session.user.id,
         season: currentSeason,
+        scorecard_image_url: scorecardImageUrl,
       })
       .select()
       .single()
@@ -363,6 +377,7 @@ export async function getRoundDetails(roundId: string) {
         id,
         date,
         submitted_by,
+        scorecard_image_url,
         users (
           name
         )

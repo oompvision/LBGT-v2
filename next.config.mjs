@@ -13,6 +13,12 @@ const nextConfig = {
     // No eslint.config.js exists yet — enable once ESLint is configured
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // Scorecard photo uploads from phones routinely exceed the 1 MB default.
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
 }
 
 export default nextConfig
