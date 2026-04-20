@@ -211,19 +211,26 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       setScorecardImageUrl(result.imageUrl ?? null)
 
       // Seed the form with up to 4 OCR'd rows; any remaining slots stay blank
-      // so the user can still add more manually if needed.
+      // so the user can still add more manually if needed. Uncertain cells
+      // (yellow in the UI) are the UNION of holes Gemini flagged as low-
+      // confidence AND holes it couldn't read at all (null score) — a
+      // stamped/unreadable cell is exactly the kind of thing the user
+      // needs to fill in and should be visually findable.
       const newPlayers = Array.from({ length: 4 }, (_, i) => {
         const ocr = result.players[i]
         if (!ocr) {
           return { userId: "", scores: Array(18).fill(""), netScores: Array(18).fill("") }
         }
         const scores = ocr.scores.map((s) => (s === null ? "" : String(s)))
+        const nullHoles = ocr.scores
+          .map((s, idx) => (s === null ? idx : -1))
+          .filter((idx) => idx >= 0)
         return {
           userId: "",
           scores,
           netScores: scores.slice(), // no handicap until user picks a player
           ocrName: ocr.name,
-          uncertainHoles: new Set(ocr.uncertainHoles ?? []),
+          uncertainHoles: new Set<number>([...(ocr.uncertainHoles ?? []), ...nullHoles]),
         }
       })
       setPlayers(newPlayers)
@@ -503,21 +510,23 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       </Card>
 
       {/* Scorecard */}
-      <Card>
+      {/* Break out of the parent container's 16px mobile side-padding so the
+           scorecard uses full viewport width and all 4 player columns fit
+           without horizontal scroll. */}
+      <Card className="-mx-4 sm:mx-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Scorecard</CardTitle>
           <CardDescription>Enter scores for each hole</CardDescription>
         </CardHeader>
-        <CardContent className="px-0 sm:px-6">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              {/* Sticky header with player selectors */}
-              <thead className="sticky top-0 z-10 bg-background">
+        <CardContent className="px-1 sm:px-6">
+          <table className="w-full text-sm border-collapse table-fixed">
+            {/* Sticky header with player selectors */}
+            <thead className="sticky top-0 z-10 bg-background">
                 <tr className="border-b">
-                  <th className="px-2 sm:px-3 py-2 text-left font-medium text-muted-foreground w-12">Hole</th>
-                  <th className="px-1 sm:px-2 py-2 text-center font-medium text-muted-foreground w-10">Par</th>
+                  <th className="px-0.5 sm:px-3 py-2 text-left font-medium text-muted-foreground w-[34px] sm:w-12">Hole</th>
+                  <th className="px-0.5 sm:px-2 py-2 text-center font-medium text-muted-foreground w-[28px] sm:w-10">Par</th>
                   {activePlayers.map((player, pIdx) => (
-                    <th key={pIdx} className="px-1 py-1 text-center w-12 align-top">
+                    <th key={pIdx} className="px-0.5 sm:px-1 py-1 text-center align-top">
                       {player.userId ? (
                         <button
                           type="button"
@@ -560,8 +569,8 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                 {/* Front 9 */}
                 {COURSE_DATA.holes.slice(0, 9).map((hole, holeIndex) => (
                   <tr key={holeIndex} className="border-b">
-                    <td className="px-2 sm:px-3 py-1.5 text-center font-medium text-sm">{hole}</td>
-                    <td className="px-1 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
+                    <td className="px-0.5 sm:px-3 py-1.5 text-center font-medium text-sm">{hole}</td>
+                    <td className="px-0.5 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
                       {COURSE_DATA.pars[holeIndex]}
                     </td>
                     {activePlayers.map((player, pIdx) => {
@@ -575,7 +584,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                             value={player.scores[holeIndex]}
                             onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
                             className={cn(
-                              "h-9 w-full text-center text-sm px-0",
+                              "h-8 sm:h-9 w-full text-center text-sm px-0 min-w-0",
                               uncertain &&
                                 "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
                             )}
@@ -590,10 +599,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
                 {/* OUT subtotal */}
                 <tr className="border-b-2 border-t bg-muted/50 font-medium">
-                  <td className="px-2 sm:px-3 py-2 text-center text-sm">Out</td>
-                  <td className="px-1 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.frontNinePar}</td>
+                  <td className="px-0.5 sm:px-3 py-2 text-center text-sm">Out</td>
+                  <td className="px-0.5 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.frontNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
-                    <td key={pIdx} className="px-1 py-2 text-center text-sm font-semibold">
+                    <td key={pIdx} className="px-0.5 sm:px-1 py-2 text-center text-sm font-semibold">
                       {calculateTotal(player.scores, 0, 9)}
                     </td>
                   ))}
@@ -607,8 +616,8 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   const holeIndex = i + 9
                   return (
                     <tr key={holeIndex} className="border-b">
-                      <td className="px-2 sm:px-3 py-1.5 text-center font-medium text-sm">{hole}</td>
-                      <td className="px-1 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
+                      <td className="px-0.5 sm:px-3 py-1.5 text-center font-medium text-sm">{hole}</td>
+                      <td className="px-0.5 sm:px-2 py-1.5 text-center text-muted-foreground text-sm">
                         {COURSE_DATA.pars[holeIndex]}
                       </td>
                       {activePlayers.map((player, pIdx) => {
@@ -622,7 +631,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                               value={player.scores[holeIndex]}
                               onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
                               className={cn(
-                                "h-9 w-full text-center text-sm px-0",
+                                "h-8 sm:h-9 w-full text-center text-sm px-0 min-w-0",
                                 uncertain &&
                                   "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
                               )}
@@ -638,10 +647,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
                 {/* IN subtotal */}
                 <tr className="border-b-2 border-t bg-muted/50 font-medium">
-                  <td className="px-2 sm:px-3 py-2 text-center text-sm">In</td>
-                  <td className="px-1 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.backNinePar}</td>
+                  <td className="px-0.5 sm:px-3 py-2 text-center text-sm">In</td>
+                  <td className="px-0.5 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.backNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
-                    <td key={pIdx} className="px-1 py-2 text-center text-sm font-semibold">
+                    <td key={pIdx} className="px-0.5 sm:px-1 py-2 text-center text-sm font-semibold">
                       {calculateTotal(player.scores, 9, 18)}
                     </td>
                   ))}
@@ -649,26 +658,31 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
 
                 {/* TOTAL */}
                 <tr className="bg-muted font-bold">
-                  <td className="px-2 sm:px-3 py-2.5 text-center text-sm">Total</td>
-                  <td className="px-1 sm:px-2 py-2.5 text-center text-sm">{COURSE_DATA.totalPar}</td>
+                  <td className="px-0.5 sm:px-3 py-2.5 text-center text-sm">Total</td>
+                  <td className="px-0.5 sm:px-2 py-2.5 text-center text-sm">{COURSE_DATA.totalPar}</td>
                   {activePlayers.map((player, pIdx) => (
-                    <td key={pIdx} className="px-1 py-2.5 text-center text-base font-bold">
+                    <td key={pIdx} className="px-0.5 sm:px-1 py-2.5 text-center text-base font-bold">
                       {calculateTotal(player.scores, 0, 18)}
                     </td>
                   ))}
                 </tr>
               </tbody>
             </table>
-          </div>
         </CardContent>
-        <CardFooter className="flex justify-between pt-4">
-          <Button variant="outline" onClick={() => router.push("/dashboard")} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <div className="flex flex-col items-end gap-1">
-            {!validation.ok && (
-              <span className="text-xs text-muted-foreground">{validation.reason}</span>
-            )}
+        <CardFooter className="flex flex-col gap-3 pt-4">
+          {!validation.ok && (
+            <span className="w-full text-center text-xs text-muted-foreground sm:text-right">
+              {validation.reason}
+            </span>
+          )}
+          <div className="flex w-full items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/dashboard")}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting || !validation.ok}
