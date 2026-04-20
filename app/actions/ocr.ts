@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { extractScorecardWithGemini } from "@/lib/ocr/gemini"
+import { extractScorecardWithGemini, GeminiError } from "@/lib/ocr/gemini"
 import { preprocessImage, type PreprocessResult } from "@/lib/ocr/preprocess"
 
 // TODO: drop back to 5 once the Gemini pipeline is dialed in. Free tier is
@@ -142,15 +142,22 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       console.warn("processed image upload failed:", processedUploadError)
     }
 
-    // Call Gemini with a single retry on transient errors. Gemini's free tier
-    // occasionally 503s under load; one retry is usually enough.
+    // Call Gemini with backoff on transient errors (server 5xx / rate limit).
+    // For auth / parse / unknown we fail fast — retrying won't help.
     let result
     try {
-      result = await withRetry(() =>
+      result = await extractWithBackoff(() =>
         extractScorecardWithGemini(processed.buffer, processed.mimeType, apiKey),
       )
     } catch (err: any) {
-      console.error("Gemini extraction failed:", err)
+      console.error("Gemini extraction failed:", {
+        name: err?.name,
+        category: err?.category,
+        message: err?.message,
+      })
+      if (err instanceof GeminiError) {
+        return { success: false, error: err.message }
+      }
       return {
         success: false,
         error:
@@ -210,13 +217,24 @@ export async function getScorecardSignedUrl(
   }
 }
 
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn()
-  } catch (err) {
-    // One retry, no backoff — Gemini latency is already multi-second and
-    // exponential backoff would blow the server-action timeout budget.
-    console.warn("[ocr] gemini retry after first failure:", err)
-    return await fn()
+// Retry transient Gemini failures (server 5xx + rate limit) with backoff.
+// Auth / parse / unknown errors fail fast — retrying won't help.
+async function extractWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
+  const delays = [1_500, 4_000] // two retries: 1.5s, then 4s
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      const shouldRetry =
+        err instanceof GeminiError && (err.category === "server" || err.category === "rate-limit")
+      if (!shouldRetry || attempt === delays.length) throw err
+      console.warn(
+        `[ocr] gemini attempt ${attempt + 1} failed (${err.category}), retrying in ${delays[attempt]}ms`,
+      )
+      await new Promise((r) => setTimeout(r, delays[attempt]))
+    }
   }
+  throw lastErr
 }

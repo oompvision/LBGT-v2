@@ -115,27 +115,43 @@ export async function extractScorecardWithGemini(
     },
   })
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        data: imageBuffer.toString("base64"),
-        mimeType,
+  let result
+  try {
+    result = await model.generateContent([
+      {
+        inlineData: {
+          data: imageBuffer.toString("base64"),
+          mimeType,
+        },
       },
-    },
-    {
-      text: "Extract the scorecard per the system instructions. Return null for any hole you can't read with high confidence, especially cells covered by CART PATH ONLY stamps.",
-    },
-  ])
+      {
+        text: "Extract the scorecard per the system instructions. Return null for any hole you can't read with high confidence, especially cells covered by CART PATH ONLY stamps. List shaky but-readable holes in lowConfidenceHoles.",
+      },
+    ])
+  } catch (err: any) {
+    throw classifyGeminiError(err)
+  }
 
-  const text = result.response.text()
-  const parsed = JSON.parse(text) as {
-    players: Array<{
-      name: string
-      scores: Array<number | null>
-      lowConfidenceHoles?: number[]
+  let text: string
+  try {
+    text = result.response.text()
+  } catch (err: any) {
+    throw new GeminiError("empty", "Gemini returned an empty response (may have been blocked by safety filters). Try a different photo.")
+  }
+
+  let parsed
+  try {
+    parsed = JSON.parse(text) as {
+      players: Array<{
+        name: string
+        scores: Array<number | null>
+        lowConfidenceHoles?: number[]
+        warnings: string[]
+      }>
       warnings: string[]
-    }>
-    warnings: string[]
+    }
+  } catch (err: any) {
+    throw new GeminiError("parse", `Gemini returned non-JSON output: ${text.slice(0, 200)}`)
   }
 
   return {
@@ -159,6 +175,45 @@ export async function extractScorecardWithGemini(
     }),
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
   }
+}
+
+// Categorize errors from the Gemini SDK so the caller can translate each
+// category into a useful user-facing message and decide whether to retry.
+export type GeminiErrorCategory = "rate-limit" | "auth" | "server" | "parse" | "empty" | "unknown"
+
+export class GeminiError extends Error {
+  constructor(
+    public readonly category: GeminiErrorCategory,
+    message: string,
+  ) {
+    super(message)
+    this.name = "GeminiError"
+  }
+}
+
+function classifyGeminiError(err: any): GeminiError {
+  const message = err?.message ?? String(err)
+  // SDK surfaces the HTTP status as part of the error message; fall back to
+  // pattern matching on the text since the shape isn't stable across versions.
+  if (/429|RESOURCE_EXHAUSTED|rate limit|quota/i.test(message)) {
+    return new GeminiError(
+      "rate-limit",
+      "Gemini rate limit reached. Free tier allows a few requests per minute — wait a minute and try again.",
+    )
+  }
+  if (/401|403|API key|unauthorized|permission/i.test(message)) {
+    return new GeminiError(
+      "auth",
+      "Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel environment variables.",
+    )
+  }
+  if (/500|502|503|504|UNAVAILABLE|internal/i.test(message)) {
+    return new GeminiError(
+      "server",
+      `Gemini server error (${message.slice(0, 120)}). Usually transient — try again in a few seconds.`,
+    )
+  }
+  return new GeminiError("unknown", message)
 }
 
 // Coerce Gemini's scores array to exactly 18 entries of (number | null).
