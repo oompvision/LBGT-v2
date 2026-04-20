@@ -142,12 +142,17 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       console.warn("processed image upload failed:", processedUploadError)
     }
 
-    // Call Gemini with backoff on transient errors (server 5xx / rate limit).
-    // For auth / parse / unknown we fail fast — retrying won't help.
+    // Call Gemini. The library already falls through a chain of models
+    // (flash → flash-lite → pro) on server/timeout/not-available errors,
+    // so an outer retry loop on top would just multiply latency without
+    // helping. Any error that reaches us here means all three models
+    // failed — retrying the whole chain 4 seconds later won't change that.
     let result
     try {
-      result = await extractWithBackoff(() =>
-        extractScorecardWithGemini(processed.buffer, processed.mimeType, apiKey),
+      result = await extractScorecardWithGemini(
+        processed.buffer,
+        processed.mimeType,
+        apiKey,
       )
     } catch (err: any) {
       console.error("Gemini extraction failed:", {
@@ -156,7 +161,13 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
         message: err?.message,
       })
       if (err instanceof GeminiError) {
-        return { success: false, error: err.message }
+        // Overload seen on every model at once is rare but real. Tell the
+        // user something actionable rather than the raw SDK message.
+        const userMessage =
+          err.category === "server" || err.category === "timeout"
+            ? "Gemini is overloaded right now (we tried 3 model tiers). Please wait a few minutes and try again, or fill out the form manually."
+            : err.message
+        return { success: false, error: userMessage }
       }
       return {
         success: false,
@@ -215,27 +226,4 @@ export async function getScorecardSignedUrl(
   } catch (error: any) {
     return { error: error.message || "Unexpected error" }
   }
-}
-
-// Retry transient Gemini failures (server 5xx + rate limit) with backoff.
-// Auth / parse / unknown errors fail fast — retrying won't help.
-async function extractWithBackoff<T>(fn: () => Promise<T>): Promise<T> {
-  const delays = [1_500, 4_000] // two retries: 1.5s, then 4s
-  let lastErr: unknown
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
-    try {
-      return await fn()
-    } catch (err) {
-      lastErr = err
-      const shouldRetry =
-        err instanceof GeminiError &&
-        (err.category === "server" || err.category === "rate-limit" || err.category === "timeout")
-      if (!shouldRetry || attempt === delays.length) throw err
-      console.warn(
-        `[ocr] gemini attempt ${attempt + 1} failed (${err.category}), retrying in ${delays[attempt]}ms`,
-      )
-      await new Promise((r) => setTimeout(r, delays[attempt]))
-    }
-  }
-  throw lastErr
 }

@@ -8,12 +8,18 @@
 
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai"
 
-// Try the best model first; if it's overloaded (503), fall back through the
-// list. Each subsequent model lives on separate Google infrastructure, so an
-// overload on 2.5-flash doesn't imply 2.0-flash is also struggling. 2.0-flash
-// is slightly less capable but more than sufficient for scorecard OCR, and
-// the free tier is almost always available.
-const MODEL_FALLBACK_ORDER = ["gemini-2.5-flash", "gemini-2.0-flash"] as const
+// Try the best model first; if it's overloaded or otherwise unavailable,
+// fall through to the next. Each model lives on separate infrastructure, so
+// an overload on 2.5-flash doesn't imply 2.5-flash-lite is also struggling.
+// - gemini-2.5-flash: primary. Best accuracy, most commonly overloaded.
+// - gemini-2.5-flash-lite: cheaper/lighter variant of 2.5 flash. Good fallback.
+// - gemini-2.5-pro: last resort. Higher quality, higher cost, almost always
+//   available — only used if both flash tiers are down.
+const MODEL_FALLBACK_ORDER = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-pro",
+] as const
 type ModelId = (typeof MODEL_FALLBACK_ORDER)[number]
 
 const SYSTEM_PROMPT = `You are extracting data from a handwritten golf scorecard photo.
@@ -115,9 +121,9 @@ export async function extractScorecardWithGemini(
 ): Promise<GeminiScorecardResult> {
   const client = new GoogleGenerativeAI(apiKey)
 
-  // Try each model in order; if we get a "server"-category error (overload,
-  // 5xx) fall through to the next one. Rate-limit / auth / parse errors
-  // are fatal — no point trying another model.
+  // Try each model in order. On "server" (overloaded), "timeout", or
+  // "not-available" (model deprecated/404), fall through to the next model.
+  // Rate-limit / auth / parse errors are fatal — another model won't help.
   let lastError: GeminiError | undefined
   for (const modelId of MODEL_FALLBACK_ORDER) {
     try {
@@ -125,9 +131,11 @@ export async function extractScorecardWithGemini(
     } catch (err) {
       const geminiErr = err instanceof GeminiError ? err : classifyGeminiError(err)
       lastError = geminiErr
-      if (geminiErr.category !== "server" && geminiErr.category !== "timeout") {
-        throw geminiErr
-      }
+      const fallbackEligible =
+        geminiErr.category === "server" ||
+        geminiErr.category === "timeout" ||
+        geminiErr.category === "not-available"
+      if (!fallbackEligible) throw geminiErr
       console.warn(
         `[ocr] model ${modelId} failed with ${geminiErr.category}, falling back to next model`,
       )
@@ -232,6 +240,7 @@ export type GeminiErrorCategory =
   | "auth"
   | "server"
   | "timeout"
+  | "not-available" // 404: this specific model isn't available to this key
   | "parse"
   | "empty"
   | "unknown"
@@ -270,6 +279,12 @@ function classifyGeminiError(err: any): GeminiError {
       return new GeminiError(
         "auth",
         "Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel environment variables.",
+      )
+    }
+    if (status === 404) {
+      return new GeminiError(
+        "not-available",
+        "This Gemini model isn't available on your API key (deprecated or restricted). Falling back to the next model.",
       )
     }
     if (status === 503) {
