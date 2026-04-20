@@ -27,18 +27,28 @@ Return valid JSON matching the provided schema, no other text.
 Scores per hole are integers, almost always 1-12. Par is usually 3, 4, or 5.
 
 CRITICAL — when to return null for a hole:
-- The cell is obscured by a "CART PATH ONLY" stamp (or any stamp). ALWAYS null.
 - The cell is blank.
 - The handwriting is genuinely illegible and you are less than highly confident.
+- A stamp (e.g. "CART PATH ONLY") fully obscures the handwritten digit so
+  you cannot see it at all. Return null.
 Never guess. A wrong number is worse than null. If you are even a little unsure,
 return null and add a warning. The user will fill in blanks manually.
+
+STAMPS — partially obscured cells:
+If a stamp like "CART PATH ONLY" OVERLAPS a cell but you can still see the
+handwritten digit through or around the stamp AND are confident in the
+reading, DO return the score. But in that case also add the hole number to
+lowConfidenceHoles so the UI flags it for user verification. In short:
+- Stamp + digit visible + confident → return the score AND add to
+  lowConfidenceHoles.
+- Stamp fully obscures digit, or you're guessing → return null.
 
 For each player, ALSO return a "lowConfidenceHoles" array listing the hole
 numbers (1-18) where your confidence in the score is below ~90% — i.e., you
 had to look carefully, the digit is ambiguous (e.g. could be 4 or 9, 6 or 0,
-3 or 8), or the writing is partially smudged. Be honest about this — the UI
-will highlight those cells so the user can verify them. Only include holes
-where you DID return a number; don't list nulls.
+3 or 8), the writing is partially smudged, or you read the digit through a
+stamp. Be honest about this — the UI will highlight those cells so the user
+can verify. Only include holes where you DID return a number; don't list nulls.
 
 If the card shows Out (holes 1-9), In (holes 10-18), or Total, verify your
 per-hole numbers sum correctly and flag mismatches in the warnings array.
