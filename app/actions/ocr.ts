@@ -4,9 +4,12 @@ import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { extractScorecardWithClaude, ClaudeError } from "@/lib/ocr/claude"
 import { preprocessImage, type PreprocessResult } from "@/lib/ocr/preprocess"
 
-// TODO: drop back to 5 once the pipeline is dialed in. At ~$0.01/call on
-// Sonnet 4.6, 100/user/day is still pennies even if someone goes wild.
-const DAILY_LIMIT = 100
+// Rolling 7-day cap per user. Most league players submit at most one round
+// per week, so 5 uploads gives plenty of headroom for verifying + re-
+// uploading a bad photo, while keeping a single bad actor from racking up
+// unlimited API costs. Raise this if a legit use case shows up.
+const WEEKLY_LIMIT = 5
+const WEEKLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const STORAGE_BUCKET = "scorecards"
 
@@ -77,8 +80,8 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       return { success: false, error: "Image must be smaller than 10MB" }
     }
 
-    // Rate limit: count OCR calls by this user in the last 24h.
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    // Rate limit: count OCR calls by this user in a rolling 7-day window.
+    const since = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString()
     const { count: recentCount, error: countError } = await admin
       .from("ocr_uploads")
       .select("id", { count: "exact", head: true })
@@ -90,10 +93,10 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
       return { success: false, error: "Could not verify upload limit. Please try again." }
     }
 
-    if ((recentCount ?? 0) >= DAILY_LIMIT) {
+    if ((recentCount ?? 0) >= WEEKLY_LIMIT) {
       return {
         success: false,
-        error: `You've used all ${DAILY_LIMIT} scorecard uploads for today. Try again tomorrow.`,
+        error: `You've used all ${WEEKLY_LIMIT} scorecard uploads for this week. Try again next week, or fill out the form manually.`,
       }
     }
 
