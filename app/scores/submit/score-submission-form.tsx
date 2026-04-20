@@ -106,6 +106,13 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
       netScores: string[]
       ocrName?: string
       uncertainHoles?: Set<number>
+      // Handwritten Out/In/Total from OCR — shown alongside the computed
+      // sum to flag per-hole extraction errors (e.g. if the handwritten Out
+      // is 50 but the sum of the nine scores is 49, the user knows to
+      // double-check the front 9).
+      handwrittenOutTotal?: number | null
+      handwrittenInTotal?: number | null
+      handwrittenTotal?: number | null
     }[]
   >([
     { userId: currentUserId, scores: Array(18).fill(""), netScores: Array(18).fill("") },
@@ -174,6 +181,9 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     newPlayers[index].netScores = Array(18).fill("")
     newPlayers[index].ocrName = undefined
     newPlayers[index].uncertainHoles = undefined
+    newPlayers[index].handwrittenOutTotal = undefined
+    newPlayers[index].handwrittenInTotal = undefined
+    newPlayers[index].handwrittenTotal = undefined
     setPlayers(newPlayers)
   }
 
@@ -231,6 +241,9 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
           netScores: scores.slice(), // no handicap until user picks a player
           ocrName: ocr.name,
           uncertainHoles: new Set<number>([...(ocr.uncertainHoles ?? []), ...nullHoles]),
+          handwrittenOutTotal: ocr.handwrittenOutTotal ?? null,
+          handwrittenInTotal: ocr.handwrittenInTotal ?? null,
+          handwrittenTotal: ocr.handwrittenTotal ?? null,
         }
       })
       setPlayers(newPlayers)
@@ -300,6 +313,31 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
     const filled = scores.slice(startIndex, endIndex).filter((s) => s !== "")
     if (filled.length === 0) return "-"
     return filled.reduce((sum, score) => sum + Number.parseInt(score), 0)
+  }
+
+  // Render a subtotal cell showing the computed sum, with the handwritten
+  // total from OCR in parens + yellow when they disagree. A mismatch means
+  // one of the per-hole scores is wrong — the user scans for the yellow
+  // row and checks the uncertain cells.
+  const renderSubtotalCell = (
+    computed: number | string,
+    handwritten: number | null | undefined,
+  ) => {
+    const mismatch =
+      typeof computed === "number" &&
+      typeof handwritten === "number" &&
+      computed !== handwritten
+    if (!mismatch) {
+      return <span>{computed}</span>
+    }
+    return (
+      <span
+        className="text-yellow-400"
+        title={`Handwritten total on the card was ${handwritten}. One of the scores in this column may be off.`}
+      >
+        {computed} <span className="text-[10px] font-normal">({handwritten})</span>
+      </span>
+    )
   }
 
   // A column "has scores" if ANY of its 18 inputs are filled. For every such
@@ -603,7 +641,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-0.5 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.frontNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-0.5 sm:px-1 py-2 text-center text-sm font-semibold">
-                      {calculateTotal(player.scores, 0, 9)}
+                      {renderSubtotalCell(
+                        calculateTotal(player.scores, 0, 9),
+                        player.handwrittenOutTotal,
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -651,7 +692,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-0.5 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.backNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-0.5 sm:px-1 py-2 text-center text-sm font-semibold">
-                      {calculateTotal(player.scores, 9, 18)}
+                      {renderSubtotalCell(
+                        calculateTotal(player.scores, 9, 18),
+                        player.handwrittenInTotal,
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -662,7 +706,10 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-0.5 sm:px-2 py-2.5 text-center text-sm">{COURSE_DATA.totalPar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-0.5 sm:px-1 py-2.5 text-center text-base font-bold">
-                      {calculateTotal(player.scores, 0, 18)}
+                      {renderSubtotalCell(
+                        calculateTotal(player.scores, 0, 18),
+                        player.handwrittenTotal,
+                      )}
                     </td>
                   ))}
                 </tr>

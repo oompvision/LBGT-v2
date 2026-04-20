@@ -48,10 +48,13 @@ had to look carefully, the digit is ambiguous (e.g. could be 4 or 9, 6 or 0,
 stamp. Be honest about this — the UI will highlight those cells so the user
 can verify. Only include holes where you DID return a number; don't list nulls.
 
-If the card shows Out (holes 1-9), In (holes 10-18), or Total, verify your
-per-hole numbers sum correctly. A sum mismatch usually means one of your
-per-hole numbers is wrong — double check, and if you're still uncertain,
-return null for the ambiguous hole.
+If the card shows Out (holes 1-9), In (holes 10-18), or Total columns,
+populate handwrittenOutTotal / handwrittenInTotal / handwrittenTotal with
+those numbers EXACTLY as written on the card — do NOT compute them from
+the per-hole scores you extracted. The app uses these to cross-check the
+per-hole extraction; if a handwritten total doesn't match the sum of
+your per-hole numbers, that tells the user something is off with an
+individual hole. Return null if a total column is blank or unreadable.
 
 The scorecard has up to 4 player rows. Each row has a handwritten name on
 the left and 18 hole scores across. Output the players in the order they
@@ -68,6 +71,14 @@ export type ClaudeScorecardResult = {
     // 0-indexed hole positions flagged as low-confidence. Value remains in
     // `scores`; the UI highlights these yellow so the user can verify.
     uncertainHoles: number[]
+    // Handwritten Out/In/Total numbers read directly off the card (not
+    // computed from `scores`). Useful for detecting when one of the
+    // extracted per-hole scores is off by showing the OCR'd handwritten
+    // sum alongside the computed sum on the form — if they differ, one
+    // of the individual scores needs correcting.
+    handwrittenOutTotal: number | null
+    handwrittenInTotal: number | null
+    handwrittenTotal: number | null
     warnings: string[]
   }>
   warnings: string[]
@@ -113,12 +124,35 @@ const SUBMIT_SCORECARD_TOOL: Anthropic.Tool = {
                 "1-indexed hole numbers (1-18) where confidence in the score is below ~90%. Only list holes where you DID return a number.",
               items: { type: "integer", minimum: 1, maximum: 18 },
             },
+            handwrittenOutTotal: {
+              type: ["integer", "null"],
+              description:
+                "The Out (front 9) total as handwritten on the card, verbatim — do NOT compute this from scores. If the Out column is blank or unreadable, use null.",
+            },
+            handwrittenInTotal: {
+              type: ["integer", "null"],
+              description:
+                "The In (back 9) total as handwritten on the card, verbatim — do NOT compute this from scores. If the In column is blank or unreadable, use null.",
+            },
+            handwrittenTotal: {
+              type: ["integer", "null"],
+              description:
+                "The 18-hole Total as handwritten on the card, verbatim — do NOT compute this from scores. If the Total column is blank or unreadable, use null.",
+            },
             warnings: {
               type: "array",
               items: { type: "string" },
             },
           },
-          required: ["name", "scores", "lowConfidenceHoles", "warnings"],
+          required: [
+            "name",
+            "scores",
+            "lowConfidenceHoles",
+            "handwrittenOutTotal",
+            "handwrittenInTotal",
+            "handwrittenTotal",
+            "warnings",
+          ],
         },
       },
       warnings: {
@@ -230,6 +264,9 @@ export async function extractScorecardWithClaude(
         name: string
         scores: Array<number | null>
         lowConfidenceHoles?: number[]
+        handwrittenOutTotal?: number | null
+        handwrittenInTotal?: number | null
+        handwrittenTotal?: number | null
         warnings?: string[]
       }>
       warnings?: string[]
@@ -254,6 +291,9 @@ export async function extractScorecardWithClaude(
         name: p.name,
         scores: normalizeScores(p.scores),
         uncertainHoles,
+        handwrittenOutTotal: normalizeTotal(p.handwrittenOutTotal, 100),
+        handwrittenInTotal: normalizeTotal(p.handwrittenInTotal, 100),
+        handwrittenTotal: normalizeTotal(p.handwrittenTotal, 200),
         warnings: Array.isArray(p.warnings) ? p.warnings : [],
       }
     }),
@@ -266,6 +306,15 @@ export async function extractScorecardWithClaude(
       cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
     },
   }
+}
+
+// Validate a handwritten total — the UI shows this alongside the computed
+// sum, so we only want plausible readings (e.g. Out/In total ≤ 100 = 9
+// holes × 11-max; full Total ≤ 200).
+function normalizeTotal(v: unknown, cap: number): number | null {
+  if (typeof v !== "number") return null
+  if (!Number.isFinite(v) || v < 0 || v > cap) return null
+  return Math.round(v)
 }
 
 // Pad/truncate to 18 entries and defensively null out implausible values

@@ -17,6 +17,13 @@ export type OcrPlayerResult = {
   // are always null in `scores`; the UI highlights the cell so the user knows
   // to fill it in / double-check rather than silently accepting a guess.
   uncertainHoles: number[]
+  // Handwritten Out/In/Total columns from the card, as-read. The UI shows
+  // these alongside the computed sums so the user can catch per-hole
+  // extraction errors (a mismatch between handwritten 50 vs computed 49
+  // means one of the nine scores is off).
+  handwrittenOutTotal: number | null
+  handwrittenInTotal: number | null
+  handwrittenTotal: number | null
   warnings: string[]
 }
 
@@ -204,6 +211,9 @@ export async function uploadAndParseScorecard(formData: FormData): Promise<OcrRe
         name: p.name,
         scores: p.scores,
         uncertainHoles: p.uncertainHoles,
+        handwrittenOutTotal: p.handwrittenOutTotal,
+        handwrittenInTotal: p.handwrittenInTotal,
+        handwrittenTotal: p.handwrittenTotal,
         warnings: filterNoisyWarnings(p.warnings),
       })),
       warnings: filterNoisyWarnings(result.warnings),
