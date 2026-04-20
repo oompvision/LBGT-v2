@@ -8,7 +8,13 @@
 
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai"
 
-const MODEL_ID = "gemini-2.5-flash"
+// Try the best model first; if it's overloaded (503), fall back through the
+// list. Each subsequent model lives on separate Google infrastructure, so an
+// overload on 2.5-flash doesn't imply 2.0-flash is also struggling. 2.0-flash
+// is slightly less capable but more than sufficient for scorecard OCR, and
+// the free tier is almost always available.
+const MODEL_FALLBACK_ORDER = ["gemini-2.5-flash", "gemini-2.0-flash"] as const
+type ModelId = (typeof MODEL_FALLBACK_ORDER)[number]
 
 const SYSTEM_PROMPT = `You are extracting data from a handwritten golf scorecard photo.
 Return valid JSON matching the provided schema, no other text.
@@ -53,6 +59,9 @@ export type GeminiScorecardResult = {
     warnings: string[]
   }>
   warnings: string[] // scorecard-level warnings
+  /** Which model actually produced the result — useful for debugging quality
+   *  differences after a fallback kicked in. */
+  modelUsed: ModelId
 }
 
 const RESPONSE_SCHEMA: Schema = {
@@ -105,8 +114,37 @@ export async function extractScorecardWithGemini(
   apiKey: string,
 ): Promise<GeminiScorecardResult> {
   const client = new GoogleGenerativeAI(apiKey)
+
+  // Try each model in order; if we get a "server"-category error (overload,
+  // 5xx) fall through to the next one. Rate-limit / auth / parse errors
+  // are fatal — no point trying another model.
+  let lastError: GeminiError | undefined
+  for (const modelId of MODEL_FALLBACK_ORDER) {
+    try {
+      return await callModel(client, modelId, imageBuffer, mimeType)
+    } catch (err) {
+      const geminiErr = err instanceof GeminiError ? err : classifyGeminiError(err)
+      lastError = geminiErr
+      if (geminiErr.category !== "server" && geminiErr.category !== "timeout") {
+        throw geminiErr
+      }
+      console.warn(
+        `[ocr] model ${modelId} failed with ${geminiErr.category}, falling back to next model`,
+      )
+    }
+  }
+
+  throw lastError ?? new GeminiError("unknown", "All Gemini models failed")
+}
+
+async function callModel(
+  client: GoogleGenerativeAI,
+  modelId: ModelId,
+  imageBuffer: Buffer,
+  mimeType: string,
+): Promise<GeminiScorecardResult> {
   const model = client.getGenerativeModel({
-    model: MODEL_ID,
+    model: modelId,
     systemInstruction: SYSTEM_PROMPT,
     generationConfig: {
       temperature: 0, // deterministic-ish; avoid random number hallucination
@@ -131,7 +169,7 @@ export async function extractScorecardWithGemini(
   } catch (err: any) {
     // Log everything we can about the SDK error — users see only the
     // classified category, but Vercel logs should have the full diagnostic.
-    console.error("[ocr] Gemini SDK raw error:", {
+    console.error(`[ocr] Gemini SDK raw error (${modelId}):`, {
       name: err?.name,
       message: err?.message,
       status: err?.status ?? err?.code ?? err?.response?.status,
@@ -183,6 +221,7 @@ export async function extractScorecardWithGemini(
       }
     }),
     warnings: Array.isArray(parsed.warnings) ? parsed.warnings : [],
+    modelUsed: modelId,
   }
 }
 
@@ -212,9 +251,44 @@ function classifyGeminiError(err: any): GeminiError {
   // the actual status in different places (message, status, code, cause).
   const message = err?.message ?? String(err)
   const causeMessage = err?.cause?.message ?? ""
-  const status = err?.status ?? err?.code ?? err?.response?.status ?? err?.cause?.status
+  const status: number | undefined =
+    err?.status ?? err?.code ?? err?.response?.status ?? err?.cause?.status
   const haystack = `${message} ${causeMessage} ${status ?? ""}`
 
+  // Prefer an explicit HTTP status code over text patterns. The SDK sometimes
+  // wraps a 503 in a message that starts with "Error fetching from ..." —
+  // previously that was misrouted as "timeout" and the user got a message
+  // that blamed their connection instead of Google being overloaded.
+  if (typeof status === "number") {
+    if (status === 429) {
+      return new GeminiError(
+        "rate-limit",
+        "Gemini rate limit reached. Free tier allows ~10 requests per minute — wait a minute and try again.",
+      )
+    }
+    if (status === 401 || status === 403) {
+      return new GeminiError(
+        "auth",
+        "Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel environment variables.",
+      )
+    }
+    if (status === 503) {
+      // Specific "model overloaded" message. The SDK's human-readable text
+      // for this reliably contains "experiencing high demand".
+      return new GeminiError(
+        "server",
+        "Gemini is temporarily overloaded. We'll fall back to a secondary model; if that also fails, wait a minute and try again.",
+      )
+    }
+    if (status >= 500) {
+      return new GeminiError(
+        "server",
+        `Gemini server error ${status}. Usually transient — try again in a few seconds.`,
+      )
+    }
+  }
+
+  // Text fallbacks for SDK variations / errors with no status code.
   if (/429|RESOURCE_EXHAUSTED|rate limit|quota/i.test(haystack)) {
     return new GeminiError(
       "rate-limit",
@@ -227,20 +301,16 @@ function classifyGeminiError(err: any): GeminiError {
       "Gemini API key is invalid or missing. Check GEMINI_API_KEY in Vercel environment variables.",
     )
   }
-  // Fetch-level failures show up as "Error fetching from ..." from the SDK,
-  // with the real HTTP status (if any) hidden in cause/response. Check the
-  // fetch-failure pattern BEFORE the 5xx regex so the user gets the more
-  // accurate "timeout — try again" message for those cases.
-  if (/fetch|network|ETIMEDOUT|ECONNRESET|aborted|timeout|Error fetching/i.test(haystack)) {
-    return new GeminiError(
-      "timeout",
-      `Couldn't reach Gemini (${message.slice(0, 140)}). Gemini's free tier can be flaky — wait 30 seconds and try again.`,
-    )
-  }
-  if (/500|502|503|504|UNAVAILABLE|internal/i.test(haystack)) {
+  if (/500|502|503|504|UNAVAILABLE|internal|high demand/i.test(haystack)) {
     return new GeminiError(
       "server",
       `Gemini server error (${message.slice(0, 140)}). Usually transient — try again in a few seconds.`,
+    )
+  }
+  if (/fetch|network|ETIMEDOUT|ECONNRESET|aborted|timeout/i.test(haystack)) {
+    return new GeminiError(
+      "timeout",
+      `Couldn't reach Gemini (${message.slice(0, 140)}). Wait 30 seconds and try again.`,
     )
   }
   return new GeminiError("unknown", message)
