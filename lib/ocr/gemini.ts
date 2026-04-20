@@ -8,18 +8,17 @@
 
 import { GoogleGenerativeAI, SchemaType, type Schema } from "@google/generative-ai"
 
-// Try the best model first; if it's overloaded, deprecated, or returns
-// garbage, fall through to the next. Each model lives on separate
-// infrastructure, so an overload on 2.5-flash doesn't imply 2.5-pro is
-// also struggling.
-// - gemini-2.5-flash: primary. Best price/performance for this task.
-// - gemini-2.5-pro: fallback. Higher quality and almost always available,
-//   at ~3-4x the cost per call (still pennies at our volume).
+// Pro first, Flash as backup. Pro costs ~4x more per call but the accuracy
+// gap on handwritten scorecards is worth it at our volume (a few dozen
+// uploads per month — pennies either way, and still within the free tier).
+// Flash only kicks in if Pro is overloaded or returns empty-result garbage.
+// - gemini-2.5-pro: primary. Highest quality vision, most accurate reads.
+// - gemini-2.5-flash: fallback. Cheap, fast, good enough when Pro is down.
 // NOTE: gemini-2.5-flash-lite is intentionally NOT in this chain. In
 // testing it accepted the image but returned every score as null with
 // fabricated sum-mismatch warnings — too small a model for handwritten
 // table OCR.
-const MODEL_FALLBACK_ORDER = ["gemini-2.5-flash", "gemini-2.5-pro"] as const
+const MODEL_FALLBACK_ORDER = ["gemini-2.5-pro", "gemini-2.5-flash"] as const
 type ModelId = (typeof MODEL_FALLBACK_ORDER)[number]
 
 const SYSTEM_PROMPT = `You are extracting data from a handwritten golf scorecard photo.

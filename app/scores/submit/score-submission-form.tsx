@@ -555,7 +555,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-1 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.frontNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-1 py-2 text-center text-sm font-semibold">
-                      {player.userId ? calculateTotal(player.scores, 0, 9) : "-"}
+                      {calculateTotal(player.scores, 0, 9)}
                     </td>
                   ))}
                 </tr>
@@ -603,7 +603,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-1 sm:px-2 py-2 text-center text-sm">{COURSE_DATA.backNinePar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-1 py-2 text-center text-sm font-semibold">
-                      {player.userId ? calculateTotal(player.scores, 9, 18) : "-"}
+                      {calculateTotal(player.scores, 9, 18)}
                     </td>
                   ))}
                 </tr>
@@ -614,7 +614,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   <td className="px-1 sm:px-2 py-2.5 text-center text-sm">{COURSE_DATA.totalPar}</td>
                   {activePlayers.map((player, pIdx) => (
                     <td key={pIdx} className="px-1 py-2.5 text-center text-base font-bold">
-                      {player.userId ? calculateTotal(player.scores, 0, 18) : "-"}
+                      {calculateTotal(player.scores, 0, 18)}
                     </td>
                   ))}
                 </tr>
