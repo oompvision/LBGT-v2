@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Get tee time details and check availability using the same logic as dashboard
     const { data: teeTimeData, error: teeTimeError } = await supabase
       .from("tee_times")
-      .select("id, date, time, max_slots")
+      .select("id, date, time, max_slots, season")
       .eq("id", teeTimeId)
       .single()
 
@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
         slots,
         player_names: playerNames || [],
         play_for_money: playForMoney || [],
+        season: teeTimeData.season,
       })
       .select()
       .single()

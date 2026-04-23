@@ -251,6 +251,7 @@ export default function BookTeeTimePage() {
           slots,
           player_names: playerNames.filter((name) => name.trim() !== ""),
           play_for_money: playForMoney,
+          season: selectedTeeTimeData?.season,
         },
       ])
 

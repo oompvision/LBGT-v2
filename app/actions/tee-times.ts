@@ -328,6 +328,7 @@ export async function createReservation(data: {
       slots: data.slots,
       player_names: data.playerNames,
       play_for_money: data.playForMoney,
+      season: teeTime.season,
     })
 
     if (error) {
