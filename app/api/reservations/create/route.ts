@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     // Get the request body
     const body = await request.json()
-    const { teeTimeId, userId, slots, playerNames, playForMoney } = body
+    const { teeTimeId, userId, slots, playerNames, playForMoney, playerUserIds } = body
 
     // Validate the request
     if (!teeTimeId || !userId || !slots || slots < 1) {
@@ -78,6 +78,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Enforce one-tee-time-per-day for every player in the group.
+    const linkedUserIds: string[] = Array.isArray(playerUserIds)
+      ? playerUserIds.filter((id: unknown): id is string => typeof id === "string" && !!id)
+      : []
+    const allPlayerIds = [userId, ...linkedUserIds]
+    {
+      const { data: sameDayReservations, error: conflictError } = await supabase
+        .from("reservations")
+        .select("id, user_id, player_user_ids, tee_times!inner ( date )")
+        .eq("tee_times.date", teeTimeData.date)
+
+      if (conflictError) {
+        console.error("Error checking day conflicts:", conflictError)
+        return NextResponse.json({ error: "Error checking availability." }, { status: 500 })
+      }
+
+      const targetIds = new Set(allPlayerIds)
+      const conflictedIds = new Set<string>()
+      for (const r of sameDayReservations || []) {
+        if (targetIds.has((r as any).user_id)) conflictedIds.add((r as any).user_id)
+        for (const uid of (((r as any).player_user_ids as (string | null)[] | null) || [])) {
+          if (uid && targetIds.has(uid)) conflictedIds.add(uid)
+        }
+      }
+      if (conflictedIds.size > 0) {
+        const { data: conflictUsers } = await supabase
+          .from("users")
+          .select("id, name")
+          .in("id", Array.from(conflictedIds))
+        const names = (conflictUsers || []).map((u) => u.name).join(", ")
+        return NextResponse.json(
+          {
+            error: `One of the players already has a reservation on this date: ${names}. Each player can only book one tee time per day.`,
+          },
+          { status: 400 },
+        )
+      }
+    }
+
     // Create the reservation directly using Supabase insert
     const { data: newReservation, error: insertError } = await supabase
       .from("reservations")
@@ -87,6 +126,7 @@ export async function POST(request: NextRequest) {
         slots,
         player_names: playerNames || [],
         play_for_money: playForMoney || [],
+        player_user_ids: Array.isArray(playerUserIds) ? playerUserIds : [],
         season: teeTimeData.season,
       })
       .select()

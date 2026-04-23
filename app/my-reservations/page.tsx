@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { CalendarIcon, Clock, Plus } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
@@ -63,28 +64,38 @@ export default async function MyReservationsPage() {
     redirect("/signin")
   }
 
+  const userId = session.user.id
+
   const { data: activeSeason } = await supabase.from("seasons").select("year").eq("is_active", true).single()
 
   const seasonYear = activeSeason?.year || new Date().getFullYear()
 
-  // Get user's reservations
+  // Get reservations where user is booker OR an invited player.
   const { data: userReservations, error } = await supabase
     .from("reservations")
-    .select(`
+    .select(
+      `
       id,
       tee_time_id,
+      user_id,
       slots,
       player_names,
+      player_user_ids,
       play_for_money,
       season,
       tee_times (
         id,
         date,
         time
+      ),
+      users (
+        id,
+        name
       )
-    `)
-    .eq("user_id", session.user.id)
-    .eq("season", seasonYear) // Filter by active season
+    `,
+    )
+    .or(`user_id.eq.${userId},player_user_ids.cs.{${userId}}`)
+    .eq("season", seasonYear)
     .order("tee_times(date)", { ascending: true })
     .order("tee_times(time)", { ascending: true })
 
@@ -92,13 +103,14 @@ export default async function MyReservationsPage() {
     console.error("Error fetching reservations:", error)
   }
 
-  // Get user data for display
-  const { data: userData } = await supabase.from("users").select("name").eq("id", session.user.id).single()
+  // Get current user's name for "you" display
+  const { data: userData } = await supabase.from("users").select("name").eq("id", userId).single()
 
   // Group reservations by date
   const reservationsByDate = (userReservations || []).reduce(
     (acc, reservation) => {
-      const date = reservation.tee_times.date
+      const date = (reservation.tee_times as any)?.date
+      if (!date) return acc
       if (!acc[date]) {
         acc[date] = []
       }
@@ -138,55 +150,93 @@ export default async function MyReservationsPage() {
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="divide-y">
-                      {dateReservations.map((reservation) => (
-                        <div key={reservation.id} className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{formatTimeFromString(reservation.tee_times.time)}</span>
-                              </div>
-                              <div className="mt-2">
-                                <p className="font-medium">
-                                  {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
-                                </p>
+                      {dateReservations.map((reservation) => {
+                        const role: "booker" | "invited" =
+                          reservation.user_id === userId ? "booker" : "invited"
+                        const bookerName = (reservation.users as any)?.name as string | undefined
+                        const playerUserIds: (string | null)[] =
+                          (reservation.player_user_ids as (string | null)[] | null) || []
+                        const playerNames = reservation.player_names || []
+                        const playForMoney = reservation.play_for_money || []
+                        const bookerIsSolo = role === "booker" && playerUserIds.length === 0
 
-                                <div className="mt-1 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{userData?.name || "You"}</span>
-                                    {reservation.play_for_money && reservation.play_for_money[0] && (
-                                      <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                        Playing for money
-                                      </span>
-                                    )}
-                                  </div>
+                        return (
+                          <div key={reservation.id} className="p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">
+                                    {formatTimeFromString((reservation.tee_times as any)?.time)}
+                                  </span>
+                                  {role === "invited" && (
+                                    <Badge variant="secondary">
+                                      Booked by {bookerName || "another player"}
+                                    </Badge>
+                                  )}
                                 </div>
+                                <div className="mt-2">
+                                  <p className="font-medium">
+                                    {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
+                                  </p>
 
-                                {reservation.player_names && reservation.player_names.length > 0 && (
-                                  <div className="mt-2 text-sm text-muted-foreground">
-                                    <p>Additional players:</p>
-                                    <ul className="list-inside list-disc">
-                                      {reservation.player_names.map((name, i) => (
-                                        <li key={i} className="flex items-center gap-2">
-                                          <span>{name}</span>
-                                          {reservation.play_for_money && reservation.play_for_money[i + 1] && (
-                                            <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                              Playing for money
-                                            </span>
-                                          )}
-                                        </li>
-                                      ))}
-                                    </ul>
+                                  <div className="mt-1 text-sm">
+                                    {/* Booker line */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium">
+                                        {role === "booker"
+                                          ? userData?.name || "You"
+                                          : bookerName || "Booker"}
+                                      </span>
+                                      {role === "booker" && (
+                                        <span className="text-xs text-muted-foreground">(you)</span>
+                                      )}
+                                      {playForMoney[0] && (
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                          Playing for money
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
+
+                                  {playerNames.length > 0 && (
+                                    <div className="mt-2 text-sm text-muted-foreground">
+                                      <p>Additional players:</p>
+                                      <ul className="list-inside list-disc">
+                                        {playerNames.map((name, i) => {
+                                          const linkedUserId = playerUserIds[i]
+                                          const isYou = linkedUserId === userId
+                                          return (
+                                            <li key={i} className="flex items-center gap-2">
+                                              <span>
+                                                {name}
+                                                {linkedUserId ? " (league)" : " (guest)"}
+                                                {isYou && " — you"}
+                                              </span>
+                                              {playForMoney[i + 1] && (
+                                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                                  Playing for money
+                                                </span>
+                                              )}
+                                            </li>
+                                          )
+                                        })}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                            <div className="ml-4">
-                              <ReservationActions reservationId={reservation.id} />
+                              <div className="ml-4 shrink-0">
+                                <ReservationActions
+                                  reservationId={reservation.id}
+                                  role={role}
+                                  bookerIsSolo={bookerIsSolo}
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </CardContent>
                 </Card>

@@ -79,6 +79,7 @@ export type Database = {
           slots: number
           player_names: string[] | null
           play_for_money: boolean[] | null
+          player_user_ids: (string | null)[] | null
           season: number | null
           created_at: string
         }
@@ -89,6 +90,7 @@ export type Database = {
           slots: number
           player_names?: string[] | null
           play_for_money?: boolean[] | null
+          player_user_ids?: (string | null)[] | null
           season?: number | null
           created_at?: string
         }
@@ -99,6 +101,7 @@ export type Database = {
           slots?: number
           player_names?: string[] | null
           play_for_money?: boolean[] | null
+          player_user_ids?: (string | null)[] | null
           season?: number | null
           created_at?: string
         }
