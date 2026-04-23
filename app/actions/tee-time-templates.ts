@@ -151,6 +151,8 @@ export async function generateTeeTimesFromTemplate(
     let createdCount = 0
     let updatedCount = 0
     let deletedCount = 0
+    const insertErrors: string[] = []
+    const updateErrors: string[] = []
 
     // Overwrite mode: delete existing tee times on matching-day-of-week dates
     // whose times are NOT in the template. Cascades reservations + availability.
@@ -238,6 +240,7 @@ export async function generateTeeTimesFromTemplate(
 
           if (updateError) {
             console.error(`Error updating tee time ${existing.id}:`, updateError)
+            updateErrors.push(`${dateStr} ${timeWithSeconds}: ${updateError.message}`)
           } else {
             updatedCount++
           }
@@ -255,6 +258,7 @@ export async function generateTeeTimesFromTemplate(
 
           if (insertError) {
             console.error(`Error inserting tee time ${dateStr} ${timeWithSeconds}:`, insertError)
+            insertErrors.push(`${dateStr} ${timeWithSeconds}: ${insertError.message}`)
           } else {
             createdCount++
           }
@@ -271,9 +275,26 @@ export async function generateTeeTimesFromTemplate(
       parts.push(`${deletedCount} deleted`)
     }
     const dayName = DAYS_OF_WEEK_NAMES[template.day_of_week] || "day"
+
+    // If everything failed (no creates, no updates), surface the underlying error
+    if (createdCount === 0 && updatedCount === 0 && (insertErrors.length > 0 || updateErrors.length > 0)) {
+      const firstError = insertErrors[0] || updateErrors[0]
+      return {
+        success: false,
+        error: `No tee times were written. First error: ${firstError}`,
+      }
+    }
+
+    let message = `Tee times: ${parts.join(", ")} across ${dates.length} ${dayName}s in ${season.name} (season year: ${season.year}).`
+    if (insertErrors.length > 0 || updateErrors.length > 0) {
+      const totalErrors = insertErrors.length + updateErrors.length
+      const firstError = insertErrors[0] || updateErrors[0]
+      message += ` ${totalErrors} slot${totalErrors === 1 ? "" : "s"} failed (first: ${firstError}).`
+    }
+
     return {
       success: true,
-      message: `Tee times: ${parts.join(", ")} across ${dates.length} ${dayName}s in ${season.name} (season year: ${season.year}).`,
+      message,
     }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to generate tee times" }
