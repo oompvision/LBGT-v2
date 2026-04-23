@@ -113,6 +113,7 @@ export default async function MyReservationsPage() {
   if (asInvitedResult.error) {
     console.error("Error fetching invited reservations:", asInvitedResult.error)
   }
+  const queryError = asBookerResult.error || asInvitedResult.error
 
   const merged = new Map<string, any>()
   for (const r of asBookerResult.data || []) merged.set(r.id, r)
@@ -161,6 +162,17 @@ export default async function MyReservationsPage() {
               </Button>
             </Link>
           </div>
+
+          {queryError && (
+            <div className="mb-6 rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm">
+              <p className="font-semibold text-destructive">Couldn&apos;t load your reservations</p>
+              <p className="text-destructive/90 mt-1 break-words">{queryError.message}</p>
+              <p className="text-muted-foreground mt-2">
+                If this mentions <code>player_user_ids</code>, run{" "}
+                <code>scripts/add-reservation-player-user-ids.sql</code> in Supabase SQL editor.
+              </p>
+            </div>
+          )}
 
           {Object.keys(reservationsByDate).length > 0 ? (
             <div className="space-y-8">
