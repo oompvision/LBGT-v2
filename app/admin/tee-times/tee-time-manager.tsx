@@ -19,6 +19,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Loader2, Plus, Trash2, Clock, Calendar, Settings, CheckCircle, AlertCircle, Users } from "lucide-react"
 import {
   saveTemplate,
@@ -26,8 +34,10 @@ import {
   getTeeTimesForDate,
   toggleTeeTime,
   getUpcomingTeeTimeDates,
+  addTeeTimeToSchedule,
   type TeeTimeTemplate,
 } from "@/app/actions/tee-time-templates"
+import { deleteTeeTime } from "@/app/actions/tee-times"
 import type { TeeTime } from "@/types/supabase"
 import {
   DEFAULT_MAX_PLAYERS_PER_TEE_TIME,
@@ -129,6 +139,7 @@ function TemplateTab({
   const [newTime, setNewTime] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [overwriteExisting, setOverwriteExisting] = useState(false)
   const [generateResult, setGenerateResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null)
 
   const addTimeSlot = () => {
@@ -193,7 +204,7 @@ function TemplateTab({
     }
 
     // Generate tee times
-    const result = await generateTeeTimesFromTemplate(season.id)
+    const result = await generateTeeTimesFromTemplate(season.id, { overwriteExisting })
     setIsGenerating(false)
     setGenerateResult(result)
   }
@@ -415,10 +426,26 @@ function TemplateTab({
               <AlertDialogDescription>
                 This will create tee times for every {DAYS_OF_WEEK[dayOfWeek]} in the {season.name} (
                 {formatDisplayDate(season.start_date)} — {formatDisplayDate(season.end_date)}).
-                Existing tee times will have their booking windows updated. New slots will be created where missing.
-                Existing reservations will not be affected.
+                Matching slots will have their booking windows updated; new slots will be created.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="flex items-start gap-3 p-3 border rounded-md bg-muted/40">
+              <Switch
+                id="overwrite-existing"
+                checked={overwriteExisting}
+                onCheckedChange={setOverwriteExisting}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="overwrite-existing" className="font-medium cursor-pointer block">
+                  Overwrite existing
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {overwriteExisting
+                    ? `Any existing ${DAYS_OF_WEEK[dayOfWeek]} tee time whose time is NOT in this template will be deleted — along with its reservations.`
+                    : "Existing tee times not in this template will be preserved."}
+                </p>
+              </div>
+            </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleGenerate}>Generate</AlertDialogAction>
@@ -447,6 +474,34 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
   const [teeTimes, setTeeTimes] = useState<(TeeTime & { reserved_slots: number; available_slots: number })[]>([])
   const [isLoadingDates, setIsLoadingDates] = useState(true)
   const [isLoadingTimes, setIsLoadingTimes] = useState(false)
+
+  const [slotToDelete, setSlotToDelete] = useState<
+    (TeeTime & { reserved_slots: number; available_slots: number }) | null
+  >(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [newSlotTime, setNewSlotTime] = useState("")
+  const [newSlotMaxSlots, setNewSlotMaxSlots] = useState(4)
+  const [isAdding, setIsAdding] = useState(false)
+
+  const refreshDates = async () => {
+    const result = await getUpcomingTeeTimeDates()
+    if (result.success && result.dates) {
+      setDates(result.dates)
+      // If the currently selected date is gone, pick the first one
+      if (selectedDate && !result.dates.includes(selectedDate)) {
+        setSelectedDate(result.dates[0] ?? null)
+      }
+    }
+  }
+
+  const refreshTeeTimes = async (date: string) => {
+    const result = await getTeeTimesForDate(date)
+    if (result.success && result.teeTimes) {
+      setTeeTimes(result.teeTimes)
+    }
+  }
 
   // Load upcoming dates on mount
   useEffect(() => {
@@ -484,6 +539,50 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
       setTeeTimes((prev) =>
         prev.map((tt) => (tt.id === teeTimeId ? { ...tt, is_available: !currentValue } : tt))
       )
+    } else {
+      toast({ title: "Error", description: result.error, variant: "destructive" })
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!slotToDelete) return
+    setIsDeleting(true)
+    const result = await deleteTeeTime(slotToDelete.id, { force: true })
+    setIsDeleting(false)
+
+    if (result.success) {
+      const hadReservations = slotToDelete.reserved_slots > 0
+      toast({
+        title: "Tee time deleted",
+        description: hadReservations
+          ? `Also deleted ${slotToDelete.reserved_slots} reservation${slotToDelete.reserved_slots === 1 ? "" : "s"}.`
+          : undefined,
+      })
+      setSlotToDelete(null)
+      if (selectedDate) await refreshTeeTimes(selectedDate)
+      await refreshDates()
+    } else {
+      toast({ title: "Error", description: result.error, variant: "destructive" })
+    }
+  }
+
+  const handleAdd = async () => {
+    if (!selectedDate || !newSlotTime) return
+    setIsAdding(true)
+    const result = await addTeeTimeToSchedule({
+      date: selectedDate,
+      time: newSlotTime,
+      maxSlots: newSlotMaxSlots,
+    })
+    setIsAdding(false)
+
+    if (result.success) {
+      toast({ title: "Tee time added" })
+      setIsAddOpen(false)
+      setNewSlotTime("")
+      setNewSlotMaxSlots(4)
+      await refreshTeeTimes(selectedDate)
+      await refreshDates()
     } else {
       toast({ title: "Error", description: result.error, variant: "destructive" })
     }
@@ -554,12 +653,30 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
       {/* Tee Times for Selected Date */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {selectedDate ? formatDisplayDate(selectedDate) : "Select a date"}
-          </CardTitle>
-          <CardDescription>
-            Manage tee times for this date. Toggle availability or view reservations.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>
+                {selectedDate ? formatDisplayDate(selectedDate) : "Select a date"}
+              </CardTitle>
+              <CardDescription>
+                Manage tee times for this date. Toggle availability, delete, or add a new slot.
+              </CardDescription>
+            </div>
+            {selectedDate && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setNewSlotTime("")
+                  setNewSlotMaxSlots(4)
+                  setIsAddOpen(true)
+                }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Add Tee Time
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingTimes ? (
@@ -597,6 +714,15 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
                         checked={tt.is_available}
                         onCheckedChange={() => handleToggle(tt.id, tt.is_available)}
                       />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setSlotToDelete(tt)}
+                        aria-label={`Delete tee time ${formatTime24to12(tt.time)}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 )
@@ -605,6 +731,97 @@ function ScheduleTab({ season }: { season: TeeTimeManagerProps["season"] }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={slotToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setSlotToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this tee time?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {slotToDelete
+                ? `Delete ${formatTime24to12(slotToDelete.time)} on ${formatDisplayDate(slotToDelete.date)}?` +
+                  (slotToDelete.reserved_slots > 0
+                    ? ` This will also delete ${slotToDelete.reserved_slots} reservation${slotToDelete.reserved_slots === 1 ? "" : "s"}.`
+                    : "")
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add tee time dialog */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Tee Time</DialogTitle>
+            <DialogDescription>
+              {selectedDate ? `Add a new slot for ${formatDisplayDate(selectedDate)}.` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-slot-time">Time</Label>
+              <Input
+                id="new-slot-time"
+                type="time"
+                value={newSlotTime}
+                onChange={(e) => setNewSlotTime(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-slot-max">Max Players</Label>
+              <Input
+                id="new-slot-max"
+                type="number"
+                min={1}
+                max={8}
+                value={newSlotMaxSlots}
+                onChange={(e) => setNewSlotMaxSlots(Number(e.target.value))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddOpen(false)} disabled={isAdding}>
+              Cancel
+            </Button>
+            <Button onClick={handleAdd} disabled={isAdding || !newSlotTime || newSlotMaxSlots < 1}>
+              {isAdding ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                "Add"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

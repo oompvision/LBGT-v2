@@ -217,7 +217,7 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 }
 
 // Function to delete a tee time
-export async function deleteTeeTime(id: string) {
+export async function deleteTeeTime(id: string, options: { force?: boolean } = {}) {
   const supabase = await createClient()
 
   try {
@@ -233,10 +233,32 @@ export async function deleteTeeTime(id: string) {
     }
 
     if (reservations && reservations.length > 0) {
-      return {
-        success: false,
-        error: "Cannot delete tee time with existing reservations. Please delete the reservations first.",
+      if (!options.force) {
+        return {
+          success: false,
+          error: "Cannot delete tee time with existing reservations. Please delete the reservations first.",
+        }
       }
+
+      const { error: delReservationsError } = await supabase
+        .from("reservations")
+        .delete()
+        .eq("tee_time_id", id)
+
+      if (delReservationsError) {
+        console.error("Error deleting reservations:", delReservationsError)
+        return { success: false, error: delReservationsError.message }
+      }
+    }
+
+    // Clean up availability row (non-fatal if it fails)
+    const { error: delAvailabilityError } = await supabase
+      .from("tee_time_availability")
+      .delete()
+      .eq("tee_time_id", id)
+
+    if (delAvailabilityError) {
+      console.error("Error deleting tee_time_availability row:", delAvailabilityError)
     }
 
     // Delete the tee time

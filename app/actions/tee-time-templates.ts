@@ -102,7 +102,10 @@ export async function saveTemplate(input: {
 }
 
 // Generate tee times for the entire season based on the template
-export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
+export async function generateTeeTimesFromTemplate(
+  seasonId: string,
+  options: { overwriteExisting?: boolean } = {},
+): Promise<{
   success: boolean
   message?: string
   error?: string
@@ -141,8 +144,58 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
       return { success: false, error: "No matching dates found in the season date range." }
     }
 
+    const dateStrs = dates.map((d) => format(d, "yyyy-MM-dd"))
+    const normalizeTime = (t: string) => t.slice(0, 5)
+    const templateTimes = new Set(template.time_slots.map(normalizeTime))
+
     let createdCount = 0
     let updatedCount = 0
+    let deletedCount = 0
+
+    // Overwrite mode: delete existing tee times on matching-day-of-week dates
+    // whose times are NOT in the template. Cascades reservations + availability.
+    if (options.overwriteExisting) {
+      const { data: existingOnDates, error: findErr } = await supabase
+        .from("tee_times")
+        .select("id, time")
+        .in("date", dateStrs)
+
+      if (findErr) {
+        return { success: false, error: `Failed to look up existing tee times: ${findErr.message}` }
+      }
+
+      const toDeleteIds = (existingOnDates || [])
+        .filter((tt) => !templateTimes.has(normalizeTime(tt.time)))
+        .map((tt) => tt.id)
+
+      if (toDeleteIds.length > 0) {
+        const { error: delResErr } = await supabase
+          .from("reservations")
+          .delete()
+          .in("tee_time_id", toDeleteIds)
+        if (delResErr) {
+          return { success: false, error: `Failed to delete reservations: ${delResErr.message}` }
+        }
+
+        const { error: delAvailErr } = await supabase
+          .from("tee_time_availability")
+          .delete()
+          .in("tee_time_id", toDeleteIds)
+        if (delAvailErr) {
+          console.error("Error deleting tee_time_availability rows:", delAvailErr)
+        }
+
+        const { error: delTtErr } = await supabase
+          .from("tee_times")
+          .delete()
+          .in("id", toDeleteIds)
+        if (delTtErr) {
+          return { success: false, error: `Failed to delete tee times: ${delTtErr.message}` }
+        }
+
+        deletedCount = toDeleteIds.length
+      }
+    }
 
     for (const date of dates) {
       const dateStr = format(date, "yyyy-MM-dd")
@@ -213,12 +266,81 @@ export async function generateTeeTimesFromTemplate(seasonId: string): Promise<{
     revalidatePath("/dashboard")
     revalidatePath("/schedule")
 
+    const parts = [`${createdCount} created`, `${updatedCount} updated`]
+    if (options.overwriteExisting) {
+      parts.push(`${deletedCount} deleted`)
+    }
+    const dayName = DAYS_OF_WEEK_NAMES[template.day_of_week] || "day"
     return {
       success: true,
-      message: `Generated ${createdCount} new tee times and updated ${updatedCount} existing ones across ${dates.length} ${DAYS_OF_WEEK_NAMES[template.day_of_week] || "day"}s for the ${season.name} (season year: ${season.year}).`,
+      message: `Tee times: ${parts.join(", ")} across ${dates.length} ${dayName}s in ${season.name} (season year: ${season.year}).`,
     }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to generate tee times" }
+  }
+}
+
+// Add a single tee time to the schedule (used by the admin weekly view).
+export async function addTeeTimeToSchedule(input: {
+  date: string
+  time: string
+  maxSlots: number
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+
+    const timeWithSeconds = input.time.length === 5 ? input.time + ":00" : input.time
+
+    // Check if a tee time at this exact date/time already exists
+    const { data: existing } = await supabase
+      .from("tee_times")
+      .select("id")
+      .eq("date", input.date)
+      .eq("time", timeWithSeconds)
+      .maybeSingle()
+
+    if (existing) {
+      return { success: false, error: "A tee time at this date and time already exists." }
+    }
+
+    // Pull the active season so the new tee time gets tagged correctly
+    const { data: activeSeason } = await supabase
+      .from("seasons")
+      .select("year")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    const { data: newTeeTime, error: insertError } = await supabase
+      .from("tee_times")
+      .insert({
+        date: input.date,
+        time: timeWithSeconds,
+        max_slots: input.maxSlots,
+        is_available: true,
+        season: activeSeason?.year ?? new Date().getFullYear(),
+      })
+      .select("id")
+      .single()
+
+    if (insertError || !newTeeTime) {
+      return { success: false, error: insertError?.message || "Failed to create tee time" }
+    }
+
+    // Mirror the availability row so booking flows see this slot as available
+    const { error: availError } = await supabase.from("tee_time_availability").insert({
+      tee_time_id: newTeeTime.id,
+      is_available: true,
+    })
+    if (availError) {
+      console.error("Error creating tee_time_availability row:", availError)
+    }
+
+    revalidatePath("/admin/tee-times")
+    revalidatePath("/dashboard")
+    revalidatePath("/schedule")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to add tee time" }
   }
 }
 
