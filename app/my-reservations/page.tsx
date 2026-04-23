@@ -71,37 +71,61 @@ export default async function MyReservationsPage() {
   const seasonYear = activeSeason?.year || new Date().getFullYear()
 
   // Get reservations where user is booker OR an invited player.
-  const { data: userReservations, error } = await supabase
-    .from("reservations")
-    .select(
-      `
+  // Two queries + merge is more robust than trying to compose .or() with
+  // a `cs` (array contains) filter — the PostgREST filter-string parser
+  // is finicky about curly braces inside .or().
+  const reservationSelect = `
+    id,
+    tee_time_id,
+    user_id,
+    slots,
+    player_names,
+    player_user_ids,
+    play_for_money,
+    season,
+    tee_times (
       id,
-      tee_time_id,
-      user_id,
-      slots,
-      player_names,
-      player_user_ids,
-      play_for_money,
-      season,
-      tee_times (
-        id,
-        date,
-        time
-      ),
-      users (
-        id,
-        name
-      )
-    `,
+      date,
+      time
+    ),
+    users (
+      id,
+      name
     )
-    .or(`user_id.eq.${userId},player_user_ids.cs.{${userId}}`)
-    .eq("season", seasonYear)
-    .order("tee_times(date)", { ascending: true })
-    .order("tee_times(time)", { ascending: true })
+  `
 
-  if (error) {
-    console.error("Error fetching reservations:", error)
+  const [asBookerResult, asInvitedResult] = await Promise.all([
+    supabase
+      .from("reservations")
+      .select(reservationSelect)
+      .eq("user_id", userId)
+      .eq("season", seasonYear),
+    supabase
+      .from("reservations")
+      .select(reservationSelect)
+      .contains("player_user_ids", [userId])
+      .eq("season", seasonYear),
+  ])
+
+  if (asBookerResult.error) {
+    console.error("Error fetching booker reservations:", asBookerResult.error)
   }
+  if (asInvitedResult.error) {
+    console.error("Error fetching invited reservations:", asInvitedResult.error)
+  }
+
+  const merged = new Map<string, any>()
+  for (const r of asBookerResult.data || []) merged.set(r.id, r)
+  for (const r of asInvitedResult.data || []) merged.set(r.id, r)
+  const userReservations = Array.from(merged.values()).sort((a, b) => {
+    const dateA = (a.tee_times as any)?.date || ""
+    const dateB = (b.tee_times as any)?.date || ""
+    if (dateA !== dateB) return dateA < dateB ? -1 : 1
+    const timeA = (a.tee_times as any)?.time || ""
+    const timeB = (b.tee_times as any)?.time || ""
+    if (timeA !== timeB) return timeA < timeB ? -1 : 1
+    return 0
+  })
 
   // Get current user's name for "you" display
   const { data: userData } = await supabase.from("users").select("name").eq("id", userId).single()
