@@ -533,6 +533,35 @@ export type Database = {
           updated_at?: string
         }
       }
+      cash_games: {
+        Row: {
+          id: string
+          date: string
+          title: string
+          description: string
+          entry_amount: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          date: string
+          title: string
+          description?: string
+          entry_amount: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          date?: string
+          title?: string
+          description?: string
+          entry_amount?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
       email_campaigns: {
         Row: {
           id: string
@@ -614,6 +643,7 @@ export type TeeTimeLog = Tables["tee_time_logs"]["Row"]
 export type InfoBox = Tables["info_boxes"]["Row"]
 export type PlayoffResult = Tables["playoff_results"]["Row"]
 export type EmailCampaign = Tables["email_campaigns"]["Row"]
+export type CashGame = Tables["cash_games"]["Row"]
 export type AvailableTeeTime = Views["available_tee_times"]["Row"]
 
 // Common joined types used in components

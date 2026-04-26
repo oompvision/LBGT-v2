@@ -26,6 +26,8 @@ import {
   checkPlayersForDateConflict,
   type LeagueUserSummary,
 } from "@/app/actions/reservation-players"
+import { getCashGameForDate } from "@/app/actions/cash-games"
+import type { CashGame } from "@/types/supabase"
 
 interface TeeTime {
   id: string
@@ -60,6 +62,7 @@ export default function BookTeeTimePage() {
   const [allTeeTimes, setAllTeeTimes] = useState<any[]>([])
   const [allReservations, setAllReservations] = useState<any[]>([])
   const [upcomingFriday, setUpcomingFriday] = useState<string>("")
+  const [cashGame, setCashGame] = useState<CashGame | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -134,6 +137,19 @@ export default function BookTeeTimePage() {
       // Get the upcoming Friday date using the updated logic (now returns a string)
       const fridayDateString = getUpcomingFridayForSeason()
       setUpcomingFriday(fridayDateString)
+
+      // Cash game for the upcoming Friday (if configured).
+      try {
+        const cashGameRes = await getCashGameForDate(fridayDateString)
+        if (cashGameRes.success) {
+          setCashGame(cashGameRes.cashGame)
+        } else {
+          setCashGame(null)
+        }
+      } catch (err) {
+        console.error("Cash game fetch error:", err)
+        setCashGame(null)
+      }
 
       // Get tee times for the upcoming Friday with error handling
       try {
@@ -609,6 +625,25 @@ export default function BookTeeTimePage() {
 
                     {selectedTeeTime && (
                       <div className="space-y-4 pt-2 border-t">
+                        {cashGame && (
+                          <div className="rounded-md border bg-muted/40 p-4 space-y-2">
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                              <span className="text-base font-semibold">{cashGame.title}</span>
+                              <span className="text-sm text-muted-foreground">
+                                ${cashGame.entry_amount} entry
+                              </span>
+                            </div>
+                            {cashGame.description && (
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {cashGame.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Opt in below for each player or guest who wants to play.
+                            </p>
+                          </div>
+                        )}
+
                         <div>
                           <Label>Players</Label>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -624,16 +659,18 @@ export default function BookTeeTimePage() {
                               <span className="font-medium">{userData?.name || "You"}</span>
                               <span className="text-xs text-muted-foreground">(you)</span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="play-for-money-main"
-                                checked={bookerPlayForMoney}
-                                onCheckedChange={(checked) => setBookerPlayForMoney(checked === true)}
-                              />
-                              <Label htmlFor="play-for-money-main" className="text-sm">
-                                Playing for money
-                              </Label>
-                            </div>
+                            {cashGame && (
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="play-for-money-main"
+                                  checked={bookerPlayForMoney}
+                                  onCheckedChange={(checked) => setBookerPlayForMoney(checked === true)}
+                                />
+                                <Label htmlFor="play-for-money-main" className="text-sm">
+                                  Opt in to {cashGame.title}
+                                </Label>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -661,16 +698,18 @@ export default function BookTeeTimePage() {
                                   <p className="text-xs text-muted-foreground">Guest</p>
                                 </div>
                               )}
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`play-for-money-${i + 1}`}
-                                  checked={p.playForMoney}
-                                  onCheckedChange={(checked) => toggleAdditionalPFM(i, checked === true)}
-                                />
-                                <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm">
-                                  Playing for money
-                                </Label>
-                              </div>
+                              {cashGame && (
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`play-for-money-${i + 1}`}
+                                    checked={p.playForMoney}
+                                    onCheckedChange={(checked) => toggleAdditionalPFM(i, checked === true)}
+                                  />
+                                  <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm">
+                                    Opt in to {cashGame.title}
+                                  </Label>
+                                </div>
+                              )}
                             </div>
                             <Button
                               type="button"
