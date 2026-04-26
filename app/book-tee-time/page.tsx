@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -14,12 +14,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Info, CheckCircle, Plus } from "lucide-react"
+import { Info, CheckCircle, Plus, Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
+import {
+  searchLeagueUsers,
+  checkPlayersForDateConflict,
+  type LeagueUserSummary,
+} from "@/app/actions/reservation-players"
 
 interface TeeTime {
   id: string
@@ -44,6 +50,10 @@ const formatTimeString = (timeString: string) => {
   }
 }
 
+type AdditionalPlayer =
+  | { type: "user"; userId: string; name: string; email: string; playForMoney: boolean }
+  | { type: "guest"; name: string; playForMoney: boolean }
+
 export default function BookTeeTimePage() {
   const { user, isLoading: authLoading } = useAuth()
   const [userData, setUserData] = useState<any>(null)
@@ -55,11 +65,17 @@ export default function BookTeeTimePage() {
 
   // Booking form state
   const [selectedTeeTime, setSelectedTeeTime] = useState<string>("")
-  const [slots, setSlots] = useState<number>(1)
-  const [playerNames, setPlayerNames] = useState<string[]>([])
-  const [playForMoney, setPlayForMoney] = useState<boolean[]>([false])
+  const [bookerPlayForMoney, setBookerPlayForMoney] = useState(false)
+  const [additionalPlayers, setAdditionalPlayers] = useState<AdditionalPlayer[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null)
+
+  // Player picker state
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState("")
+  const [pickerResults, setPickerResults] = useState<LeagueUserSummary[]>([])
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const pickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const router = useRouter()
   const { toast } = useToast()
@@ -203,24 +219,67 @@ export default function BookTeeTimePage() {
   // Filter out tee times with no available slots
   const availableTeeTimes = teeTimesWithAvailability.filter((tt) => tt.availableSlots > 0)
 
-  const handleSlotsChange = (value: string) => {
-    const slotsCount = Number.parseInt(value, 10)
-    setSlots(slotsCount)
-    setPlayerNames(Array(Math.max(0, slotsCount - 1)).fill(""))
-    setPlayForMoney(Array(Math.max(1, slotsCount)).fill(false))
+  const selectedTeeTimeData = teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)
+  const totalSlots = additionalPlayers.length + 1
+  const maxSlotsForSelection = selectedTeeTimeData
+    ? Math.min(selectedTeeTimeData.availableSlots, selectedTeeTimeData.max_slots)
+    : 4
+  const atCapacity = totalSlots >= maxSlotsForSelection
+
+  const addGuestPlayer = () => {
+    if (atCapacity) return
+    setAdditionalPlayers((prev) => [...prev, { type: "guest", name: "", playForMoney: false }])
   }
 
-  const handlePlayerNameChange = (index: number, value: string) => {
-    const newPlayerNames = [...playerNames]
-    newPlayerNames[index] = value
-    setPlayerNames(newPlayerNames)
+  const addLeaguePlayer = (u: LeagueUserSummary) => {
+    if (atCapacity) return
+    setAdditionalPlayers((prev) => [
+      ...prev,
+      { type: "user", userId: u.id, name: u.name, email: u.email, playForMoney: false },
+    ])
+    setPickerOpen(false)
+    setPickerQuery("")
+    setPickerResults([])
   }
 
-  const handlePlayForMoneyChange = (index: number, checked: boolean) => {
-    const newPlayForMoney = [...playForMoney]
-    newPlayForMoney[index] = checked
-    setPlayForMoney(newPlayForMoney)
+  const removeAdditionalPlayer = (index: number) => {
+    setAdditionalPlayers((prev) => prev.filter((_, i) => i !== index))
   }
+
+  const updateGuestName = (index: number, name: string) => {
+    setAdditionalPlayers((prev) =>
+      prev.map((p, i) => (i === index && p.type === "guest" ? { ...p, name } : p)),
+    )
+  }
+
+  const toggleAdditionalPFM = (index: number, value: boolean) => {
+    setAdditionalPlayers((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, playForMoney: value } : p)),
+    )
+  }
+
+  // Debounced player search.
+  useEffect(() => {
+    if (!pickerOpen) return
+    if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
+    pickerDebounceRef.current = setTimeout(async () => {
+      setPickerLoading(true)
+      const excludeIds = [user?.id, ...additionalPlayers
+        .filter((p): p is Extract<AdditionalPlayer, { type: "user" }> => p.type === "user")
+        .map((p) => p.userId)]
+        .filter((x): x is string => !!x)
+      const result = await searchLeagueUsers(pickerQuery, excludeIds)
+      setPickerLoading(false)
+      if (result.success && result.users) {
+        setPickerResults(result.users)
+      } else {
+        setPickerResults([])
+      }
+    }, 200)
+    return () => {
+      if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
+    }
+  }, [pickerOpen, pickerQuery, additionalPlayers, user?.id])
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -234,23 +293,83 @@ export default function BookTeeTimePage() {
       return
     }
 
-    setIsSubmitting(true)
-    setBookingSuccess(null) // Clear any previous success message
+    // Validate guest names are filled in.
+    for (let i = 0; i < additionalPlayers.length; i++) {
+      const p = additionalPlayers[i]
+      if (p.type === "guest" && !p.name.trim()) {
+        toast({
+          title: "Guest name required",
+          description: `Please enter a name for guest in seat ${i + 2}.`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
 
-    // Get booking details for confirmation
-    const selectedTeeTimeData = allTeeTimes.find((t) => t.id === selectedTeeTime)
+    if (!selectedTeeTimeData) {
+      toast({
+        title: "Tee time no longer available",
+        description: "Please select a tee time again.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (totalSlots > selectedTeeTimeData.availableSlots) {
+      toast({
+        title: "Not enough available slots",
+        description: `Only ${selectedTeeTimeData.availableSlots} slot(s) left at this tee time.`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+    setBookingSuccess(null)
+
     const confirmationMessage = selectedTeeTimeData
-      ? `Booking confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${slots} ${slots === 1 ? "player" : "players"}.`
-      : `Booking confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
+      ? `Booking confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${totalSlots} ${totalSlots === 1 ? "player" : "players"}.`
+      : `Booking confirmed with ${totalSlots} ${totalSlots === 1 ? "player" : "players"}.`
+
+    // Build the aligned arrays.
+    const player_names = additionalPlayers.map((p) => p.name.trim())
+    const player_user_ids: (string | null)[] = additionalPlayers.map((p) =>
+      p.type === "user" ? p.userId : null,
+    )
+    const play_for_money = [bookerPlayForMoney, ...additionalPlayers.map((p) => p.playForMoney)]
+
+    // Pre-submit conflict check for all league players in the group.
+    const leagueIdsToCheck = [user.id, ...player_user_ids.filter((id): id is string => !!id)]
+    try {
+      const conflictResult = await checkPlayersForDateConflict(
+        selectedTeeTimeData.date,
+        leagueIdsToCheck,
+      )
+      if (conflictResult.success && conflictResult.conflicts && conflictResult.conflicts.length > 0) {
+        const names = conflictResult.conflicts.map((c) => c.name).join(", ")
+        toast({
+          title: "Scheduling conflict",
+          description: `${names} already has a reservation on ${formatDateDisplay(selectedTeeTimeData.date)}. Each player can only book one tee time per day.`,
+          variant: "destructive",
+        })
+        setIsSubmitting(false)
+        return
+      }
+    } catch (err) {
+      // If the check itself fails, fall through and let the server enforce it.
+      console.error("Conflict pre-check failed:", err)
+    }
 
     try {
       const { error } = await supabase.from("reservations").insert([
         {
           tee_time_id: selectedTeeTime,
           user_id: user.id,
-          slots,
-          player_names: playerNames.filter((name) => name.trim() !== ""),
-          play_for_money: playForMoney,
+          slots: totalSlots,
+          player_names,
+          play_for_money,
+          player_user_ids,
+          season: selectedTeeTimeData?.season,
         },
       ])
 
@@ -263,10 +382,8 @@ export default function BookTeeTimePage() {
         return
       }
 
-      // Show success message
       setBookingSuccess(confirmationMessage)
 
-      // Also try the toast as backup
       toast({
         title: "🎉 Tee Time Booked Successfully!",
         description: confirmationMessage,
@@ -274,9 +391,12 @@ export default function BookTeeTimePage() {
       })
 
       setSelectedTeeTime("")
-      setSlots(1)
-      setPlayerNames([])
-      setPlayForMoney([false])
+      setBookerPlayForMoney(false)
+      setAdditionalPlayers([])
+
+      // Refresh reservation counts so the tee time list updates
+      const { data: freshReservations } = await supabase.from("reservations").select("tee_time_id, slots")
+      setAllReservations(freshReservations || [])
     } catch (error: any) {
       toast({
         title: "Booking Failed",
@@ -488,68 +608,131 @@ export default function BookTeeTimePage() {
                     </div>
 
                     {selectedTeeTime && (
-                      <div className="space-y-2">
-                        <Label htmlFor="slots">Number of Players</Label>
-                        <Select value={slots.toString()} onValueChange={handleSlotsChange}>
-                          <SelectTrigger id="slots">
-                            <SelectValue placeholder="Select number of players" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from(
-                              {
-                                length: Math.min(
-                                  4,
-                                  teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)?.availableSlots || 0,
-                                ),
-                              },
-                              (_, i) => (
-                                <SelectItem key={i + 1} value={(i + 1).toString()}>
-                                  {i + 1} {i === 0 ? "player" : "players"}
-                                </SelectItem>
-                              ),
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {selectedTeeTime && (
-                      <div className="space-y-2 pt-2 border-t">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="play-for-money-main"
-                            checked={playForMoney[0]}
-                            onCheckedChange={(checked) => handlePlayForMoneyChange(0, checked === true)}
-                          />
-                          <Label htmlFor="play-for-money-main" className="font-medium">
-                            I want to play for money
-                          </Label>
+                      <div className="space-y-4 pt-2 border-t">
+                        <div>
+                          <Label>Players</Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {totalSlots} of {maxSlotsForSelection} seat{maxSlotsForSelection === 1 ? "" : "s"} taken.
+                          </p>
                         </div>
-                      </div>
-                    )}
 
-                    {slots > 1 && (
-                      <div className="space-y-3 pt-2 border-t">
-                        <Label>Additional Player Names & Options</Label>
-                        {Array.from({ length: slots - 1 }, (_, i) => (
-                          <div key={i} className="space-y-2">
-                            <Input
-                              placeholder={`Player ${i + 2} name`}
-                              value={playerNames[i] || ""}
-                              onChange={(e) => handlePlayerNameChange(i, e.target.value)}
-                            />
+                        {/* Booker row */}
+                        <div className="flex items-start gap-3 p-3 border rounded-md bg-muted/30">
+                          <UserRound className="h-4 w-4 mt-1 text-muted-foreground" />
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{userData?.name || "You"}</span>
+                              <span className="text-xs text-muted-foreground">(you)</span>
+                            </div>
                             <div className="flex items-center space-x-2">
                               <Checkbox
-                                id={`play-for-money-${i + 1}`}
-                                checked={playForMoney[i + 1] || false}
-                                onCheckedChange={(checked) => handlePlayForMoneyChange(i + 1, checked === true)}
+                                id="play-for-money-main"
+                                checked={bookerPlayForMoney}
+                                onCheckedChange={(checked) => setBookerPlayForMoney(checked === true)}
                               />
-                              <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm text-muted-foreground">
-                                This player wants to play for money
+                              <Label htmlFor="play-for-money-main" className="text-sm">
+                                Playing for money
                               </Label>
                             </div>
                           </div>
+                        </div>
+
+                        {/* Additional player rows */}
+                        {additionalPlayers.map((p, i) => (
+                          <div key={i} className="flex items-start gap-3 p-3 border rounded-md">
+                            {p.type === "user" ? (
+                              <UserRound className="h-4 w-4 mt-1 text-muted-foreground" />
+                            ) : (
+                              <UserPlus className="h-4 w-4 mt-1 text-muted-foreground" />
+                            )}
+                            <div className="flex-1 space-y-2">
+                              {p.type === "user" ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{p.name}</span>
+                                  <span className="text-xs text-muted-foreground">(league player)</span>
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  <Input
+                                    placeholder="Guest name"
+                                    value={p.name}
+                                    onChange={(e) => updateGuestName(i, e.target.value)}
+                                  />
+                                  <p className="text-xs text-muted-foreground">Guest</p>
+                                </div>
+                              )}
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`play-for-money-${i + 1}`}
+                                  checked={p.playForMoney}
+                                  onCheckedChange={(checked) => toggleAdditionalPFM(i, checked === true)}
+                                />
+                                <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm">
+                                  Playing for money
+                                </Label>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => removeAdditionalPlayer(i)}
+                              aria-label={`Remove player ${i + 2}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         ))}
+
+                        {/* Add buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="outline" disabled={atCapacity}>
+                                <UserRoundPlus className="h-4 w-4 mr-2" />
+                                Add Player
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-0" align="start">
+                              <div className="p-3 border-b">
+                                <Input
+                                  placeholder="Search league members..."
+                                  value={pickerQuery}
+                                  onChange={(e) => setPickerQuery(e.target.value)}
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="max-h-64 overflow-y-auto">
+                                {pickerLoading ? (
+                                  <div className="p-4 flex justify-center">
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                  </div>
+                                ) : pickerResults.length === 0 ? (
+                                  <p className="p-4 text-sm text-muted-foreground text-center">
+                                    {pickerQuery ? "No matching members" : "Start typing to search"}
+                                  </p>
+                                ) : (
+                                  pickerResults.map((u) => (
+                                    <button
+                                      key={u.id}
+                                      type="button"
+                                      className="w-full text-left p-3 hover:bg-accent transition-colors border-b last:border-b-0"
+                                      onClick={() => addLeaguePlayer(u)}
+                                    >
+                                      <div className="font-medium text-sm">{u.name}</div>
+                                      <div className="text-xs text-muted-foreground">{u.email}</div>
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          <Button type="button" variant="outline" onClick={addGuestPlayer} disabled={atCapacity}>
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Add Guest
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </CardContent>

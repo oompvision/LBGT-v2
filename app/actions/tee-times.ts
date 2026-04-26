@@ -217,7 +217,7 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 }
 
 // Function to delete a tee time
-export async function deleteTeeTime(id: string) {
+export async function deleteTeeTime(id: string, options: { force?: boolean } = {}) {
   const supabase = await createClient()
 
   try {
@@ -233,10 +233,32 @@ export async function deleteTeeTime(id: string) {
     }
 
     if (reservations && reservations.length > 0) {
-      return {
-        success: false,
-        error: "Cannot delete tee time with existing reservations. Please delete the reservations first.",
+      if (!options.force) {
+        return {
+          success: false,
+          error: "Cannot delete tee time with existing reservations. Please delete the reservations first.",
+        }
       }
+
+      const { error: delReservationsError } = await supabase
+        .from("reservations")
+        .delete()
+        .eq("tee_time_id", id)
+
+      if (delReservationsError) {
+        console.error("Error deleting reservations:", delReservationsError)
+        return { success: false, error: delReservationsError.message }
+      }
+    }
+
+    // Clean up availability row (non-fatal if it fails)
+    const { error: delAvailabilityError } = await supabase
+      .from("tee_time_availability")
+      .delete()
+      .eq("tee_time_id", id)
+
+    if (delAvailabilityError) {
+      console.error("Error deleting tee_time_availability row:", delAvailabilityError)
     }
 
     // Delete the tee time
@@ -265,6 +287,7 @@ export async function createReservation(data: {
   slots: number
   playerNames: string[]
   playForMoney: boolean[]
+  playerUserIds?: (string | null)[]
 }) {
   const supabase = await createClient()
 
@@ -321,6 +344,41 @@ export async function createReservation(data: {
       }
     }
 
+    // Enforce one-tee-time-per-day for everyone in the group (booker + linked users).
+    const linkedUserIds = (data.playerUserIds || []).filter((id): id is string => !!id)
+    const allPlayerIds = [data.userId, ...linkedUserIds]
+    if (allPlayerIds.length > 0) {
+      const { data: sameDayReservations, error: conflictError } = await supabase
+        .from("reservations")
+        .select("id, user_id, player_user_ids, tee_times!inner ( date, time )")
+        .eq("tee_times.date", teeTime.date)
+
+      if (conflictError) {
+        console.error("Error checking day conflicts:", conflictError)
+        return { success: false, error: conflictError.message }
+      }
+
+      const targetIds = new Set(allPlayerIds)
+      const conflictedIds = new Set<string>()
+      for (const r of sameDayReservations || []) {
+        if (targetIds.has(r.user_id)) conflictedIds.add(r.user_id)
+        for (const uid of ((r.player_user_ids as (string | null)[] | null) || [])) {
+          if (uid && targetIds.has(uid)) conflictedIds.add(uid)
+        }
+      }
+      if (conflictedIds.size > 0) {
+        const { data: conflictUsers } = await supabase
+          .from("users")
+          .select("id, name")
+          .in("id", Array.from(conflictedIds))
+        const names = (conflictUsers || []).map((u) => u.name).join(", ")
+        return {
+          success: false,
+          error: `One of the players already has a reservation on this date: ${names}. Each player can only book one tee time per day.`,
+        }
+      }
+    }
+
     // Create the reservation
     const { error } = await supabase.from("reservations").insert({
       tee_time_id: data.teeTimeId,
@@ -328,6 +386,8 @@ export async function createReservation(data: {
       slots: data.slots,
       player_names: data.playerNames,
       play_for_money: data.playForMoney,
+      player_user_ids: data.playerUserIds || [],
+      season: teeTime.season,
     })
 
     if (error) {
