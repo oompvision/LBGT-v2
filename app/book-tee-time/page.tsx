@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Info, CheckCircle, Plus, Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
+import { Info, Plus, Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
@@ -26,6 +26,11 @@ import {
   checkPlayersForDateConflict,
   type LeagueUserSummary,
 } from "@/app/actions/reservation-players"
+import { getCashGameForDate } from "@/app/actions/cash-games"
+import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
+import type { CashGame } from "@/types/supabase"
+import { BookingConfirmationModal } from "@/components/booking-confirmation-modal"
+import { computePlayerOwed, type BookingPlayerSummary } from "@/lib/booking-summary"
 
 interface TeeTime {
   id: string
@@ -60,6 +65,7 @@ export default function BookTeeTimePage() {
   const [allTeeTimes, setAllTeeTimes] = useState<any[]>([])
   const [allReservations, setAllReservations] = useState<any[]>([])
   const [upcomingFriday, setUpcomingFriday] = useState<string>("")
+  const [cashGame, setCashGame] = useState<CashGame | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -68,7 +74,12 @@ export default function BookTeeTimePage() {
   const [bookerPlayForMoney, setBookerPlayForMoney] = useState(false)
   const [additionalPlayers, setAdditionalPlayers] = useState<AdditionalPlayer[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null)
+  const [confirmation, setConfirmation] = useState<{
+    date: string
+    time: string
+    cashGameTitle: string | null
+    players: BookingPlayerSummary[]
+  } | null>(null)
 
   // Player picker state
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -135,6 +146,19 @@ export default function BookTeeTimePage() {
       const fridayDateString = getUpcomingFridayForSeason()
       setUpcomingFriday(fridayDateString)
 
+      // Cash game for the upcoming Friday (if configured).
+      try {
+        const cashGameRes = await getCashGameForDate(fridayDateString)
+        if (cashGameRes.success) {
+          setCashGame(cashGameRes.cashGame)
+        } else {
+          setCashGame(null)
+        }
+      } catch (err) {
+        console.error("Cash game fetch error:", err)
+        setCashGame(null)
+      }
+
       // Get tee times for the upcoming Friday with error handling
       try {
         const { data: allTeeTimesResult, error: teeTimesError } = await supabase
@@ -193,16 +217,6 @@ export default function BookTeeTimePage() {
       loadPageData()
     }
   }, [user, authLoading])
-
-  // Clear success message after 8 seconds
-  useEffect(() => {
-    if (bookingSuccess) {
-      const timer = setTimeout(() => {
-        setBookingSuccess(null)
-      }, 8000)
-      return () => clearTimeout(timer)
-    }
-  }, [bookingSuccess])
 
   // Calculate available slots for each tee time
   const teeTimesWithAvailability = allTeeTimes.map((teeTime) => {
@@ -325,11 +339,6 @@ export default function BookTeeTimePage() {
     }
 
     setIsSubmitting(true)
-    setBookingSuccess(null)
-
-    const confirmationMessage = selectedTeeTimeData
-      ? `Booking confirmed for ${formatDateDisplay(selectedTeeTimeData.date)} at ${formatTimeString(selectedTeeTimeData.time)} with ${totalSlots} ${totalSlots === 1 ? "player" : "players"}.`
-      : `Booking confirmed with ${totalSlots} ${totalSlots === 1 ? "player" : "players"}.`
 
     // Build the aligned arrays.
     const player_names = additionalPlayers.map((p) => p.name.trim())
@@ -361,17 +370,20 @@ export default function BookTeeTimePage() {
     }
 
     try {
-      const { error } = await supabase.from("reservations").insert([
-        {
-          tee_time_id: selectedTeeTime,
-          user_id: user.id,
-          slots: totalSlots,
-          player_names,
-          play_for_money,
-          player_user_ids,
-          season: selectedTeeTimeData?.season,
-        },
-      ])
+      const { data: insertedRows, error } = await supabase
+        .from("reservations")
+        .insert([
+          {
+            tee_time_id: selectedTeeTime,
+            user_id: user.id,
+            slots: totalSlots,
+            player_names,
+            play_for_money,
+            player_user_ids,
+            season: selectedTeeTimeData?.season,
+          },
+        ])
+        .select("id")
 
       if (error) {
         toast({
@@ -382,12 +394,37 @@ export default function BookTeeTimePage() {
         return
       }
 
-      setBookingSuccess(confirmationMessage)
+      // Build the modal summary from local state. This avoids a server round-trip
+      // and matches the data the user just entered.
+      const cashGameEntry = cashGame?.entry_amount ?? 0
+      const summaryPlayers: BookingPlayerSummary[] = [
+        {
+          index: 0,
+          name: userData?.name || "You",
+          isBooker: true,
+          optedIn: bookerPlayForMoney,
+          entryAmount: bookerPlayForMoney ? cashGameEntry : 0,
+          owe: computePlayerOwed(bookerPlayForMoney, cashGameEntry),
+          email: userData?.email || null,
+          userId: user.id,
+        },
+        ...additionalPlayers.map((p, i) => ({
+          index: i + 1,
+          name: p.name.trim() || `Player ${i + 2}`,
+          isBooker: false,
+          optedIn: p.playForMoney,
+          entryAmount: p.playForMoney ? cashGameEntry : 0,
+          owe: computePlayerOwed(p.playForMoney, cashGameEntry),
+          email: p.type === "user" ? p.email : null,
+          userId: p.type === "user" ? p.userId : null,
+        })),
+      ]
 
-      toast({
-        title: "🎉 Tee Time Booked Successfully!",
-        description: confirmationMessage,
-        duration: 5000,
+      setConfirmation({
+        date: selectedTeeTimeData.date,
+        time: selectedTeeTimeData.time,
+        cashGameTitle: cashGame?.title ?? null,
+        players: summaryPlayers,
       })
 
       setSelectedTeeTime("")
@@ -397,6 +434,15 @@ export default function BookTeeTimePage() {
       // Refresh reservation counts so the tee time list updates
       const { data: freshReservations } = await supabase.from("reservations").select("tee_time_id, slots")
       setAllReservations(freshReservations || [])
+
+      // Fire confirmation emails in the background. Booking is already saved;
+      // failures here are logged server-side and don't block the user.
+      const reservationId = insertedRows?.[0]?.id
+      if (reservationId) {
+        sendBookingConfirmationEmails(reservationId).catch((err) => {
+          console.error("Confirmation email send failed:", err)
+        })
+      }
     } catch (error: any) {
       toast({
         title: "Booking Failed",
@@ -564,15 +610,6 @@ export default function BookTeeTimePage() {
           </div>
 
           <div className="space-y-6">
-            {/* Success Alert - Always visible when booking succeeds */}
-            {bookingSuccess && (
-              <Alert className="border-green-200 bg-green-50">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertTitle className="text-green-800">🎉 Tee Time Booked Successfully!</AlertTitle>
-                <AlertDescription className="text-green-700">{bookingSuccess}</AlertDescription>
-              </Alert>
-            )}
-
             <Alert>
               <Info className="h-4 w-4" />
               <AlertTitle>Booking Information</AlertTitle>
@@ -609,6 +646,25 @@ export default function BookTeeTimePage() {
 
                     {selectedTeeTime && (
                       <div className="space-y-4 pt-2 border-t">
+                        {cashGame && (
+                          <div className="rounded-md border bg-muted/40 p-4 space-y-2">
+                            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                              <span className="text-base font-semibold">{cashGame.title}</span>
+                              <span className="text-sm text-muted-foreground">
+                                ${cashGame.entry_amount} entry
+                              </span>
+                            </div>
+                            {cashGame.description && (
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                                {cashGame.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Opt in below for each player or guest who wants to play.
+                            </p>
+                          </div>
+                        )}
+
                         <div>
                           <Label>Players</Label>
                           <p className="text-xs text-muted-foreground mt-1">
@@ -624,16 +680,18 @@ export default function BookTeeTimePage() {
                               <span className="font-medium">{userData?.name || "You"}</span>
                               <span className="text-xs text-muted-foreground">(you)</span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="play-for-money-main"
-                                checked={bookerPlayForMoney}
-                                onCheckedChange={(checked) => setBookerPlayForMoney(checked === true)}
-                              />
-                              <Label htmlFor="play-for-money-main" className="text-sm">
-                                Playing for money
-                              </Label>
-                            </div>
+                            {cashGame && (
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id="play-for-money-main"
+                                  checked={bookerPlayForMoney}
+                                  onCheckedChange={(checked) => setBookerPlayForMoney(checked === true)}
+                                />
+                                <Label htmlFor="play-for-money-main" className="text-sm">
+                                  Opt in to {cashGame.title}
+                                </Label>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -661,16 +719,18 @@ export default function BookTeeTimePage() {
                                   <p className="text-xs text-muted-foreground">Guest</p>
                                 </div>
                               )}
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`play-for-money-${i + 1}`}
-                                  checked={p.playForMoney}
-                                  onCheckedChange={(checked) => toggleAdditionalPFM(i, checked === true)}
-                                />
-                                <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm">
-                                  Playing for money
-                                </Label>
-                              </div>
+                              {cashGame && (
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`play-for-money-${i + 1}`}
+                                    checked={p.playForMoney}
+                                    onCheckedChange={(checked) => toggleAdditionalPFM(i, checked === true)}
+                                  />
+                                  <Label htmlFor={`play-for-money-${i + 1}`} className="text-sm">
+                                    Opt in to {cashGame.title}
+                                  </Label>
+                                </div>
+                              )}
                             </div>
                             <Button
                               type="button"
@@ -763,6 +823,19 @@ export default function BookTeeTimePage() {
         </div>
       </main>
       <Footer />
+      {confirmation && (
+        <BookingConfirmationModal
+          open={!!confirmation}
+          date={confirmation.date}
+          time={confirmation.time}
+          cashGameTitle={confirmation.cashGameTitle}
+          players={confirmation.players}
+          onDismiss={() => {
+            setConfirmation(null)
+            router.push("/my-reservations")
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -10,6 +10,12 @@ export const DEFAULT_BOOKING_CLOSES_TIME = "18:00" // 6 PM ET
 // Player handicap range
 export const MAX_STROKES_GIVEN = 20
 
+// Pricing
+// Per-player base tee time cost (USD). Update here if the green fee changes.
+export const BASE_TEE_TIME_COST = 75
+// Email address players Zelle their tee time fees to.
+export const ZELLE_PAYMENT_EMAIL = "anthony@longbeachgolftour.com"
+
 // Course data for Long Beach Golf Course (18 holes)
 export const COURSE_DATA = {
   holes: Array.from({ length: 18 }, (_, i) => i + 1),
