@@ -16,15 +16,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useToast } from "@/components/ui/use-toast"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Info, Plus, Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
+import { Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
 import {
   searchLeagueUsers,
   checkPlayersForDateConflict,
+  getMyReservationForDate,
   type LeagueUserSummary,
+  type MyReservationForDate,
 } from "@/app/actions/reservation-players"
 import { getCashGameForDate } from "@/app/actions/cash-games"
 import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
@@ -66,6 +67,7 @@ export default function BookTeeTimePage() {
   const [allReservations, setAllReservations] = useState<any[]>([])
   const [upcomingFriday, setUpcomingFriday] = useState<string>("")
   const [cashGame, setCashGame] = useState<CashGame | null>(null)
+  const [existingReservation, setExistingReservation] = useState<MyReservationForDate | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -157,6 +159,20 @@ export default function BookTeeTimePage() {
       } catch (err) {
         console.error("Cash game fetch error:", err)
         setCashGame(null)
+      }
+
+      // Existing reservation for that date (booker or invited league player).
+      // If present, the booking form is hidden and the user is pointed at /my-reservations.
+      try {
+        const existingRes = await getMyReservationForDate(fridayDateString)
+        if (existingRes.success) {
+          setExistingReservation(existingRes.reservation)
+        } else {
+          setExistingReservation(null)
+        }
+      } catch (err) {
+        console.error("Existing reservation lookup failed:", err)
+        setExistingReservation(null)
       }
 
       // Get tee times for the upcoming Friday with error handling
@@ -596,27 +612,24 @@ export default function BookTeeTimePage() {
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">Book Tee Time</h1>
-              <p className="text-muted-foreground">Reserve your spot for the upcoming round</p>
-            </div>
-            <Link href="/my-reservations">
-              <Button variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                View My Reservations
-              </Button>
-            </Link>
-          </div>
-
           <div className="space-y-6">
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>Booking Information</AlertTitle>
-              <AlertDescription>
-                Each player can book one tee time per week for up to 4 players.
-              </AlertDescription>
-            </Alert>
+            {existingReservation ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>You already have a tee time booked</CardTitle>
+                  <CardDescription>
+                    {formatDateDisplay(existingReservation.date)} at{" "}
+                    {formatTimeString(existingReservation.time)} EST
+                  </CardDescription>
+                </CardHeader>
+                <CardFooter>
+                  <Button asChild className="text-white">
+                    <Link href="/my-reservations">View my reservations</Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            ) : (
+              <>
 
             {availableTeeTimes.length > 0 ? (
               <form onSubmit={handleBooking} className="space-y-6">
@@ -818,6 +831,8 @@ export default function BookTeeTimePage() {
                   </Button>
                 </CardFooter>
               </Card>
+            )}
+              </>
             )}
           </div>
         </div>
