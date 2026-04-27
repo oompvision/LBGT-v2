@@ -86,7 +86,9 @@ export default async function MyReservationsPage() {
     tee_times (
       id,
       date,
-      time
+      time,
+      max_slots,
+      booking_closes_at
     ),
     users (
       id,
@@ -137,6 +139,22 @@ export default async function MyReservationsPage() {
   const hasUpcomingFridayReservation = userReservations.some(
     (r) => (r.tee_times as any)?.date === upcomingFriday,
   )
+
+  // Cash games for the dates in this user's reservations, so each card can show
+  // the correct opt-in label inside the Edit dialog.
+  const allDates = Array.from(
+    new Set(userReservations.map((r) => (r.tee_times as any)?.date).filter(Boolean) as string[]),
+  )
+  const cashGamesByDate = new Map<string, string>()
+  if (allDates.length > 0) {
+    const { data: cashGames } = await supabase
+      .from("cash_games")
+      .select("date, title")
+      .in("date", allDates)
+    for (const cg of (cashGames as { date: string; title: string }[] | null) || []) {
+      cashGamesByDate.set(cg.date, cg.title)
+    }
+  }
 
   // Group reservations by date
   const reservationsByDate = (userReservations || []).reduce(
@@ -288,6 +306,29 @@ export default async function MyReservationsPage() {
                             reservationId={reservation.id}
                             role={role}
                             bookerIsSolo={bookerIsSolo}
+                            viewerUserId={userId}
+                            cashGameTitle={
+                              cashGamesByDate.get((reservation.tee_times as any)?.date) ?? null
+                            }
+                            editData={{
+                              id: reservation.id,
+                              slots: reservation.slots,
+                              maxSlots: (reservation.tee_times as any)?.max_slots ?? 4,
+                              teeTimeDate: (reservation.tee_times as any)?.date ?? "",
+                              teeTimeTime: (reservation.tee_times as any)?.time ?? "",
+                              bookingClosesAt:
+                                (reservation.tee_times as any)?.booking_closes_at ?? null,
+                              bookerName: bookerName || "Booker",
+                              bookerUserId: reservation.user_id,
+                              additionalPlayers: playerNames.map((name, i) => ({
+                                name,
+                                userId: playerUserIds[i] ?? null,
+                              })),
+                              playForMoney: Array.from(
+                                { length: reservation.slots },
+                                (_, i) => !!playForMoney[i],
+                              ),
+                            }}
                           />
                         </div>
                       )

@@ -237,7 +237,10 @@ export async function captureCancellationSnapshot(
   }
 }
 
-export async function sendBookingConfirmationEmails(reservationId: string) {
+export async function sendBookingConfirmationEmails(
+  reservationId: string,
+  options?: { onlyUserIds?: string[] },
+) {
   try {
     const apiKey = process.env.RESEND_API_KEY
     if (!apiKey) {
@@ -273,7 +276,12 @@ export async function sendBookingConfirmationEmails(reservationId: string) {
     })
     const icsBase64 = Buffer.from(ics, "utf8").toString("base64")
 
-    const recipients = players.filter((p) => !!p.email)
+    const onlyIds = options?.onlyUserIds && options.onlyUserIds.length > 0
+      ? new Set(options.onlyUserIds)
+      : null
+    const recipients = players
+      .filter((p) => !!p.email)
+      .filter((p) => (onlyIds ? p.userId && onlyIds.has(p.userId) : true))
     if (recipients.length === 0) {
       return { success: true, sent: 0, total: 0 }
     }
