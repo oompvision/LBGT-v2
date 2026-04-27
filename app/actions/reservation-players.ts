@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import {
+  captureCancellationSnapshot,
+  sendBookingCancellationEmails,
+} from "@/app/actions/booking-emails"
 
 export interface LeagueUserSummary {
   id: string
@@ -197,9 +201,15 @@ export async function removePlayerFromReservation(
     if (isBooker) {
       // Booker alone (no additional seats) → treat remove-self as cancel
       if (playerUserIds.length === 0) {
+        const snapshot = await captureCancellationSnapshot(reservationId)
         const { error: deleteError } = await supabase.from("reservations").delete().eq("id", reservationId)
         if (deleteError) {
           return { success: false, error: deleteError.message }
+        }
+        if (snapshot) {
+          sendBookingCancellationEmails(snapshot).catch((err) => {
+            console.error("Cancellation email send failed:", err)
+          })
         }
         revalidatePath("/my-reservations")
         revalidatePath("/dashboard")
@@ -320,9 +330,16 @@ export async function cancelReservationAsBooker(
       }
     }
 
+    const snapshot = await captureCancellationSnapshot(reservationId)
     const { error: deleteError } = await supabase.from("reservations").delete().eq("id", reservationId)
     if (deleteError) {
       return { success: false, error: deleteError.message }
+    }
+
+    if (snapshot) {
+      sendBookingCancellationEmails(snapshot).catch((err) => {
+        console.error("Cancellation email send failed:", err)
+      })
     }
 
     revalidatePath("/my-reservations")

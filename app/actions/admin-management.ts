@@ -2,6 +2,10 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import {
+  captureCancellationSnapshot,
+  sendBookingCancellationEmails,
+} from "@/app/actions/booking-emails"
 
 // Create a Supabase client with admin privileges
 const supabaseAdmin = createAdminClient()
@@ -194,6 +198,9 @@ export async function deleteReservation(reservationId: string) {
       return { success: false, error: "Invalid reservation ID provided" }
     }
 
+    // Capture recipient details before deletion so we can email them after.
+    const snapshot = await captureCancellationSnapshot(reservationId)
+
     // Call the SQL function we just created
     const { data, error } = await supabaseAdmin.rpc("delete_reservation_completely", {
       p_reservation_id: reservationId,
@@ -208,6 +215,12 @@ export async function deleteReservation(reservationId: string) {
     if (data === false) {
       console.error("Reservation deletion failed - reservation may not exist")
       return { success: false, error: "Reservation deletion failed - reservation may not exist" }
+    }
+
+    if (snapshot) {
+      sendBookingCancellationEmails(snapshot).catch((err) => {
+        console.error("Cancellation email send failed:", err)
+      })
     }
 
     // Revalidate relevant paths
