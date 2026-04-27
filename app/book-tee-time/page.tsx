@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -14,14 +14,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { PlayerPicker } from "@/components/player-picker"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
+import { UserPlus, UserRound, UserRoundPlus, X } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useRouter } from "next/navigation"
 import {
-  searchLeagueUsers,
   checkPlayersForDateConflict,
   getMyReservationForDate,
   type LeagueUserSummary,
@@ -85,10 +84,6 @@ export default function BookTeeTimePage() {
 
   // Player picker state
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerQuery, setPickerQuery] = useState("")
-  const [pickerResults, setPickerResults] = useState<LeagueUserSummary[]>([])
-  const [pickerLoading, setPickerLoading] = useState(false)
-  const pickerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const router = useRouter()
   const { toast } = useToast()
@@ -261,15 +256,19 @@ export default function BookTeeTimePage() {
     setAdditionalPlayers((prev) => [...prev, { type: "guest", name: "", playForMoney: false }])
   }
 
-  const addLeaguePlayer = (u: LeagueUserSummary) => {
-    if (atCapacity) return
-    setAdditionalPlayers((prev) => [
-      ...prev,
-      { type: "user", userId: u.id, name: u.name, email: u.email, playForMoney: false },
-    ])
-    setPickerOpen(false)
-    setPickerQuery("")
-    setPickerResults([])
+  const addLeaguePlayers = (users: LeagueUserSummary[]) => {
+    if (users.length === 0) return
+    setAdditionalPlayers((prev) => {
+      const remaining = Math.max(0, maxSlotsForSelection - (prev.length + 1))
+      const toAdd = users.slice(0, remaining).map((u) => ({
+        type: "user" as const,
+        userId: u.id,
+        name: u.name,
+        email: u.email,
+        playForMoney: false,
+      }))
+      return [...prev, ...toAdd]
+    })
   }
 
   const removeAdditionalPlayer = (index: number) => {
@@ -287,29 +286,6 @@ export default function BookTeeTimePage() {
       prev.map((p, i) => (i === index ? { ...p, playForMoney: value } : p)),
     )
   }
-
-  // Debounced player search.
-  useEffect(() => {
-    if (!pickerOpen) return
-    if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
-    pickerDebounceRef.current = setTimeout(async () => {
-      setPickerLoading(true)
-      const excludeIds = [user?.id, ...additionalPlayers
-        .filter((p): p is Extract<AdditionalPlayer, { type: "user" }> => p.type === "user")
-        .map((p) => p.userId)]
-        .filter((x): x is string => !!x)
-      const result = await searchLeagueUsers(pickerQuery, excludeIds)
-      setPickerLoading(false)
-      if (result.success && result.users) {
-        setPickerResults(result.users)
-      } else {
-        setPickerResults([])
-      }
-    }, 200)
-    return () => {
-      if (pickerDebounceRef.current) clearTimeout(pickerDebounceRef.current)
-    }
-  }, [pickerOpen, pickerQuery, additionalPlayers, user?.id])
 
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -760,47 +736,15 @@ export default function BookTeeTimePage() {
 
                         {/* Add buttons */}
                         <div className="flex flex-wrap gap-2">
-                          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-                            <PopoverTrigger asChild>
-                              <Button type="button" variant="outline" disabled={atCapacity}>
-                                <UserRoundPlus className="h-4 w-4 mr-2" />
-                                Add Player
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-0" align="start">
-                              <div className="p-3 border-b">
-                                <Input
-                                  placeholder="Search league members..."
-                                  value={pickerQuery}
-                                  onChange={(e) => setPickerQuery(e.target.value)}
-                                  autoFocus
-                                />
-                              </div>
-                              <div className="max-h-64 overflow-y-auto">
-                                {pickerLoading ? (
-                                  <div className="p-4 flex justify-center">
-                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                  </div>
-                                ) : pickerResults.length === 0 ? (
-                                  <p className="p-4 text-sm text-muted-foreground text-center">
-                                    {pickerQuery ? "No matching members" : "Start typing to search"}
-                                  </p>
-                                ) : (
-                                  pickerResults.map((u) => (
-                                    <button
-                                      key={u.id}
-                                      type="button"
-                                      className="w-full text-left p-3 hover:bg-accent transition-colors border-b last:border-b-0"
-                                      onClick={() => addLeaguePlayer(u)}
-                                    >
-                                      <div className="font-medium text-sm">{u.name}</div>
-                                      <div className="text-xs text-muted-foreground">{u.email}</div>
-                                    </button>
-                                  ))
-                                )}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={atCapacity}
+                            onClick={() => setPickerOpen(true)}
+                          >
+                            <UserRoundPlus className="h-4 w-4 mr-2" />
+                            Add Player(s)
+                          </Button>
                           <Button type="button" variant="outline" onClick={addGuestPlayer} disabled={atCapacity}>
                             <UserPlus className="h-4 w-4 mr-2" />
                             Add Guest
@@ -838,6 +782,18 @@ export default function BookTeeTimePage() {
         </div>
       </main>
       <Footer />
+      <PlayerPicker
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        excludeUserIds={[
+          ...(user?.id ? [user.id] : []),
+          ...additionalPlayers
+            .filter((p): p is Extract<AdditionalPlayer, { type: "user" }> => p.type === "user")
+            .map((p) => p.userId),
+        ]}
+        maxSelectable={Math.max(0, maxSlotsForSelection - (additionalPlayers.length + 1))}
+        onConfirm={(users) => addLeaguePlayers(users)}
+      />
       {confirmation && (
         <BookingConfirmationModal
           open={!!confirmation}

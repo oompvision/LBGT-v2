@@ -27,7 +27,7 @@ export async function searchLeagueUsers(
       .select("id, name, email")
       .eq("is_confirmed", true)
       .order("name", { ascending: true })
-      .limit(25)
+      .limit(500)
 
     const trimmed = query.trim()
     if (trimmed) {
