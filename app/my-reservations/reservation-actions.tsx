@@ -86,16 +86,16 @@ export function ReservationActions({ reservationId, role, bookerIsSolo }: Reserv
     return (
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="destructive" size="sm" className="text-white" disabled={isCancelling}>
+          <Button variant="destructive" className="w-full sm:w-auto text-white" disabled={isCancelling}>
             {isCancelling ? (
               <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Cancelling...
               </>
             ) : (
               <>
-                <Trash2 className="mr-1 h-4 w-4" />
-                Cancel
+                <Trash2 className="mr-2 h-4 w-4" />
+                Cancel Reservation
               </>
             )}
           </Button>
@@ -129,15 +129,15 @@ export function ReservationActions({ reservationId, role, bookerIsSolo }: Reserv
     return (
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" size="sm" disabled={isRemoving}>
+          <Button variant="outline" className="w-full sm:w-auto" disabled={isRemoving}>
             {isRemoving ? (
               <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Removing...
               </>
             ) : (
               <>
-                <LogOut className="mr-1 h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Remove Myself
               </>
             )}
@@ -169,18 +169,18 @@ export function ReservationActions({ reservationId, role, bookerIsSolo }: Reserv
 
   // Booker in a group: two buttons, remove-self (transfers) and cancel (whole thing).
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col sm:flex-row gap-2">
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" size="sm" disabled={isRemoving || isCancelling}>
+          <Button variant="outline" className="w-full sm:w-auto" disabled={isRemoving || isCancelling}>
             {isRemoving ? (
               <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Removing...
               </>
             ) : (
               <>
-                <LogOut className="mr-1 h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" />
                 Remove Myself
               </>
             )}
@@ -210,15 +210,15 @@ export function ReservationActions({ reservationId, role, bookerIsSolo }: Reserv
 
       <AlertDialog>
         <AlertDialogTrigger asChild>
-          <Button variant="destructive" size="sm" className="text-white" disabled={isCancelling || isRemoving}>
+          <Button variant="destructive" className="w-full sm:w-auto text-white" disabled={isCancelling || isRemoving}>
             {isCancelling ? (
               <>
-                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Cancelling...
               </>
             ) : (
               <>
-                <Trash2 className="mr-1 h-4 w-4" />
+                <Trash2 className="mr-2 h-4 w-4" />
                 Cancel Reservation
               </>
             )}
