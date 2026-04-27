@@ -37,8 +37,8 @@ export function BookingConfirmationModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onDismiss()}>
-      <DialogContent className="sm:max-w-lg bg-white text-slate-900 p-0 gap-0 overflow-hidden">
-        <div className="flex items-center gap-3 px-6 pt-6 pb-4 border-b border-slate-200">
+      <DialogContent className="sm:max-w-lg bg-white text-slate-900 p-0 gap-0 max-h-[90dvh] flex flex-col">
+        <div className="shrink-0 flex items-center gap-3 px-6 pt-6 pb-4 border-b border-slate-200">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
             <CheckCircle2 className="h-5 w-5 text-emerald-600" />
           </div>
@@ -50,7 +50,7 @@ export function BookingConfirmationModal({
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <div className="rounded-lg bg-slate-50 border border-slate-200 p-4">
             <div className="flex items-center gap-2 text-slate-900">
               <Calendar className="h-4 w-4 text-slate-500" />
@@ -133,7 +133,7 @@ export function BookingConfirmationModal({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t border-slate-200 bg-slate-50 sm:justify-end">
+        <DialogFooter className="shrink-0 px-6 py-4 border-t border-slate-200 bg-slate-50 sm:justify-end">
           <Button onClick={onDismiss} className="text-white">
             Got it
           </Button>
