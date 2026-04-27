@@ -45,12 +45,44 @@ export function MobileMenu() {
           {user ? (
             <>
               <Link
-                href="/dashboard"
+                href="/"
                 onClick={() => setOpen(false)}
                 className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="Go to dashboard"
+                aria-label="Go to homepage"
               >
-                Dashboard
+                Home
+              </Link>
+              <Link
+                href="/book-tee-time"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="Book a tee time"
+              >
+                Book Tee Time
+              </Link>
+              <Link
+                href="/my-reservations"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="View my reservations"
+              >
+                My Reservations
+              </Link>
+              <Link
+                href="/schedule"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="View schedule"
+              >
+                Schedule
+              </Link>
+              <Link
+                href="/scores/league-rounds"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="View tour leaderboard"
+              >
+                Tour Leaderboard
               </Link>
               <Link
                 href="/scores/submit"
@@ -64,33 +96,9 @@ export function MobileMenu() {
                 href="/scores/my-rounds"
                 onClick={() => setOpen(false)}
                 className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="View your rounds"
+                aria-label="View your scores"
               >
-                My Rounds
-              </Link>
-              <Link
-                href="/scores/league-rounds"
-                onClick={() => setOpen(false)}
-                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="View tour leaderboard"
-              >
-                Tour Leaderboard
-              </Link>
-              <Link
-                href="/reservations"
-                onClick={() => setOpen(false)}
-                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="View reservations"
-              >
-                Tee Times
-              </Link>
-              <Link
-                href="/schedule"
-                onClick={() => setOpen(false)}
-                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="View schedule"
-              >
-                Schedule
+                My Scores
               </Link>
               <Link
                 href="/profile"

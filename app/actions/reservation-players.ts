@@ -27,7 +27,7 @@ export async function searchLeagueUsers(
       .select("id, name, email")
       .eq("is_confirmed", true)
       .order("name", { ascending: true })
-      .limit(25)
+      .limit(500)
 
     const trimmed = query.trim()
     if (trimmed) {
@@ -134,6 +134,64 @@ export async function checkPlayersForDateConflict(
     return { success: true, conflicts }
   } catch (error: any) {
     return { success: false, error: error.message || "Failed to check for conflicts" }
+  }
+}
+
+export type MyReservationForDate = {
+  id: string
+  date: string
+  time: string
+  isBooker: boolean
+}
+
+// Returns the signed-in user's reservation on the given date, if any.
+// Matches when the user is the booker OR is listed in player_user_ids.
+export async function getMyReservationForDate(
+  date: string,
+): Promise<{ success: boolean; reservation: MyReservationForDate | null; error?: string }> {
+  const supabase = await createClient()
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session) {
+      return { success: false, reservation: null, error: "Not signed in" }
+    }
+    const userId = session.user.id
+
+    const { data, error } = await supabase
+      .from("reservations")
+      .select(
+        `
+        id,
+        user_id,
+        player_user_ids,
+        tee_times!inner ( date, time )
+      `,
+      )
+      .eq("tee_times.date", date)
+
+    if (error) {
+      return { success: false, reservation: null, error: error.message }
+    }
+
+    for (const r of data || []) {
+      const tt = (r as any).tee_times as { date: string; time: string } | null
+      if (!tt) continue
+      const playerUserIds = ((r as any).player_user_ids as (string | null)[] | null) || []
+      const isBooker = (r as any).user_id === userId
+      const isInvited = playerUserIds.includes(userId)
+      if (isBooker || isInvited) {
+        return {
+          success: true,
+          reservation: { id: (r as any).id, date: tt.date, time: tt.time, isBooker },
+        }
+      }
+    }
+
+    return { success: true, reservation: null }
+  } catch (error: any) {
+    return { success: false, reservation: null, error: error.message || "Failed to look up reservation" }
   }
 }
 

@@ -6,10 +6,10 @@ import { createClient } from "@/lib/supabase/server"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarIcon, Clock, Plus } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CalendarIcon, Clock, Plus, BadgeCheck } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
+import { getUpcomingFridayForSeason } from "@/lib/utils"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -86,7 +86,9 @@ export default async function MyReservationsPage() {
     tee_times (
       id,
       date,
-      time
+      time,
+      max_slots,
+      booking_closes_at
     ),
     users (
       id,
@@ -131,6 +133,29 @@ export default async function MyReservationsPage() {
   // Get current user's name for "you" display
   const { data: userData } = await supabase.from("users").select("name").eq("id", userId).single()
 
+  // Hide the "Book Tee Time" CTA when the user already has a reservation on the
+  // upcoming Friday — same one-per-Friday rule the booking page enforces.
+  const upcomingFriday = getUpcomingFridayForSeason()
+  const hasUpcomingFridayReservation = userReservations.some(
+    (r) => (r.tee_times as any)?.date === upcomingFriday,
+  )
+
+  // Cash games for the dates in this user's reservations, so each card can show
+  // the correct opt-in label inside the Edit dialog.
+  const allDates = Array.from(
+    new Set(userReservations.map((r) => (r.tee_times as any)?.date).filter(Boolean) as string[]),
+  )
+  const cashGamesByDate = new Map<string, string>()
+  if (allDates.length > 0) {
+    const { data: cashGames } = await supabase
+      .from("cash_games")
+      .select("date, title")
+      .in("date", allDates)
+    for (const cg of (cashGames as { date: string; title: string }[] | null) || []) {
+      cashGamesByDate.set(cg.date, cg.title)
+    }
+  }
+
   // Group reservations by date
   const reservationsByDate = (userReservations || []).reduce(
     (acc, reservation) => {
@@ -150,17 +175,21 @@ export default async function MyReservationsPage() {
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">My Reservations</h1>
-              <p className="text-muted-foreground">View and manage your tee time reservations</p>
-            </div>
-            <Link href="/book-tee-time">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Book Tee Time
-              </Button>
-            </Link>
+          <div className="mb-6 space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">My Reservations</h1>
+            <p className="text-sm text-muted-foreground">
+              View and manage your tee time reservations
+            </p>
+            {hasUpcomingFridayReservation ? null : (
+              <div className="pt-2">
+                <Link href="/book-tee-time">
+                  <Button className="w-full sm:w-auto">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Book Tee Time
+                  </Button>
+                </Link>
+              </div>
+            )}
           </div>
 
           {queryError && (
@@ -175,105 +204,135 @@ export default async function MyReservationsPage() {
           )}
 
           {Object.keys(reservationsByDate).length > 0 ? (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {Object.entries(reservationsByDate).map(([date, dateReservations]) => (
                 <Card key={date}>
                   <CardHeader className="bg-muted/50">
                     <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-                      <CardTitle>{formatDateSafely(date)}</CardTitle>
+                      <CalendarIcon className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <CardTitle className="text-base sm:text-lg">{formatDateSafely(date)}</CardTitle>
                     </div>
                   </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y">
-                      {dateReservations.map((reservation) => {
-                        const role: "booker" | "invited" =
-                          reservation.user_id === userId ? "booker" : "invited"
-                        const bookerName = (reservation.users as any)?.name as string | undefined
-                        const playerUserIds: (string | null)[] =
-                          (reservation.player_user_ids as (string | null)[] | null) || []
-                        const playerNames = reservation.player_names || []
-                        const playForMoney = reservation.play_for_money || []
-                        const bookerIsSolo = role === "booker" && playerUserIds.length === 0
+                  <CardContent className="p-4 space-y-6">
+                    {dateReservations.map((reservation) => {
+                      const role: "booker" | "invited" =
+                        reservation.user_id === userId ? "booker" : "invited"
+                      const bookerName = (reservation.users as any)?.name as string | undefined
+                      const playerUserIds: (string | null)[] =
+                        (reservation.player_user_ids as (string | null)[] | null) || []
+                      const playerNames: string[] = reservation.player_names || []
+                      const playForMoney: boolean[] = reservation.play_for_money || []
+                      const bookerIsSolo = role === "booker" && playerUserIds.length === 0
 
-                        return (
-                          <div key={reservation.id} className="p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Clock className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium">
-                                    {formatTimeFromString((reservation.tee_times as any)?.time)}
-                                  </span>
-                                  {role === "invited" && (
-                                    <Badge variant="secondary">
-                                      Booked by {bookerName || "another player"}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="mt-2">
-                                  <p className="font-medium">
-                                    {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
-                                  </p>
+                      type PlayerEntry = {
+                        name: string
+                        isViewer: boolean
+                        isLeague: boolean
+                        optedIn: boolean
+                      }
 
-                                  <div className="mt-1 text-sm">
-                                    {/* Booker line */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium">
-                                        {role === "booker"
-                                          ? userData?.name || "You"
-                                          : bookerName || "Booker"}
-                                      </span>
-                                      {role === "booker" && (
-                                        <span className="text-xs text-muted-foreground">(you)</span>
-                                      )}
-                                      {playForMoney[0] && (
-                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                          Playing for money
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
+                      const players: PlayerEntry[] = [
+                        {
+                          name: role === "booker" ? userData?.name || "You" : bookerName || "Booker",
+                          isViewer: role === "booker",
+                          isLeague: true,
+                          optedIn: !!playForMoney[0],
+                        },
+                        ...playerNames.map((name, i) => ({
+                          name,
+                          isViewer: playerUserIds[i] === userId,
+                          isLeague: !!playerUserIds[i],
+                          optedIn: !!playForMoney[i + 1],
+                        })),
+                      ]
 
-                                  {playerNames.length > 0 && (
-                                    <div className="mt-2 text-sm text-muted-foreground">
-                                      <p>Additional players:</p>
-                                      <ul className="list-inside list-disc">
-                                        {playerNames.map((name, i) => {
-                                          const linkedUserId = playerUserIds[i]
-                                          const isYou = linkedUserId === userId
-                                          return (
-                                            <li key={i} className="flex items-center gap-2">
-                                              <span>
-                                                {name}
-                                                {linkedUserId ? " (league)" : " (guest)"}
-                                                {isYou && " — you"}
-                                              </span>
-                                              {playForMoney[i + 1] && (
-                                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                                  Playing for money
-                                                </span>
-                                              )}
-                                            </li>
-                                          )
-                                        })}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="ml-4 shrink-0">
-                                <ReservationActions
-                                  reservationId={reservation.id}
-                                  role={role}
-                                  bookerIsSolo={bookerIsSolo}
-                                />
-                              </div>
-                            </div>
+                      // Move the viewer to the top of the list (if they aren't already).
+                      const viewerIdx = players.findIndex((p) => p.isViewer)
+                      if (viewerIdx > 0) {
+                        const [self] = players.splice(viewerIdx, 1)
+                        players.unshift(self)
+                      }
+
+                      const showOptInLegend = playForMoney.some(Boolean)
+
+                      return (
+                        <div key={reservation.id} className="space-y-4">
+                          <div className="flex items-center gap-2 text-sm">
+                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="font-medium">
+                              {formatTimeFromString((reservation.tee_times as any)?.time)} EST
+                            </span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-muted-foreground">
+                              {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
+                            </span>
                           </div>
-                        )
-                      })}
-                    </div>
+
+                          <ul className="space-y-2">
+                            {players.map((p, i) => (
+                              <li
+                                key={i}
+                                className="flex items-center flex-wrap gap-x-2 gap-y-1 text-sm"
+                              >
+                                <span className={p.isViewer ? "font-semibold" : ""}>{p.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {p.isLeague ? "(Tour Member)" : "(Guest)"}
+                                </span>
+                                {p.optedIn && (
+                                  <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                    money
+                                    <BadgeCheck className="h-3 w-3" />
+                                  </span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            {role === "invited" && (
+                              <p>Booked by {bookerName || "another player"}</p>
+                            )}
+                            {showOptInLegend && (
+                              <p>
+                                <span className="inline-flex items-center gap-1">
+                                  money <BadgeCheck className="h-3 w-3" />
+                                </span>{" "}
+                                indicates players opted into the weekly cash contest
+                              </p>
+                            )}
+                          </div>
+
+                          <ReservationActions
+                            reservationId={reservation.id}
+                            role={role}
+                            bookerIsSolo={bookerIsSolo}
+                            viewerUserId={userId}
+                            cashGameTitle={
+                              cashGamesByDate.get((reservation.tee_times as any)?.date) ?? null
+                            }
+                            editData={{
+                              id: reservation.id,
+                              slots: reservation.slots,
+                              maxSlots: (reservation.tee_times as any)?.max_slots ?? 4,
+                              teeTimeDate: (reservation.tee_times as any)?.date ?? "",
+                              teeTimeTime: (reservation.tee_times as any)?.time ?? "",
+                              bookingClosesAt:
+                                (reservation.tee_times as any)?.booking_closes_at ?? null,
+                              bookerName: bookerName || "Booker",
+                              bookerUserId: reservation.user_id,
+                              additionalPlayers: playerNames.map((name, i) => ({
+                                name,
+                                userId: playerUserIds[i] ?? null,
+                              })),
+                              playForMoney: Array.from(
+                                { length: reservation.slots },
+                                (_, i) => !!playForMoney[i],
+                              ),
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
                   </CardContent>
                 </Card>
               ))}
@@ -284,11 +343,11 @@ export default async function MyReservationsPage() {
                 <CardTitle>No Reservations</CardTitle>
                 <CardDescription>You haven&apos;t made any tee time reservations yet.</CardDescription>
               </CardHeader>
-              <CardFooter>
+              <CardContent>
                 <Link href="/book-tee-time">
-                  <Button>Book Your First Tee Time</Button>
+                  <Button className="w-full sm:w-auto">Book Your First Tee Time</Button>
                 </Link>
-              </CardFooter>
+              </CardContent>
             </Card>
           )}
         </div>
