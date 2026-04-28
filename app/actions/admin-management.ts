@@ -394,12 +394,13 @@ export async function updateStrokesGivenDirectly(userId: string, strokesGiven: n
   }
 }
 
-// Function to confirm a member (admin only)
+// Function to confirm a member (admin only). Confirmed members default to
+// active so they can immediately be picked for bookings and score logs.
 export async function confirmMember(userId: string) {
   try {
     const { error } = await supabaseAdmin
       .from("users")
-      .update({ is_confirmed: true })
+      .update({ is_confirmed: true, is_active: true })
       .eq("id", userId)
 
     if (error) {
@@ -415,12 +416,13 @@ export async function confirmMember(userId: string) {
   }
 }
 
-// Function to unconfirm a member (admin only)
+// Function to unconfirm a member (admin only). Reverting to pending also
+// forces the user back to inactive so they're hidden from player pickers.
 export async function unconfirmMember(userId: string) {
   try {
     const { error } = await supabaseAdmin
       .from("users")
-      .update({ is_confirmed: false })
+      .update({ is_confirmed: false, is_active: false })
       .eq("id", userId)
 
     if (error) {
@@ -432,6 +434,48 @@ export async function unconfirmMember(userId: string) {
     return { success: true, message: "Member confirmation revoked" }
   } catch (error: any) {
     console.error("Error in unconfirmMember:", error)
+    return { success: false, error: error.message || "An unexpected error occurred" }
+  }
+}
+
+// Toggle a confirmed user's active state (admin only). Pending users cannot
+// be marked active — their state is dictated by `is_confirmed`.
+export async function setUserActiveState(userId: string, isActive: boolean) {
+  try {
+    if (isActive) {
+      const { data: user, error: fetchError } = await supabaseAdmin
+        .from("users")
+        .select("is_confirmed")
+        .eq("id", userId)
+        .single()
+
+      if (fetchError) {
+        console.error("Error fetching user for active toggle:", fetchError)
+        return { success: false, error: fetchError.message }
+      }
+
+      if (!user?.is_confirmed) {
+        return { success: false, error: "Only confirmed users can be set to active." }
+      }
+    }
+
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update({ is_active: isActive })
+      .eq("id", userId)
+
+    if (error) {
+      console.error("Error updating user active state:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/users")
+    return {
+      success: true,
+      message: isActive ? "User marked as active" : "User marked as inactive",
+    }
+  } catch (error: any) {
+    console.error("Error in setUserActiveState:", error)
     return { success: false, error: error.message || "An unexpected error occurred" }
   }
 }

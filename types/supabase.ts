@@ -9,6 +9,7 @@ export type Database = {
           strokes_given: number | null
           is_admin: boolean
           is_confirmed: boolean
+          is_active: boolean
           phone_number: string | null
           created_at: string
           profile_picture_url: string | null
@@ -20,6 +21,7 @@ export type Database = {
           strokes_given?: number | null
           is_admin?: boolean
           is_confirmed?: boolean
+          is_active?: boolean
           phone_number?: string | null
           created_at?: string
           profile_picture_url?: string | null
@@ -31,6 +33,7 @@ export type Database = {
           strokes_given?: number | null
           is_admin?: boolean
           is_confirmed?: boolean
+          is_active?: boolean
           phone_number?: string | null
           created_at?: string
           profile_picture_url?: string | null

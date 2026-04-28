@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Edit, Loader2, Phone, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
 import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
   updateUser,
@@ -26,6 +26,7 @@ import {
   adminRemoveProfilePicture,
   confirmMember,
   unconfirmMember,
+  setUserActiveState,
 } from "@/app/actions/admin-management"
 import type { User } from "@/types/supabase"
 import { MAX_STROKES_GIVEN } from "@/lib/constants"
@@ -54,6 +55,7 @@ export function UserManagement({ users }: UserManagementProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [isConfirming, setIsConfirming] = useState<string | null>(null)
+  const [isTogglingActive, setIsTogglingActive] = useState<string | null>(null)
   const [isUploadingPicture, setIsUploadingPicture] = useState<string | null>(null)
   const [selectedPictureUser, setSelectedPictureUser] = useState<any>(null)
   const [isPictureDialogOpen, setIsPictureDialogOpen] = useState(false)
@@ -192,6 +194,29 @@ export function UserManagement({ users }: UserManagementProps) {
     }
   }
 
+  const handleToggleActive = async (user: User, nextActive: boolean) => {
+    setIsTogglingActive(user.id)
+    try {
+      const result = await setUserActiveState(user.id, nextActive)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      toast({
+        title: "Success",
+        description: result.message,
+      })
+      router.refresh()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user state",
+        variant: "destructive",
+      })
+    } finally {
+      setIsTogglingActive(null)
+    }
+  }
+
   const handleProfilePictureUpload = async (userId: string, formData: FormData) => {
     setIsUploadingPicture(userId)
 
@@ -287,13 +312,20 @@ export function UserManagement({ users }: UserManagementProps) {
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <CardTitle className="text-base">{user.name || "Unnamed User"}</CardTitle>
                         {user.is_admin && <Badge>Admin</Badge>}
                         {user.is_confirmed ? (
                           <Badge variant="outline" className="border-green-500 text-green-600">Confirmed</Badge>
                         ) : (
                           <Badge variant="destructive">Pending</Badge>
+                        )}
+                        {user.is_active ? (
+                          <Badge variant="outline" className="border-green-500 text-green-600">Active</Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-muted-foreground text-muted-foreground">
+                            Inactive
+                          </Badge>
                         )}
                       </div>
                       <CardDescription>{user.email || "No email"}</CardDescription>
@@ -315,6 +347,28 @@ export function UserManagement({ users }: UserManagementProps) {
                           <ShieldCheck className="mr-2 h-4 w-4" />
                         )}
                         {user.is_confirmed ? "Revoke" : "Confirm"}
+                      </Button>
+                    )}
+                    {!user.is_admin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleActive(user, !user.is_active)}
+                        disabled={!user.is_confirmed || isTogglingActive === user.id}
+                        title={
+                          !user.is_confirmed
+                            ? "Confirm this user before changing their state"
+                            : undefined
+                        }
+                      >
+                        {isTogglingActive === user.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : user.is_active ? (
+                          <PowerOff className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Power className="mr-2 h-4 w-4" />
+                        )}
+                        {user.is_active ? "Deactivate" : "Activate"}
                       </Button>
                     )}
                     <Button

@@ -26,15 +26,19 @@ export async function submitScores(
       return { success: false, error: "You must be logged in to submit scores" }
     }
 
-    // Check if user is confirmed
+    // Check if user is confirmed and active
     const { data: userData } = await supabase
       .from("users")
-      .select("is_confirmed")
+      .select("is_confirmed, is_active")
       .eq("id", session.user.id)
       .single()
 
     if (!userData?.is_confirmed) {
       return { success: false, error: "Your account is pending admin approval. You cannot submit scores yet." }
+    }
+
+    if (!userData?.is_active) {
+      return { success: false, error: "Your account is inactive. Contact a league admin to log scores." }
     }
 
     // Validate input data
@@ -433,11 +437,19 @@ export async function getRoundDetails(roundId: string) {
   }
 }
 
+// Returns league members eligible to appear in the score-logging player picker.
+// Pending and inactive users are excluded — admins can't pick them when
+// logging scores for a round.
 export async function getAllUsers() {
   try {
     const supabase = await createClient()
 
-    const { data: users, error } = await supabase.from("users").select("id, name").order("name")
+    const { data: users, error } = await supabase
+      .from("users")
+      .select("id, name")
+      .eq("is_confirmed", true)
+      .eq("is_active", true)
+      .order("name")
 
     if (error) {
       console.error("Error fetching users:", error)
