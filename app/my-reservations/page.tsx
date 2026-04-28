@@ -7,9 +7,8 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarIcon, Clock, Plus, BadgeCheck } from "lucide-react"
+import { CalendarIcon, Clock, BadgeCheck } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
-import { getUpcomingFridayForSeason } from "@/lib/utils"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -133,13 +132,6 @@ export default async function MyReservationsPage() {
   // Get current user's name for "you" display
   const { data: userData } = await supabase.from("users").select("name").eq("id", userId).single()
 
-  // Hide the "Book Tee Time" CTA when the user already has a reservation on the
-  // upcoming Friday — same one-per-Friday rule the booking page enforces.
-  const upcomingFriday = getUpcomingFridayForSeason()
-  const hasUpcomingFridayReservation = userReservations.some(
-    (r) => (r.tee_times as any)?.date === upcomingFriday,
-  )
-
   // Cash games for the dates in this user's reservations, so each card can show
   // the correct opt-in label inside the Edit dialog.
   const allDates = Array.from(
@@ -180,16 +172,6 @@ export default async function MyReservationsPage() {
             <p className="text-sm text-muted-foreground">
               View and manage your tee time reservations
             </p>
-            {hasUpcomingFridayReservation ? null : (
-              <div className="pt-2">
-                <Link href="/book-tee-time">
-                  <Button className="w-full sm:w-auto">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Book Tee Time
-                  </Button>
-                </Link>
-              </div>
-            )}
           </div>
 
           {queryError && (
@@ -345,7 +327,7 @@ export default async function MyReservationsPage() {
               </CardHeader>
               <CardContent>
                 <Link href="/book-tee-time">
-                  <Button className="w-full sm:w-auto">Book Your First Tee Time</Button>
+                  <Button className="w-full sm:w-auto">Book Tee Time</Button>
                 </Link>
               </CardContent>
             </Card>

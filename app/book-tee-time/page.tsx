@@ -684,7 +684,7 @@ export default function BookTeeTimePage() {
                         <div>
                           <Label>Players</Label>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {totalSlots} of {maxSlotsForSelection} seat{maxSlotsForSelection === 1 ? "" : "s"} taken.
+                            {totalSlots} of {maxSlotsForSelection} slot{maxSlotsForSelection === 1 ? "" : "s"} taken
                           </p>
                         </div>
 

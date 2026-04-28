@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search, X } from "lucide-react"
 import {
   searchLeagueUsers,
   type LeagueUserSummary,
@@ -65,19 +65,19 @@ function PickerBody({
   const atMax = count >= maxSelectable
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col flex-1 min-h-0">
       <div className="shrink-0 pb-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search members..."
+            placeholder="Search Players..."
             className="pl-9"
           />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          {count} of {maxSelectable} seat{maxSelectable === 1 ? "" : "s"} selected
+          {count} of {maxSelectable} slot{maxSelectable === 1 ? "" : "s"} selected
         </p>
       </div>
 
@@ -127,7 +127,27 @@ function PickerBody({
         )}
       </div>
 
-      <div className="shrink-0 pt-3 flex items-center justify-end gap-2">
+      <div className="shrink-0 pt-3 flex flex-wrap items-center justify-end gap-2">
+        {count > 0 && (
+          <ul className="flex flex-wrap gap-1.5 mr-auto">
+            {Array.from(selected.values()).map((u) => (
+              <li
+                key={u.id}
+                className="inline-flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground pl-2 pr-1 py-0.5 text-xs"
+              >
+                <span className="max-w-[140px] truncate">{u.name}</span>
+                <button
+                  type="button"
+                  onClick={() => toggle(u)}
+                  aria-label={`Remove ${u.name}`}
+                  className="rounded-full p-0.5 hover:bg-foreground/10 focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <Button variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
@@ -215,7 +235,9 @@ export function PlayerPicker({
           className="h-[85dvh] flex flex-col p-4"
           onOpenAutoFocus={preventAutoFocus}
         >
-          <SheetTitle className="sr-only">Add players</SheetTitle>
+          <SheetTitle className="shrink-0 text-base font-semibold pr-8 mb-2">
+            Add Players
+          </SheetTitle>
           {body}
         </SheetContent>
       </Sheet>
@@ -228,7 +250,9 @@ export function PlayerPicker({
         className="sm:max-w-md p-4 max-h-[80vh] flex flex-col"
         onOpenAutoFocus={preventAutoFocus}
       >
-        <DialogTitle className="sr-only">Add players</DialogTitle>
+        <DialogTitle className="shrink-0 text-base font-semibold pr-8 mb-2">
+          Add Players
+        </DialogTitle>
         {body}
       </DialogContent>
     </Dialog>
