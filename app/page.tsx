@@ -59,7 +59,7 @@ export default function Home() {
               <div className="flex flex-col gap-4 sm:flex-row sm:justify-center mt-8">
                 {user ? (
                   <Button asChild size="lg" className="bg-green-600 hover:bg-green-700 text-white">
-                    <Link href="/book-tee-time">Reserve Tee Time</Link>
+                    <Link href="/book-tee-time">Book Tee Time</Link>
                   </Button>
                 ) : (
                   <>
