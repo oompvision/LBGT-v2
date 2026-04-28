@@ -769,7 +769,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                   Submitting...
                 </>
               ) : (
-                "Submit Scores"
+                "Submit Scorecard"
               )}
             </Button>
           </div>

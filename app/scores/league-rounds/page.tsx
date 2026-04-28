@@ -238,7 +238,7 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
               </CardHeader>
               <CardFooter>
                 <Link href="/scores/submit">
-                  <Button>Submit First Round</Button>
+                  <Button>Submit First Scorecard</Button>
                 </Link>
               </CardFooter>
             </Card>
