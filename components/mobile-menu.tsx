@@ -88,9 +88,9 @@ export function MobileMenu() {
                 href="/scores/submit"
                 onClick={() => setOpen(false)}
                 className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
-                aria-label="Submit your score"
+                aria-label="Submit your scorecard"
               >
-                Submit Score
+                Submit Scorecard
               </Link>
               <Link
                 href="/scores/my-rounds"
