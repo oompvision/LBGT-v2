@@ -101,7 +101,7 @@ export default async function SubmitScorePage() {
         <main className="flex-1 py-8">
           <div className="container">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold tracking-tight">Submit Scores</h1>
+              <h1 className="text-3xl font-bold tracking-tight">Submit Scorecard</h1>
               <p className="text-muted-foreground">Enter scores for yourself and up to three other players</p>
             </div>
 
