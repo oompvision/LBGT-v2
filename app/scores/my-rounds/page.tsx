@@ -33,15 +33,15 @@ export default async function MyRoundsPage() {
       <Header />
       <main className="flex-1 py-8">
         <div className="container">
-          <div className="mb-8 flex items-center justify-between">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">My Rounds</h1>
               <p className="text-muted-foreground">View all your golf rounds and scores</p>
             </div>
-            <Link href="/scores/submit">
+            <Link href="/scores/submit" className="self-start sm:self-auto">
               <Button>
                 <ClipboardList className="mr-2 h-4 w-4" />
-                Submit New Scores
+                Submit New Scorecard
               </Button>
             </Link>
           </div>
@@ -116,7 +116,7 @@ export default async function MyRoundsPage() {
               </CardHeader>
               <CardFooter>
                 <Link href="/scores/submit">
-                  <Button>Submit Your First Round</Button>
+                  <Button>Submit Your First Scorecard</Button>
                 </Link>
               </CardFooter>
             </Card>

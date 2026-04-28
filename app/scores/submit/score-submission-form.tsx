@@ -650,7 +650,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                             value={player.scores[holeIndex]}
                             onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
                             className={cn(
-                              "h-8 sm:h-9 w-full text-center text-sm px-0 min-w-0",
+                              "h-8 sm:h-9 w-full text-center text-base sm:text-sm px-0 min-w-0",
                               uncertain &&
                                 "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
                             )}
@@ -700,7 +700,7 @@ export function ScoreSubmissionForm({ users, currentUserId }: ScoreSubmissionFor
                               value={player.scores[holeIndex]}
                               onChange={(e) => handleScoreChange(pIdx, holeIndex, e.target.value)}
                               className={cn(
-                                "h-8 sm:h-9 w-full text-center text-sm px-0 min-w-0",
+                                "h-8 sm:h-9 w-full text-center text-base sm:text-sm px-0 min-w-0",
                                 uncertain &&
                                   "border-yellow-500 bg-yellow-500/10 focus-visible:ring-yellow-500",
                               )}

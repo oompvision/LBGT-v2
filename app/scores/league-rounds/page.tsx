@@ -129,7 +129,7 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
             <Link href="/scores/submit" className="shrink-0">
               <Button size="sm">
                 <ClipboardList className="mr-2 h-4 w-4" />
-                Submit New Scores
+                Submit New Scorecard
               </Button>
             </Link>
           </div>
