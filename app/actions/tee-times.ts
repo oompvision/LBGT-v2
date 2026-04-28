@@ -292,6 +292,51 @@ export async function createReservation(data: {
   const supabase = await createClient()
 
   try {
+    // Block bookings from users who are pending or have been deactivated by
+    // an admin. The picker already hides them, but enforce server-side too.
+    const { data: bookerStatus, error: bookerStatusError } = await supabase
+      .from("users")
+      .select("is_confirmed, is_active")
+      .eq("id", data.userId)
+      .single()
+
+    if (bookerStatusError) {
+      console.error("Error fetching booker status:", bookerStatusError)
+      return { success: false, error: bookerStatusError.message }
+    }
+
+    if (!bookerStatus?.is_confirmed) {
+      return { success: false, error: "Your account is pending admin approval and cannot book tee times yet." }
+    }
+
+    if (!bookerStatus?.is_active) {
+      return { success: false, error: "Your account is inactive. Contact a league admin to book tee times." }
+    }
+
+    // Reject any linked players who are no longer active. This catches the
+    // race where someone is added to the form, then deactivated before submit.
+    const linkedIdsForCheck = (data.playerUserIds || []).filter((id): id is string => !!id)
+    if (linkedIdsForCheck.length > 0) {
+      const { data: linkedStatuses, error: linkedStatusError } = await supabase
+        .from("users")
+        .select("id, name, is_confirmed, is_active")
+        .in("id", linkedIdsForCheck)
+
+      if (linkedStatusError) {
+        console.error("Error fetching linked player statuses:", linkedStatusError)
+        return { success: false, error: linkedStatusError.message }
+      }
+
+      const blocked = (linkedStatuses || []).filter((u) => !u.is_confirmed || !u.is_active)
+      if (blocked.length > 0) {
+        const names = blocked.map((u) => u.name).join(", ")
+        return {
+          success: false,
+          error: `These players can't be added right now (inactive or pending approval): ${names}.`,
+        }
+      }
+    }
+
     // First, check if the tee time is available in tee_time_availability
     const { data: availabilityData, error: availabilityError } = await supabase
       .from("tee_time_availability")

@@ -563,6 +563,33 @@ export default function BookTeeTimePage() {
     )
   }
 
+  // Block inactive members from booking, even though they are confirmed.
+  if (userData && userData.is_confirmed && !userData.is_active) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <Header />
+        <main className="flex-1 py-8">
+          <div className="container max-w-lg">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Inactive</CardTitle>
+                <CardDescription>
+                  Your account is currently inactive. Contact a league admin to be reactivated before booking tee times.
+                </CardDescription>
+              </CardHeader>
+              <CardFooter>
+                <Button asChild variant="outline">
+                  <Link href="/">Back to Home</Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
+
   // Show error if there was a problem loading data
   if (error) {
     return (

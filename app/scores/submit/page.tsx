@@ -27,10 +27,10 @@ export default async function SubmitScorePage() {
       redirect("/signin")
     }
 
-    // Check if user is confirmed
+    // Check if user is confirmed and active
     const { data: userData } = await supabase
       .from("users")
-      .select("is_confirmed")
+      .select("is_confirmed, is_active")
       .eq("id", session.user.id)
       .single()
 
@@ -45,6 +45,26 @@ export default async function SubmitScorePage() {
                 <AlertTitle>Account Pending Approval</AlertTitle>
                 <AlertDescription>
                   Your account is awaiting confirmation from a league admin. Once confirmed, you'll be able to submit scores.
+                </AlertDescription>
+              </Alert>
+            </div>
+          </main>
+          <Footer />
+        </div>
+      )
+    }
+
+    if (!userData?.is_active) {
+      return (
+        <div className="flex min-h-screen flex-col">
+          <Header />
+          <main className="flex-1 py-8">
+            <div className="container max-w-lg">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Account Inactive</AlertTitle>
+                <AlertDescription>
+                  Your account is currently inactive. Contact a league admin to be reactivated before logging scores.
                 </AlertDescription>
               </Alert>
             </div>

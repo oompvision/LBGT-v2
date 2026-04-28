@@ -13,7 +13,9 @@ export interface LeagueUserSummary {
   email: string
 }
 
-// Search confirmed league members by name or email for the "Add Player" picker.
+// Search confirmed, active league members by name or email for the
+// "Add Player" picker. Inactive users are hidden so they can't be added to
+// new bookings, but their existing reservations stay intact.
 // Excludes any userIds the caller already has in the booking form (booker + already-added).
 export async function searchLeagueUsers(
   query: string,
@@ -26,6 +28,7 @@ export async function searchLeagueUsers(
       .from("users")
       .select("id, name, email")
       .eq("is_confirmed", true)
+      .eq("is_active", true)
       .order("name", { ascending: true })
       .limit(500)
 
