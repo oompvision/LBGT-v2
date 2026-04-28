@@ -16,8 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
-import { CheckCircle, Edit, Loader2, Phone, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
 import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
   updateUser,
@@ -350,6 +349,28 @@ export function UserManagement({ users }: UserManagementProps) {
                         {user.is_confirmed ? "Revoke" : "Confirm"}
                       </Button>
                     )}
+                    {!user.is_admin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleActive(user, !user.is_active)}
+                        disabled={!user.is_confirmed || isTogglingActive === user.id}
+                        title={
+                          !user.is_confirmed
+                            ? "Confirm this user before changing their state"
+                            : undefined
+                        }
+                      >
+                        {isTogglingActive === user.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : user.is_active ? (
+                          <PowerOff className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Power className="mr-2 h-4 w-4" />
+                        )}
+                        {user.is_active ? "Deactivate" : "Activate"}
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -403,26 +424,6 @@ export function UserManagement({ users }: UserManagementProps) {
                   <div>
                     <p className="text-sm font-medium">Strokes Given</p>
                     <p className="text-sm text-muted-foreground">{user.strokes_given || 0}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center justify-between rounded-md border p-3">
-                  <div>
-                    <p className="text-sm font-medium">User State</p>
-                    <p className="text-xs text-muted-foreground">
-                      {user.is_confirmed
-                        ? "Inactive users can sign in but can't book tee times, log scores, or be added to other members' bookings."
-                        : "Pending users are inactive until they're confirmed."}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {isTogglingActive === user.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <span className="text-sm font-medium">{user.is_active ? "Active" : "Inactive"}</span>
-                    <Switch
-                      checked={user.is_active}
-                      onCheckedChange={(checked) => handleToggleActive(user, checked)}
-                      disabled={!user.is_confirmed || isTogglingActive === user.id}
-                      aria-label="Toggle user active state"
-                    />
                   </div>
                 </div>
               </CardContent>
