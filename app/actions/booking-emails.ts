@@ -164,14 +164,28 @@ function buildConfirmationEmailHtml(opts: {
     ? `$${BASE_TEE_TIME_COST} green fee + $${opts.recipient.entryAmount} ${escapeHtml(opts.cashGameTitle)} entry`
     : `$${BASE_TEE_TIME_COST} green fee`
 
+  // Email clients can't run JS, so a real "copy on click" button isn't
+  // possible. Instead, render the address as a prominent monospace pill
+  // (à la verification-code emails) so users are visually cued to long-press
+  // / select to copy. `user-select: all` makes a single tap select the
+  // whole address where supported (iOS Mail, Apple Mail); clients that
+  // strip it (Outlook) still let the user select normally.
   const highlight = `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0;">
       <tr>
         <td style="background-color: #FFF7E0; border: 1px solid #F2C84B; border-radius: 8px; padding: 16px;">
           <p style="margin: 0 0 6px; font-weight: 600; color: #1a1a1a;">You owe $${youOwe}</p>
-          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 14px;">${breakdown}</p>
-          <p style="margin: 0; color: #1a1a1a;">
-            Please Zelle <a href="mailto:${ZELLE_PAYMENT_EMAIL}" style="color:#1a1a1a;">${ZELLE_PAYMENT_EMAIL}</a> $${youOwe}.
+          <p style="margin: 0 0 12px; color: #4a4a4a; font-size: 14px;">${breakdown}</p>
+          <p style="margin: 0 0 8px; color: #1a1a1a;">Send via Zelle to:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 6px;">
+            <tr>
+              <td style="background-color: #ffffff; border: 1px solid #F2C84B; border-radius: 8px; padding: 10px 14px; font-family: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; font-weight: 600; color: #1a1a1a; -webkit-user-select: all; -moz-user-select: all; user-select: all;">
+                ${escapeHtml(ZELLE_PAYMENT_EMAIL)}
+              </td>
+            </tr>
+          </table>
+          <p style="margin: 0; color: #6b6b6b; font-size: 12px;">
+            Tap and hold to copy on mobile, or click to select on desktop.
           </p>
         </td>
       </tr>
