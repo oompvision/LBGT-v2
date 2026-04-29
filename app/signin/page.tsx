@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
@@ -15,6 +15,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createUserInDatabase } from "../actions/auth"
 
 export default function SignInPage() {
+  // useSearchParams (used inside SignInPageInner) requires a Suspense
+  // boundary in Next 15 so the static prerender can bail out cleanly.
+  return (
+    <Suspense fallback={null}>
+      <SignInPageInner />
+    </Suspense>
+  )
+}
+
+function SignInPageInner() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
