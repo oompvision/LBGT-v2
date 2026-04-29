@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CalendarIcon, Clock, BadgeCheck } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
+import { formatPhone } from "@/lib/phone"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -80,6 +81,7 @@ export default async function MyReservationsPage() {
     slots,
     player_names,
     player_user_ids,
+    guest_phones,
     play_for_money,
     season,
     tee_times (
@@ -203,6 +205,8 @@ export default async function MyReservationsPage() {
                       const playerUserIds: (string | null)[] =
                         (reservation.player_user_ids as (string | null)[] | null) || []
                       const playerNames: string[] = reservation.player_names || []
+                      const guestPhones: (string | null)[] =
+                        (reservation.guest_phones as (string | null)[] | null) || []
                       const playForMoney: boolean[] = reservation.play_for_money || []
                       const bookerIsSolo = role === "booker" && playerUserIds.length === 0
 
@@ -211,6 +215,9 @@ export default async function MyReservationsPage() {
                         isViewer: boolean
                         isLeague: boolean
                         optedIn: boolean
+                        // Only populated for the booker's view; null for invited
+                        // viewers so we don't leak the number to non-bookers.
+                        guestPhone: string | null
                       }
 
                       const players: PlayerEntry[] = [
@@ -219,12 +226,15 @@ export default async function MyReservationsPage() {
                           isViewer: role === "booker",
                           isLeague: true,
                           optedIn: !!playForMoney[0],
+                          guestPhone: null,
                         },
                         ...playerNames.map((name, i) => ({
                           name,
                           isViewer: playerUserIds[i] === userId,
                           isLeague: !!playerUserIds[i],
                           optedIn: !!playForMoney[i + 1],
+                          guestPhone:
+                            role === "booker" && !playerUserIds[i] ? guestPhones[i] ?? null : null,
                         })),
                       ]
 
@@ -260,6 +270,11 @@ export default async function MyReservationsPage() {
                                 <span className="text-xs text-muted-foreground">
                                   {p.isLeague ? "(Tour Member)" : "(Guest)"}
                                 </span>
+                                {p.guestPhone && (
+                                  <span className="text-xs text-muted-foreground">
+                                    · {formatPhone(p.guestPhone)}
+                                  </span>
+                                )}
                                 {p.optedIn && (
                                   <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
                                     money
@@ -305,6 +320,7 @@ export default async function MyReservationsPage() {
                               additionalPlayers: playerNames.map((name, i) => ({
                                 name,
                                 userId: playerUserIds[i] ?? null,
+                                phone: role === "booker" ? guestPhones[i] ?? null : null,
                               })),
                               playForMoney: Array.from(
                                 { length: reservation.slots },

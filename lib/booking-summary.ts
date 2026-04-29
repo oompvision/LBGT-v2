@@ -9,6 +9,9 @@ export type BookingPlayerSummary = {
   owe: number
   email: string | null
   userId: string | null
+  // 10-digit US phone (digits only) for guest seats; null for league players
+  // and the booker. Only the booker and admins are authorized to see these.
+  guestPhone: string | null
 }
 
 export type BookingSummary = {

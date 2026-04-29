@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { deleteReservation } from "@/app/actions/tee-times"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
+import { formatPhone } from "@/lib/phone"
 
 interface Reservation {
   id: string
   slots: number
   player_names: string[]
+  player_user_ids?: (string | null)[]
+  guest_phones?: (string | null)[]
   play_for_money: boolean[]
   users: {
     name: string
@@ -97,14 +100,23 @@ export function AdminReservationsList({ reservations }: AdminReservationsListPro
                 <div className="mt-2">
                   <h4 className="text-sm font-medium mb-1">Additional Players ({reservation.player_names.length}):</h4>
                   <ul className="space-y-1">
-                    {reservation.player_names.map((name, index) => (
-                      <li key={index} className="flex items-center space-x-2">
-                        <span>{name}</span>
-                        {reservation.play_for_money && reservation.play_for_money[index + 1] && (
-                          <Badge className="bg-green-500 hover:bg-green-600">Playing for money</Badge>
-                        )}
-                      </li>
-                    ))}
+                    {reservation.player_names.map((name, index) => {
+                      const isGuest = !reservation.player_user_ids?.[index]
+                      const phone = reservation.guest_phones?.[index]
+                      return (
+                        <li key={index} className="flex flex-wrap items-center gap-2">
+                          <span>{name}</span>
+                          {isGuest && (
+                            <span className="text-xs text-muted-foreground">
+                              (Guest{phone ? ` · ${formatPhone(phone)}` : ""})
+                            </span>
+                          )}
+                          {reservation.play_for_money && reservation.play_for_money[index + 1] && (
+                            <Badge className="bg-green-500 hover:bg-green-600">Playing for money</Badge>
+                          )}
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )}

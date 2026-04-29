@@ -10,6 +10,7 @@ import {
   type BookingPlayerSummary,
 } from "@/lib/booking-summary"
 import { BASE_TEE_TIME_COST, ZELLE_PAYMENT_EMAIL } from "@/lib/constants"
+import { formatPhone } from "@/lib/phone"
 
 const FROM_ADDRESS = "Long Beach Golf Tour <commissioner@updates.longbeachgolftour.com>"
 const COURSE_LOCATION = "The Golf Club at Middlebay, Oceanside, NY"
@@ -46,6 +47,7 @@ type ReservationFetch = {
   slots: number
   player_names: string[] | null
   player_user_ids: (string | null)[] | null
+  guest_phones: (string | null)[] | null
   play_for_money: boolean[] | null
   tee_times: { date: string; time: string } | null
   users: { name: string | null; email: string | null } | null
@@ -58,7 +60,7 @@ async function fetchReservationDetails(
   const { data, error } = await supabaseAdmin
     .from("reservations")
     .select(
-      "id, user_id, slots, player_names, player_user_ids, play_for_money, tee_times(date, time), users:user_id(name, email)",
+      "id, user_id, slots, player_names, player_user_ids, guest_phones, play_for_money, tee_times(date, time), users:user_id(name, email)",
     )
     .eq("id", reservationId)
     .single()
@@ -84,6 +86,7 @@ async function buildPlayerSummaries(
 ): Promise<BookingPlayerSummary[]> {
   const additionalNames = res.player_names || []
   const additionalIds = res.player_user_ids || []
+  const additionalPhones = res.guest_phones || []
   const pfm = res.play_for_money || []
 
   const idsToLookup = additionalIds.filter((id): id is string => !!id)
@@ -100,6 +103,7 @@ async function buildPlayerSummaries(
     owe: computePlayerOwed(bookerOptedIn, cashGameEntry),
     email: res.users?.email || null,
     userId: res.user_id,
+    guestPhone: null,
   })
 
   for (let i = 0; i < additionalNames.length; i++) {
@@ -115,6 +119,7 @@ async function buildPlayerSummaries(
       owe: computePlayerOwed(optedIn, cashGameEntry),
       email: lookup?.email || null,
       userId: uid,
+      guestPhone: uid ? null : additionalPhones[i] ?? null,
     })
   }
   return players
@@ -136,7 +141,12 @@ function buildConfirmationEmailHtml(opts: {
     .map((p) => {
       const youTag = p.name === opts.recipient.name && p.isBooker === opts.recipient.isBooker ? " (you)" : ""
       const optTag = p.optedIn && opts.cashGameTitle ? ` · opted in to ${escapeHtml(opts.cashGameTitle)}` : ""
-      return `<li style="margin: 4px 0;">${escapeHtml(p.name)}${youTag}${optTag}</li>`
+      // Show guest phone only to the booker — invited players shouldn't see it.
+      const phoneTag =
+        opts.recipient.isBooker && p.guestPhone
+          ? ` · ${escapeHtml(formatPhone(p.guestPhone))}`
+          : ""
+      return `<li style="margin: 4px 0;">${escapeHtml(p.name)}${youTag}${phoneTag}${optTag}</li>`
     })
     .join("")
 

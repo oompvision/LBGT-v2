@@ -29,6 +29,7 @@ import {
 import { removePlayerFromReservation } from "@/app/actions/reservation-players"
 import { isBookingWindowOpen, isBeforeCutoff } from "@/lib/booking-summary"
 import type { LeagueUserSummary } from "@/app/actions/reservation-players"
+import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 
 const OPT_IN_BUFFER_MINUTES = 60
 
@@ -41,7 +42,7 @@ export type EditReservationData = {
   bookingClosesAt: string | null
   bookerName: string
   bookerUserId: string
-  additionalPlayers: { name: string; userId: string | null }[]
+  additionalPlayers: { name: string; userId: string | null; phone: string | null }[]
   playForMoney: boolean[]
 }
 
@@ -62,6 +63,9 @@ type EditPlayer = {
   isLeague: boolean
   optedIn: boolean
   originalIdx: number | null // index in original player_names; null for newly added
+  // Only meaningful for newly-added guest rows. Stored as digits only; we
+  // don't try to backfill phones for guests that pre-date this column.
+  phone: string
 }
 
 function useIsMobile() {
@@ -86,6 +90,7 @@ function buildInitialPlayers(reservation: EditReservationData): EditPlayer[] {
       isLeague: true,
       optedIn: !!reservation.playForMoney[0],
       originalIdx: null,
+      phone: "",
     },
     ...reservation.additionalPlayers.map((p, i) => ({
       key: `orig-${i}`,
@@ -95,6 +100,7 @@ function buildInitialPlayers(reservation: EditReservationData): EditPlayer[] {
       isLeague: !!p.userId,
       optedIn: !!reservation.playForMoney[i + 1],
       originalIdx: i,
+      phone: p.phone ?? "",
     })),
   ]
 }
@@ -153,6 +159,7 @@ export function EditReservationDialog({
           isLeague: true,
           optedIn: false,
           originalIdx: null as number | null,
+          phone: "",
         })),
       ]
     })
@@ -170,6 +177,7 @@ export function EditReservationDialog({
         isLeague: false,
         optedIn: false,
         originalIdx: null,
+        phone: "",
       },
     ])
   }
@@ -178,13 +186,28 @@ export function EditReservationDialog({
     setPlayers((prev) => prev.map((p) => (p.key === key ? { ...p, name } : p)))
   }
 
+  const updateGuestPhone = (key: string, value: string) => {
+    const digits = stripPhone(value).slice(0, 10)
+    setPlayers((prev) => prev.map((p) => (p.key === key ? { ...p, phone: digits } : p)))
+  }
+
   const initial = useMemo(() => buildInitialPlayers(reservation), [reservation])
 
   const handleSaveBooker = async () => {
-    // Validate guest names
+    // Validate every guest has a name. For newly-added guests (no original
+    // index), also require a 10-digit phone — pre-existing guests are
+    // grandfathered since the phone column shipped after they were booked.
     for (const p of players) {
       if (!p.isBooker && !p.userId && !p.name.trim()) {
         toast({ title: "Guest name required", description: "Fill in every guest's name.", variant: "destructive" })
+        return
+      }
+      if (!p.isBooker && !p.userId && p.originalIdx === null && !isValidPhone(p.phone)) {
+        toast({
+          title: "Guest phone required",
+          description: `Please enter a valid 10-digit phone number for ${p.name.trim() || "the new guest"}.`,
+          variant: "destructive",
+        })
         return
       }
     }
@@ -215,7 +238,7 @@ export function EditReservationDialog({
       for (const a of additions) {
         const payload = a.userId
           ? ({ type: "user", userId: a.userId } as const)
-          : ({ type: "guest", name: a.name.trim() } as const)
+          : ({ type: "guest", name: a.name.trim(), phone: a.phone } as const)
         const res = await addPlayerToReservation(reservation.id, payload)
         if (!res.success) {
           toast({ title: "Error", description: res.error || "Failed to add player.", variant: "destructive" })
@@ -325,17 +348,33 @@ export function EditReservationDialog({
           return (
             <div key={p.key} className="rounded-md border p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 space-y-1 flex-1">
+                <div className="min-w-0 space-y-2 flex-1">
                   {isGuestRow && p.originalIdx === null ? (
-                    <Input
-                      placeholder="Guest name"
-                      value={p.name}
-                      onChange={(e) => updateGuestName(p.key, e.target.value)}
-                    />
+                    <>
+                      <Input
+                        placeholder="Guest name"
+                        value={p.name}
+                        onChange={(e) => updateGuestName(p.key, e.target.value)}
+                      />
+                      <Input
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="off"
+                        placeholder="Phone (required)"
+                        value={formatPhone(p.phone)}
+                        onChange={(e) => updateGuestPhone(p.key, e.target.value)}
+                        aria-label={`Phone number for ${p.name || "new guest"}`}
+                      />
+                    </>
                   ) : (
-                    <p className={"truncate " + (isViewer ? "font-semibold" : "font-medium")}>
-                      {p.name}
-                    </p>
+                    <>
+                      <p className={"truncate " + (isViewer ? "font-semibold" : "font-medium")}>
+                        {p.name}
+                      </p>
+                      {role === "booker" && isGuestRow && p.phone && (
+                        <p className="text-xs text-muted-foreground">{formatPhone(p.phone)}</p>
+                      )}
+                    </>
                   )}
                   <p className="text-xs text-muted-foreground">
                     {p.isLeague ? "Tour Member" : "Guest"}

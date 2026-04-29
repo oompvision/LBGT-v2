@@ -228,6 +228,7 @@ export async function removePlayerFromReservation(
         slots,
         player_names,
         player_user_ids,
+        guest_phones,
         play_for_money,
         tee_time_id,
         tee_times ( booking_closes_at )
@@ -250,6 +251,7 @@ export async function removePlayerFromReservation(
 
     const playerUserIds: (string | null)[] = (reservation.player_user_ids as (string | null)[]) || []
     const playerNames: string[] = reservation.player_names || []
+    const guestPhones: (string | null)[] = (reservation.guest_phones as (string | null)[]) || []
     const playForMoney: boolean[] = reservation.play_for_money || []
 
     const isBooker = reservation.user_id === userId
@@ -295,6 +297,10 @@ export async function removePlayerFromReservation(
         ...playerNames.slice(0, firstLeagueIdx),
         ...playerNames.slice(firstLeagueIdx + 1),
       ]
+      const newGuestPhones = [
+        ...guestPhones.slice(0, firstLeagueIdx),
+        ...guestPhones.slice(firstLeagueIdx + 1),
+      ]
       // play_for_money: index 0 = booker, index i+1 = additional player i.
       // Promote play_for_money[firstLeagueIdx + 1] to the new booker flag,
       // drop the old booker flag (index 0), and remove the promoted player's
@@ -314,6 +320,7 @@ export async function removePlayerFromReservation(
           slots: reservation.slots - 1,
           player_user_ids: newPlayerUserIds,
           player_names: newPlayerNames,
+          guest_phones: newGuestPhones,
           play_for_money: newPlayForMoney,
         })
         .eq("id", reservationId)
@@ -331,6 +338,10 @@ export async function removePlayerFromReservation(
         ...playerNames.slice(0, invitedIndex),
         ...playerNames.slice(invitedIndex + 1),
       ]
+      const newGuestPhones = [
+        ...guestPhones.slice(0, invitedIndex),
+        ...guestPhones.slice(invitedIndex + 1),
+      ]
       const newPlayForMoney = [
         ...playForMoney.slice(0, invitedIndex + 1),
         ...playForMoney.slice(invitedIndex + 2),
@@ -342,6 +353,7 @@ export async function removePlayerFromReservation(
           slots: reservation.slots - 1,
           player_user_ids: newPlayerUserIds,
           player_names: newPlayerNames,
+          guest_phones: newGuestPhones,
           play_for_money: newPlayForMoney,
         })
         .eq("id", reservationId)
