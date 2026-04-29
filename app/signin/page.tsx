@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -15,12 +15,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { createUserInDatabase } from "../actions/auth"
 
 export default function SignInPage() {
+  // useSearchParams (used inside SignInPageInner) requires a Suspense
+  // boundary in Next 15 so the static prerender can bail out cleanly.
+  return (
+    <Suspense fallback={null}>
+      <SignInPageInner />
+    </Suspense>
+  )
+}
+
+function SignInPageInner() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Surface ?error=... bounced back from /auth/callback (failed magic link).
+  useEffect(() => {
+    const err = searchParams.get("error")
+    if (err) setErrorMessage(err)
+  }, [searchParams])
 
   // If the URL hash contains a recovery token, redirect to reset-password
   useEffect(() => {
@@ -156,8 +173,8 @@ export default function SignInPage() {
                   </Link>
                 </div>
                 <div className="text-center text-sm">
-                  <Link href="/mobile-signin" className="text-muted-foreground underline">
-                    Mobile Sign In
+                  <Link href="/signin/magic-link" className="text-muted-foreground underline">
+                    Email me a sign-in link instead
                   </Link>
                 </div>
               </CardFooter>
