@@ -1,6 +1,7 @@
 import { AdminTabs } from "../admin-tabs"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatPhone } from "@/lib/phone"
 
 // Prevent prerendering and force dynamic rendering
 export const dynamic = "force-dynamic"
@@ -150,9 +151,20 @@ export default async function AdminReservationsPage() {
                             <div className="mt-2">
                               <div className="font-medium">Additional Players:</div>
                               <ul className="list-disc list-inside text-muted-foreground">
-                                {reservation.player_names.map((name, index) => (
-                                  <li key={index}>{name || "Unnamed Player"}</li>
-                                ))}
+                                {reservation.player_names.map((name, index) => {
+                                  const isGuest = !reservation.player_user_ids?.[index]
+                                  const phone = reservation.guest_phones?.[index]
+                                  return (
+                                    <li key={index}>
+                                      {name || "Unnamed Player"}
+                                      {isGuest && (
+                                        <span className="ml-1 text-xs">
+                                          (Guest{phone ? ` · ${formatPhone(phone)}` : ""})
+                                        </span>
+                                      )}
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </div>
                           )}

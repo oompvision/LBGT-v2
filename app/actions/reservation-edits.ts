@@ -8,6 +8,7 @@ import {
 } from "@/lib/booking-summary"
 import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
 import { checkPlayersForDateConflict } from "@/app/actions/reservation-players"
+import { isValidPhone, stripPhone } from "@/lib/phone"
 
 const OPT_IN_BUFFER_MINUTES = 60
 
@@ -17,6 +18,7 @@ type ReservationFetch = {
   slots: number
   player_names: string[] | null
   player_user_ids: (string | null)[] | null
+  guest_phones: (string | null)[] | null
   play_for_money: boolean[] | null
   tee_time_id: string
   tee_times: { id: string; date: string; time: string; max_slots: number; booking_closes_at: string | null } | null
@@ -30,7 +32,7 @@ async function fetchReservation(reservationId: string): Promise<{
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, user_id, slots, player_names, player_user_ids, play_for_money, tee_time_id, tee_times(id, date, time, max_slots, booking_closes_at)",
+      "id, user_id, slots, player_names, player_user_ids, guest_phones, play_for_money, tee_time_id, tee_times(id, date, time, max_slots, booking_closes_at)",
     )
     .eq("id", reservationId)
     .single()
@@ -57,7 +59,7 @@ export async function addPlayerToReservation(
   reservationId: string,
   addition:
     | { type: "user"; userId: string }
-    | { type: "guest"; name: string },
+    | { type: "guest"; name: string; phone: string },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const userId = await getSessionUserId()
@@ -81,10 +83,12 @@ export async function addPlayerToReservation(
 
     const playerNames = reservation.player_names || []
     const playerUserIds = reservation.player_user_ids || []
+    const guestPhones = reservation.guest_phones || []
     const playForMoney = reservation.play_for_money || [false]
 
     let nameToInsert: string
     let userIdToInsert: string | null
+    let phoneToInsert: string | null = null
 
     if (addition.type === "user") {
       // Block re-adding the booker or anyone already in the group.
@@ -119,12 +123,18 @@ export async function addPlayerToReservation(
     } else {
       const trimmed = addition.name.trim()
       if (!trimmed) return { success: false, error: "Guest name required." }
+      const digits = stripPhone(addition.phone)
+      if (!isValidPhone(digits)) {
+        return { success: false, error: "A valid 10-digit phone number is required for guests." }
+      }
       nameToInsert = trimmed
       userIdToInsert = null
+      phoneToInsert = digits
     }
 
     const newPlayerNames = [...playerNames, nameToInsert]
     const newPlayerUserIds = [...playerUserIds, userIdToInsert]
+    const newGuestPhones = [...guestPhones, phoneToInsert]
     const newPlayForMoney = [...playForMoney, false]
     const newSlots = reservation.slots + 1
 
@@ -135,6 +145,7 @@ export async function addPlayerToReservation(
         slots: newSlots,
         player_names: newPlayerNames,
         player_user_ids: newPlayerUserIds,
+        guest_phones: newGuestPhones,
         play_for_money: newPlayForMoney,
       })
       .eq("id", reservationId)
@@ -180,6 +191,7 @@ export async function removePlayerByIndex(
 
     const playerNames = reservation.player_names || []
     const playerUserIds = reservation.player_user_ids || []
+    const guestPhones = reservation.guest_phones || []
     const playForMoney = reservation.play_for_money || [false]
 
     if (playerIndex < 0 || playerIndex >= playerNames.length) {
@@ -188,6 +200,7 @@ export async function removePlayerByIndex(
 
     const newPlayerNames = playerNames.filter((_, i) => i !== playerIndex)
     const newPlayerUserIds = playerUserIds.filter((_, i) => i !== playerIndex)
+    const newGuestPhones = guestPhones.filter((_, i) => i !== playerIndex)
     // play_for_money index 0 is booker; additional player i corresponds to index i+1.
     const newPlayForMoney = playForMoney.filter((_, i) => i !== playerIndex + 1)
     const newSlots = Math.max(1, reservation.slots - 1)
@@ -199,6 +212,7 @@ export async function removePlayerByIndex(
         slots: newSlots,
         player_names: newPlayerNames,
         player_user_ids: newPlayerUserIds,
+        guest_phones: newGuestPhones,
         play_for_money: newPlayForMoney,
       })
       .eq("id", reservationId)

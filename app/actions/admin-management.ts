@@ -85,6 +85,8 @@ export async function getAllReservationsWithDetails(season?: number) {
         user_id,
         slots,
         player_names,
+        player_user_ids,
+        guest_phones,
         play_for_money,
         season,
         users (

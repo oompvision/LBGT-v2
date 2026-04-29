@@ -22,6 +22,7 @@ import {
   getAllRoundsWithDetails,
 } from "@/app/actions/admin-management"
 import { Loader2, Pencil, Trash2, User, Users } from "lucide-react"
+import { formatPhone } from "@/lib/phone"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -608,14 +609,23 @@ export function AdminDashboardTabs({
                                     <span className="text-green-600 text-xs">(Playing for $)</span>
                                   )}
                                 </li>
-                                {reservation.player_names?.map((name: string, index: number) => (
-                                  <li key={index} className="flex items-center gap-1">
-                                    {name}
-                                    {reservation.play_for_money?.[index + 1] && (
-                                      <span className="text-green-600 text-xs">(Playing for $)</span>
-                                    )}
-                                  </li>
-                                ))}
+                                {reservation.player_names?.map((name: string, index: number) => {
+                                  const isGuest = !reservation.player_user_ids?.[index]
+                                  const phone = reservation.guest_phones?.[index]
+                                  return (
+                                    <li key={index} className="flex flex-wrap items-center gap-1">
+                                      {name}
+                                      {isGuest && (
+                                        <span className="text-muted-foreground text-xs">
+                                          (Guest{phone ? ` · ${formatPhone(phone)}` : ""})
+                                        </span>
+                                      )}
+                                      {reservation.play_for_money?.[index + 1] && (
+                                        <span className="text-green-600 text-xs">(Playing for $)</span>
+                                      )}
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </div>
                           </div>

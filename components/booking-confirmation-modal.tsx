@@ -6,6 +6,7 @@ import { CheckCircle2, Calendar, Clock, UserRound } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ZELLE_PAYMENT_EMAIL, BASE_TEE_TIME_COST } from "@/lib/constants"
 import { formatTimeOfDay, type BookingPlayerSummary } from "@/lib/booking-summary"
+import { formatPhone } from "@/lib/phone"
 
 type Props = {
   open: boolean
@@ -102,6 +103,11 @@ export function BookingConfirmationModal({
                               </span>
                             )}
                           </div>
+                          {p.guestPhone && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {formatPhone(p.guestPhone)}
+                            </p>
+                          )}
                           <p className="text-xs text-slate-600 mt-0.5">{breakdown}</p>
                         </div>
                       </div>

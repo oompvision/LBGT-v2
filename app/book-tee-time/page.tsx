@@ -31,6 +31,7 @@ import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
 import type { CashGame } from "@/types/supabase"
 import { BookingConfirmationModal } from "@/components/booking-confirmation-modal"
 import { computePlayerOwed, type BookingPlayerSummary } from "@/lib/booking-summary"
+import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 
 interface TeeTime {
   id: string
@@ -57,7 +58,7 @@ const formatTimeString = (timeString: string) => {
 
 type AdditionalPlayer =
   | { type: "user"; userId: string; name: string; email: string; playForMoney: boolean }
-  | { type: "guest"; name: string; playForMoney: boolean }
+  | { type: "guest"; name: string; phone: string; playForMoney: boolean }
 
 export default function BookTeeTimePage() {
   const { user, isLoading: authLoading } = useAuth()
@@ -253,7 +254,10 @@ export default function BookTeeTimePage() {
 
   const addGuestPlayer = () => {
     if (atCapacity) return
-    setAdditionalPlayers((prev) => [...prev, { type: "guest", name: "", playForMoney: false }])
+    setAdditionalPlayers((prev) => [
+      ...prev,
+      { type: "guest", name: "", phone: "", playForMoney: false },
+    ])
   }
 
   const addLeaguePlayers = (users: LeagueUserSummary[]) => {
@@ -281,6 +285,13 @@ export default function BookTeeTimePage() {
     )
   }
 
+  const updateGuestPhone = (index: number, value: string) => {
+    const digits = stripPhone(value).slice(0, 10)
+    setAdditionalPlayers((prev) =>
+      prev.map((p, i) => (i === index && p.type === "guest" ? { ...p, phone: digits } : p)),
+    )
+  }
+
   const toggleAdditionalPFM = (index: number, value: boolean) => {
     setAdditionalPlayers((prev) =>
       prev.map((p, i) => (i === index ? { ...p, playForMoney: value } : p)),
@@ -299,13 +310,21 @@ export default function BookTeeTimePage() {
       return
     }
 
-    // Validate guest names are filled in.
+    // Validate guest names + phones are filled in.
     for (let i = 0; i < additionalPlayers.length; i++) {
       const p = additionalPlayers[i]
       if (p.type === "guest" && !p.name.trim()) {
         toast({
           title: "Guest name required",
           description: `Please enter a name for guest in seat ${i + 2}.`,
+          variant: "destructive",
+        })
+        return
+      }
+      if (p.type === "guest" && !isValidPhone(p.phone)) {
+        toast({
+          title: "Guest phone required",
+          description: `Please enter a valid 10-digit phone number for guest in seat ${i + 2}.`,
           variant: "destructive",
         })
         return
@@ -336,6 +355,9 @@ export default function BookTeeTimePage() {
     const player_names = additionalPlayers.map((p) => p.name.trim())
     const player_user_ids: (string | null)[] = additionalPlayers.map((p) =>
       p.type === "user" ? p.userId : null,
+    )
+    const guest_phones: (string | null)[] = additionalPlayers.map((p) =>
+      p.type === "guest" ? p.phone : null,
     )
     const play_for_money = [bookerPlayForMoney, ...additionalPlayers.map((p) => p.playForMoney)]
 
@@ -372,6 +394,7 @@ export default function BookTeeTimePage() {
             player_names,
             play_for_money,
             player_user_ids,
+            guest_phones,
             season: selectedTeeTimeData?.season,
           },
         ])
@@ -399,6 +422,7 @@ export default function BookTeeTimePage() {
           owe: computePlayerOwed(bookerPlayForMoney, cashGameEntry),
           email: userData?.email || null,
           userId: user.id,
+          guestPhone: null,
         },
         ...additionalPlayers.map((p, i) => ({
           index: i + 1,
@@ -409,6 +433,7 @@ export default function BookTeeTimePage() {
           owe: computePlayerOwed(p.playForMoney, cashGameEntry),
           email: p.type === "user" ? p.email : null,
           userId: p.type === "user" ? p.userId : null,
+          guestPhone: p.type === "guest" ? p.phone : null,
         })),
       ]
 
@@ -726,13 +751,24 @@ export default function BookTeeTimePage() {
                                   <span className="text-xs text-muted-foreground">(league player)</span>
                                 </div>
                               ) : (
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                   <Input
                                     placeholder="Guest name"
                                     value={p.name}
                                     onChange={(e) => updateGuestName(i, e.target.value)}
                                   />
-                                  <p className="text-xs text-muted-foreground">Guest</p>
+                                  <Input
+                                    type="tel"
+                                    inputMode="tel"
+                                    autoComplete="off"
+                                    placeholder="Phone (required)"
+                                    value={formatPhone(p.phone)}
+                                    onChange={(e) => updateGuestPhone(i, e.target.value)}
+                                    aria-label={`Phone number for guest ${i + 2}`}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    Guest · phone is shared only with you and league admins
+                                  </p>
                                 </div>
                               )}
                               {cashGame && (

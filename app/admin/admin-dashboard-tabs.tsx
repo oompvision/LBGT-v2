@@ -21,6 +21,7 @@ import { CalendarIcon, Edit, Loader2, Search, Trash2, User } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { updateUser, deleteUser } from "@/app/actions/admin-management"
 import type { User, TeeTime, ReservationWithDetails } from "@/types/supabase"
+import { formatPhone } from "@/lib/phone"
 import { MAX_STROKES_GIVEN } from "@/lib/constants"
 
 interface AdminDashboardTabsProps {
@@ -247,9 +248,22 @@ export function AdminDashboardTabs({ users, teeTimes, reservations }: AdminDashb
                             {reservation.slots} {reservation.slots === 1 ? "player" : "players"}
                           </p>
                           {reservation.player_names && reservation.player_names.length > 0 && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Additional players: {reservation.player_names.join(", ")}
-                            </div>
+                            <ul className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                              {reservation.player_names.map((name: string, idx: number) => {
+                                const isGuest = !reservation.player_user_ids?.[idx]
+                                const phone = reservation.guest_phones?.[idx]
+                                return (
+                                  <li key={idx}>
+                                    {name}
+                                    {isGuest && (
+                                      <span className="ml-1">
+                                        (Guest{phone ? ` · ${formatPhone(phone)}` : ""})
+                                      </span>
+                                    )}
+                                  </li>
+                                )
+                              })}
+                            </ul>
                           )}
                         </div>
                       </div>

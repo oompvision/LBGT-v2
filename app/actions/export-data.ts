@@ -2,6 +2,7 @@
 
 import { createAdminClient } from "@/lib/supabase/server"
 import { formatDate } from "@/lib/utils"
+import { formatPhone } from "@/lib/phone"
 
 // Create a Supabase client with service role key to bypass RLS
 const supabaseAdmin = createAdminClient()
@@ -47,6 +48,8 @@ export async function exportReservationsToCSV(weekDate: string) {
         user_id,
         slots,
         player_names,
+        player_user_ids,
+        guest_phones,
         play_for_money,
         created_at,
         users (
@@ -123,13 +126,22 @@ export async function exportReservationsToCSV(weekDate: string) {
             playingForMoney = "Yes"
           }
 
+          const isLeague = !!(
+            Array.isArray(reservation.player_user_ids) && reservation.player_user_ids[i]
+          )
+          const rawPhone =
+            !isLeague && Array.isArray(reservation.guest_phones)
+              ? reservation.guest_phones[i] ?? ""
+              : ""
+          const guestPhone = rawPhone ? formatPhone(rawPhone) : ""
           playerRows.push({
             date,
             time,
             reservationId: reservation.id,
             playerName,
             playerEmail: "", // Additional players don't have emails in the system
-            playerType: "Additional Player",
+            playerType: isLeague ? "Additional Player (League)" : "Additional Player (Guest)",
+            guestPhone,
             playingForMoney,
             created: createdAt,
           })
@@ -154,6 +166,7 @@ export async function exportReservationsToCSV(weekDate: string) {
       { key: "playerName", header: "Player Name" },
       { key: "playerEmail", header: "Player Email" },
       { key: "playerType", header: "Player Type" },
+      { key: "guestPhone", header: "Guest Phone" },
       { key: "playingForMoney", header: "Playing for Money" },
       { key: "created", header: "Reservation Created" },
     ]
