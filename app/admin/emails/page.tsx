@@ -18,7 +18,10 @@ interface Member {
   id: string
   name: string
   email: string
+  is_active: boolean
 }
+
+type RecipientType = "all_active" | "all_with_inactive" | "selected"
 
 interface Campaign {
   id: string
@@ -39,7 +42,7 @@ export default function AdminEmailsPage() {
   const [showCta, setShowCta] = useState(false)
   const [ctaText, setCtaText] = useState("")
   const [ctaUrl, setCtaUrl] = useState("")
-  const [recipientType, setRecipientType] = useState<"all" | "selected">("all")
+  const [recipientType, setRecipientType] = useState<RecipientType>("all_active")
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isSending, setIsSending] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -75,6 +78,17 @@ export default function AdminEmailsPage() {
       m.email.toLowerCase().includes(memberSearch.toLowerCase())
   )
 
+  const activeMembers = members.filter((m) => m.is_active)
+  const inactiveCount = members.length - activeMembers.length
+  const allMembersCount = members.length // confirmed only, since getAllMembers filters
+
+  const recipientCount =
+    recipientType === "all_active"
+      ? activeMembers.length
+      : recipientType === "all_with_inactive"
+        ? allMembersCount
+        : selectedIds.length
+
   const toggleMember = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]))
   }
@@ -104,11 +118,18 @@ export default function AdminEmailsPage() {
       return
     }
 
-    const memberCount = recipientType === "all" ? members.length : selectedIds.length
+    const memberCount = recipientCount
     const totalCount = memberCount + extraEmails.length
-    const parts = []
-    if (memberCount > 0) parts.push(`${memberCount} ${memberCount === 1 ? "member" : "members"}`)
-    if (extraEmails.length > 0) parts.push(`${extraEmails.length} additional ${extraEmails.length === 1 ? "email" : "emails"}`)
+    const memberLabel =
+      recipientType === "all_active"
+        ? `${memberCount} active ${memberCount === 1 ? "player" : "players"}`
+        : recipientType === "all_with_inactive"
+          ? `${memberCount} ${memberCount === 1 ? "player" : "players"} (active + inactive)`
+          : `${memberCount} ${memberCount === 1 ? "member" : "members"}`
+    const parts: string[] = []
+    if (memberCount > 0) parts.push(memberLabel)
+    if (extraEmails.length > 0)
+      parts.push(`${extraEmails.length} additional ${extraEmails.length === 1 ? "email" : "emails"}`)
     const confirmed = window.confirm(`Send this email to ${parts.join(" and ")} (${totalCount} total)?`)
     if (!confirmed) return
 
@@ -275,11 +296,13 @@ export default function AdminEmailsPage() {
                   <>
                     <Send className="mr-2 h-4 w-4" />
                     Send Email
-                    {recipientType === "all"
-                      ? ` to All Members (${members.length})`
-                      : selectedIds.length > 0
-                        ? ` to ${selectedIds.length} Selected`
-                        : ""}
+                    {recipientType === "all_active"
+                      ? ` to All Active Players (${activeMembers.length})`
+                      : recipientType === "all_with_inactive"
+                        ? ` to All Active + Inactive Players (${allMembersCount})`
+                        : selectedIds.length > 0
+                          ? ` to ${selectedIds.length} Selected`
+                          : ""}
                   </>
                 )}
               </Button>
@@ -314,7 +337,13 @@ export default function AdminEmailsPage() {
                             <span>{new Date(campaign.sent_at).toLocaleDateString()}</span>
                             <span>&middot;</span>
                             <Badge variant="secondary" className="text-xs">
-                              {campaign.recipient_type === "all" ? "All members" : "Selected"}
+                              {campaign.recipient_type === "all_active"
+                                ? "Active members"
+                                : campaign.recipient_type === "all_with_inactive"
+                                  ? "All + inactive"
+                                  : campaign.recipient_type === "selected"
+                                    ? "Selected"
+                                    : "All members"}
                             </Badge>
                             <span>&middot;</span>
                             <span>{campaign.recipient_count} sent</span>
@@ -357,22 +386,49 @@ export default function AdminEmailsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Toggle */}
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setRecipientType("all")}
-                  className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
-                    recipientType === "all" ? "border-primary bg-primary/5 font-medium" : "hover:bg-muted/50"
-                  }`}
-                >
-                  All Members ({members.length})
-                </button>
+              {/* Recipient mode: All Members (active-only or active+inactive) vs. specific picks. */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                    All Members
+                  </p>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientType("all_active")}
+                      className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
+                        recipientType === "all_active"
+                          ? "border-primary bg-primary/5 font-medium"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      Active only ({activeMembers.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientType("all_with_inactive")}
+                      className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
+                        recipientType === "all_with_inactive"
+                          ? "border-primary bg-primary/5 font-medium"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      Active + Inactive ({allMembersCount})
+                      {inactiveCount > 0 && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          (+{inactiveCount} inactive)
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setRecipientType("selected")}
                   className={`w-full text-left p-3 rounded-lg border text-sm transition-colors ${
-                    recipientType === "selected" ? "border-primary bg-primary/5 font-medium" : "hover:bg-muted/50"
+                    recipientType === "selected"
+                      ? "border-primary bg-primary/5 font-medium"
+                      : "hover:bg-muted/50"
                   }`}
                 >
                   Select Specific Members
@@ -405,8 +461,15 @@ export default function AdminEmailsPage() {
                           checked={selectedIds.includes(member.id)}
                           onCheckedChange={() => toggleMember(member.id)}
                         />
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{member.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-sm font-medium truncate">{member.name}</p>
+                            {!member.is_active && (
+                              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 shrink-0">
+                                Inactive
+                              </Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                         </div>
                       </label>

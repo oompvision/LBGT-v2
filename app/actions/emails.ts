@@ -59,9 +59,14 @@ export async function getAllMembers() {
     return { success: false, error: "Forbidden" }
   }
 
+  // Confirmed only — pending applicants shouldn't appear in the email picker
+  // or be reachable via "All Members" / "All Active + Inactive". `is_active`
+  // is returned so the UI can show an "Inactive" badge next to soft-disabled
+  // members in the per-member picker.
   const { data, error } = await supabaseAdmin
     .from("users")
-    .select("id, name, email")
+    .select("id, name, email, is_active")
+    .eq("is_confirmed", true)
     .order("name")
 
   if (error) {
