@@ -453,3 +453,162 @@ export async function updateOptIns(
     }
   }
 }
+
+// True for reservations created by an admin where they aren't on the tee
+// time as a player. We disambiguate by the array shape, not by `is_admin`
+// on the booker, so the answer doesn't drift if a user gets promoted to
+// admin later: regular bookings keep `slots = 1 + player_names.length`
+// (booker + additional players), while admin-owned ones keep
+// `slots = player_names.length` (booker is metadata only, every entry in
+// player_names is an actual player).
+export function isAdminCreatedReservation(reservation: {
+  slots: number
+  player_names: string[] | null
+}): boolean {
+  return (reservation.player_names?.length ?? 0) === reservation.slots
+}
+
+// Admin-only entry point for creating a reservation on behalf of league
+// members + guests without putting the admin on the tee time. The schema
+// stores admin's user_id as the row's `user_id` (metadata / audit owner)
+// but admin doesn't count toward `slots` and never appears in
+// `player_names`. The booker-aligned `play_for_money[0]` is kept as a
+// phantom `false` so existing read code that maps `play_for_money[i+1]`
+// to additional player `i` still works without a special case.
+export async function adminCreateReservation(input: {
+  teeTimeId: string
+  players: Array<
+    | { type: "user"; userId: string; name: string; optedIn: boolean }
+    | { type: "guest"; name: string; phone: string; optedIn: boolean }
+  >
+}): Promise<{ success: boolean; reservationId?: string; error?: string }> {
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) return { success: false, error: "You must be signed in." }
+
+    const adminId = await getSessionAdminId()
+    if (adminId !== userId) {
+      return { success: false, error: "Forbidden — admin only." }
+    }
+
+    if (input.players.length === 0) {
+      return { success: false, error: "Add at least one player." }
+    }
+
+    const supabase = await createClient()
+
+    const { data: teeTime, error: teeTimeErr } = await supabase
+      .from("tee_times")
+      .select("id, date, time, max_slots, season")
+      .eq("id", input.teeTimeId)
+      .single()
+
+    if (teeTimeErr || !teeTime) {
+      return { success: false, error: "Tee time not found." }
+    }
+
+    // Admin bypass on booking_closes_at — by design (per spec). Capacity
+    // still applies and is re-checked here.
+    const { data: existing } = await supabase
+      .from("reservations")
+      .select("slots")
+      .eq("tee_time_id", input.teeTimeId)
+    const reservedSlots = (existing || []).reduce((sum, r) => sum + (r.slots ?? 0), 0)
+    const availableSlots = (teeTime.max_slots ?? 4) - reservedSlots
+    if (input.players.length > availableSlots) {
+      return {
+        success: false,
+        error: `Only ${availableSlots} slot${availableSlots === 1 ? "" : "s"} left at this tee time.`,
+      }
+    }
+
+    // Validate guest names + phones; same rules as regular booking.
+    for (let i = 0; i < input.players.length; i++) {
+      const p = input.players[i]
+      if (p.type === "guest") {
+        if (!p.name?.trim()) {
+          return { success: false, error: `Guest in seat ${i + 1} is missing a name.` }
+        }
+        const digits = stripPhone(p.phone || "")
+        if (!isValidPhone(digits)) {
+          return {
+            success: false,
+            error: `Guest in seat ${i + 1} needs a valid 10-digit phone.`,
+          }
+        }
+      }
+    }
+
+    // Conflict check — even admins shouldn't accidentally double-book the
+    // same league member on the same day.
+    const playerUserIds: (string | null)[] = input.players.map((p) =>
+      p.type === "user" ? p.userId : null,
+    )
+    const leagueIdsToCheck = playerUserIds.filter((id): id is string => !!id)
+    if (leagueIdsToCheck.length > 0) {
+      try {
+        const conflictResult = await checkPlayersForDateConflict(
+          teeTime.date,
+          leagueIdsToCheck,
+        )
+        if (conflictResult.success && conflictResult.conflicts && conflictResult.conflicts.length > 0) {
+          const names = conflictResult.conflicts.map((c) => c.name).join(", ")
+          return {
+            success: false,
+            error: `${names} already has a reservation that day.`,
+          }
+        }
+      } catch (err) {
+        console.error("Admin conflict pre-check failed:", err)
+      }
+    }
+
+    const player_names = input.players.map((p) => p.name.trim())
+    const guest_phones: (string | null)[] = input.players.map((p) =>
+      p.type === "guest" ? stripPhone(p.phone) : null,
+    )
+    // Phantom `false` at index 0 represents the admin's non-playing slot;
+    // entries 1..N align with additional player i in the schema's view.
+    const play_for_money = [false, ...input.players.map((p) => p.optedIn)]
+
+    const { data: insertedRows, error: insertErr } = await supabase
+      .from("reservations")
+      .insert([
+        {
+          tee_time_id: input.teeTimeId,
+          user_id: userId,
+          slots: input.players.length,
+          player_names,
+          player_user_ids: playerUserIds,
+          guest_phones,
+          play_for_money,
+          season: teeTime.season,
+        },
+      ])
+      .select("id")
+
+    if (insertErr) {
+      return { success: false, error: insertErr.message }
+    }
+
+    const reservationId = insertedRows?.[0]?.id as string | undefined
+
+    // Send confirmation emails to every league member on the booking.
+    // Admin themselves isn't on the tee time so they don't get emailed.
+    if (reservationId) {
+      sendBookingConfirmationEmails(reservationId).catch((err) =>
+        console.error("Admin-created booking email send failed:", err),
+      )
+    }
+
+    revalidatePath("/my-reservations")
+    revalidatePath("/schedule")
+    revalidatePath("/admin/dashboard")
+    return { success: true, reservationId }
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to create reservation.",
+    }
+  }
+}

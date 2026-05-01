@@ -89,22 +89,30 @@ async function buildPlayerSummaries(
   const additionalPhones = res.guest_phones || []
   const pfm = res.play_for_money || []
 
+  // Admin-created reservations record the admin's user_id as the row owner
+  // but the admin isn't a player on the tee time. Detect that by array
+  // shape (slots === player_names.length means no booker-as-player slot
+  // was reserved at index 0) and skip the booker row in the summary.
+  const adminCreated = (additionalNames.length ?? 0) === res.slots
+
   const idsToLookup = additionalIds.filter((id): id is string => !!id)
   const userMap = await fetchLeagueUsers(idsToLookup)
 
   const players: BookingPlayerSummary[] = []
-  const bookerOptedIn = !!pfm[0]
-  players.push({
-    index: 0,
-    name: res.users?.name || "Booker",
-    isBooker: true,
-    optedIn: bookerOptedIn,
-    entryAmount: bookerOptedIn ? cashGameEntry : 0,
-    owe: computePlayerOwed(bookerOptedIn, cashGameEntry),
-    email: res.users?.email || null,
-    userId: res.user_id,
-    guestPhone: null,
-  })
+  if (!adminCreated) {
+    const bookerOptedIn = !!pfm[0]
+    players.push({
+      index: 0,
+      name: res.users?.name || "Booker",
+      isBooker: true,
+      optedIn: bookerOptedIn,
+      entryAmount: bookerOptedIn ? cashGameEntry : 0,
+      owe: computePlayerOwed(bookerOptedIn, cashGameEntry),
+      email: res.users?.email || null,
+      userId: res.user_id,
+      guestPhone: null,
+    })
+  }
 
   for (let i = 0; i < additionalNames.length; i++) {
     const optedIn = !!pfm[i + 1]
