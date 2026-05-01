@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CalendarIcon, Clock, BadgeCheck } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -119,7 +120,16 @@ export default async function MyReservationsPage() {
   const queryError = asBookerResult.error || asInvitedResult.error
 
   const merged = new Map<string, any>()
-  for (const r of asBookerResult.data || []) merged.set(r.id, r)
+  // The booker-side query (.eq("user_id", userId)) also matches admin-created
+  // reservations where the admin is the metadata owner without being a player.
+  // Filter those out so an admin doesn't see admin-created bookings listed as
+  // "theirs" on /my-reservations — they only show up if the admin is also in
+  // player_user_ids (i.e., admin added themselves as a league player).
+  for (const r of asBookerResult.data || []) {
+    if (!isAdminCreatedReservation({ slots: (r as any).slots, player_names: (r as any).player_names })) {
+      merged.set(r.id, r)
+    }
+  }
   for (const r of asInvitedResult.data || []) merged.set(r.id, r)
   const userReservations = Array.from(merged.values()).sort((a, b) => {
     const dateA = (a.tee_times as any)?.date || ""
@@ -199,15 +209,24 @@ export default async function MyReservationsPage() {
                   </CardHeader>
                   <CardContent className="p-4 space-y-6">
                     {dateReservations.map((reservation) => {
-                      const role: "booker" | "invited" =
-                        reservation.user_id === userId ? "booker" : "invited"
-                      const bookerName = (reservation.users as any)?.name as string | undefined
+                      const playerNames: string[] = reservation.player_names || []
                       const playerUserIds: (string | null)[] =
                         (reservation.player_user_ids as (string | null)[] | null) || []
-                      const playerNames: string[] = reservation.player_names || []
                       const guestPhones: (string | null)[] =
                         (reservation.guest_phones as (string | null)[] | null) || []
                       const playForMoney: boolean[] = reservation.play_for_money || []
+                      // Admin-created reservations don't have a "booker" who's
+                      // playing — admin's user_id is metadata, not a player.
+                      const adminCreated = isAdminCreatedReservation({
+                        slots: reservation.slots,
+                        player_names: playerNames,
+                      })
+                      // For admin-created bookings, every viewer (even the
+                      // admin themselves, though we filter those out below)
+                      // is treated as "invited" — there is no booker player.
+                      const role: "booker" | "invited" =
+                        !adminCreated && reservation.user_id === userId ? "booker" : "invited"
+                      const bookerName = (reservation.users as any)?.name as string | undefined
                       const bookerIsSolo = role === "booker" && playerUserIds.length === 0
 
                       type PlayerEntry = {
@@ -221,13 +240,24 @@ export default async function MyReservationsPage() {
                       }
 
                       const players: PlayerEntry[] = [
-                        {
-                          name: role === "booker" ? userData?.name || "You" : bookerName || "Booker",
-                          isViewer: role === "booker",
-                          isLeague: true,
-                          optedIn: !!playForMoney[0],
-                          guestPhone: null,
-                        },
+                        // Admin-created bookings have no booker-as-player row;
+                        // skip the synthetic booker entry so the admin's name
+                        // doesn't appear as a player on a tee time they're not
+                        // actually on.
+                        ...(adminCreated
+                          ? []
+                          : [
+                              {
+                                name:
+                                  role === "booker"
+                                    ? userData?.name || "You"
+                                    : bookerName || "Booker",
+                                isViewer: role === "booker",
+                                isLeague: true,
+                                optedIn: !!playForMoney[0],
+                                guestPhone: null,
+                              },
+                            ]),
                         ...playerNames.map((name, i) => ({
                           name,
                           isViewer: playerUserIds[i] === userId,

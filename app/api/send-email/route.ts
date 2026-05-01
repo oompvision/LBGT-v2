@@ -34,7 +34,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Subject and body are required" }, { status: 400 })
     }
 
-    // Get member recipients
+    // Get member recipients. Only confirmed users are ever eligible (pending
+    // applicants don't get league mailings). "all_active" further restricts
+    // to is_active = true; "all_with_inactive" pulls every confirmed user.
     let recipients: { id?: string; email: string; name: string }[]
 
     if (recipientType === "selected" && recipientIds?.length > 0) {
@@ -42,13 +44,24 @@ export async function POST(request: NextRequest) {
         .from("users")
         .select("id, email, name")
         .in("id", recipientIds)
+        .eq("is_confirmed", true)
 
       if (error) throw error
       recipients = data || []
-    } else if (recipientType === "all") {
+    } else if (recipientType === "all_active") {
       const { data, error } = await supabaseAdmin
         .from("users")
         .select("id, email, name")
+        .eq("is_confirmed", true)
+        .eq("is_active", true)
+
+      if (error) throw error
+      recipients = data || []
+    } else if (recipientType === "all_with_inactive") {
+      const { data, error } = await supabaseAdmin
+        .from("users")
+        .select("id, email, name")
+        .eq("is_confirmed", true)
 
       if (error) throw error
       recipients = data || []
@@ -121,7 +134,11 @@ export async function POST(request: NextRequest) {
       body,
       cta_text: ctaText || null,
       cta_url: ctaUrl || null,
-      recipient_type: recipientType === "selected" ? "selected" : "all",
+      // Stored verbatim so history can distinguish active-only blasts from
+      // ones that intentionally swept in inactive members. Legacy rows from
+      // before this split keep their "all" value and are rendered as
+      // "All members" (legacy) in the history badge.
+      recipient_type: recipientType,
       recipient_ids: recipientType === "selected" ? recipientIds : null,
       recipient_count: totalSent,
       sent_by: session.user.id,

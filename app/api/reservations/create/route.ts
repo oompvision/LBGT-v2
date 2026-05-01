@@ -14,10 +14,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized. Please sign in to make a reservation." }, { status: 401 })
     }
 
-    // Check if user is confirmed
+    // Check if user is confirmed and capture admin status (admins bypass the
+    // booking-window cutoff so they can fix things up after the deadline).
     const { data: userData } = await supabase
       .from("users")
-      .select("is_confirmed")
+      .select("is_confirmed, is_admin")
       .eq("id", user.id)
       .single()
 
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       )
     }
+    const isAdmin = !!userData.is_admin
 
     // Get the request body
     const body = await request.json()
@@ -45,13 +47,25 @@ export async function POST(request: NextRequest) {
     // Get tee time details and check availability using the same logic as dashboard
     const { data: teeTimeData, error: teeTimeError } = await supabase
       .from("tee_times")
-      .select("id, date, time, max_slots, season")
+      .select("id, date, time, max_slots, season, booking_closes_at")
       .eq("id", teeTimeId)
       .single()
 
     if (teeTimeError || !teeTimeData) {
       console.error("Error fetching tee time details:", teeTimeError)
       return NextResponse.json({ error: "Tee time not found." }, { status: 404 })
+    }
+
+    // Block past-deadline bookings — admins are allowed to override.
+    if (
+      !isAdmin &&
+      teeTimeData.booking_closes_at &&
+      new Date(teeTimeData.booking_closes_at) < new Date()
+    ) {
+      return NextResponse.json(
+        { error: "Booking has closed for this tee time." },
+        { status: 400 },
+      )
     }
 
     // Get existing reservations for this tee time

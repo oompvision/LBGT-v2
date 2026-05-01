@@ -12,17 +12,16 @@ import { toast } from "@/components/ui/use-toast"
 import { format, parseISO, isValid } from "date-fns"
 import type { User, TeeTime, RoundWithScores, ReservationWithDetails, Score, HoleScores } from "@/types/supabase"
 import type { Season } from "@/app/actions/seasons"
-import { DEFAULT_MAX_PLAYERS_PER_TEE_TIME } from "@/lib/constants"
 import {
-  addReservation,
   deleteReservation,
   deleteRound,
   editPlayerScore,
   getAllReservationsWithDetails,
   getAllRoundsWithDetails,
 } from "@/app/actions/admin-management"
-import { Loader2, Pencil, Trash2, User, Users } from "lucide-react"
+import { Loader2, Pencil, Trash2 } from "lucide-react"
 import { formatPhone } from "@/lib/phone"
+import { AdminAddReservation } from "@/components/admin-add-reservation"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,12 +66,6 @@ export function AdminDashboardTabs({
   const [loadingScores, setLoadingScores] = useState(false)
   const [loadingReservations, setLoadingReservations] = useState(false)
   const [loadingAction, setLoadingAction] = useState(false)
-  const [selectedUser, setSelectedUser] = useState("")
-  const [selectedUserName, setSelectedUserName] = useState("")
-  const [selectedTeeTime, setSelectedTeeTime] = useState("")
-  const [slots, setSlots] = useState(1)
-  const [playerNames, setPlayerNames] = useState<string[]>([])
-  const [playForMoney, setPlayForMoney] = useState<boolean[]>([false])
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<{ id: string; type: "round" | "reservation" } | null>(null)
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
@@ -166,131 +159,6 @@ export function AdminDashboardTabs({
     } catch (error) {
       console.error("Error formatting time:", error, "Time string:", timeString)
       return "3:30 PM" // Default to 3:30 PM if there's an error
-    }
-  }
-
-  const handleUserChange = (userId: string) => {
-    setSelectedUser(userId)
-    // Find the user's name
-    const user = users.find((u) => u.id === userId)
-    setSelectedUserName(user?.name || "")
-  }
-
-  const handleSlotsChange = (value: number) => {
-    const newValue = Math.max(1, Math.min(DEFAULT_MAX_PLAYERS_PER_TEE_TIME, value))
-    setSlots(newValue)
-
-    // Update player names array - only for additional players (slots 2-4)
-    const newPlayerNames = [...playerNames]
-    // Resize the array to have (newValue - 1) elements (for additional players)
-    while (newPlayerNames.length < newValue - 1) {
-      newPlayerNames.push("")
-    }
-    setPlayerNames(newPlayerNames.slice(0, Math.max(0, newValue - 1)))
-
-    // Update play for money array - for all players including the main player
-    const newPlayForMoney = [...playForMoney]
-    while (newPlayForMoney.length < newValue) {
-      newPlayForMoney.push(false)
-    }
-    setPlayForMoney(newPlayForMoney.slice(0, newValue))
-  }
-
-  const handlePlayerNameChange = (index: number, value: string) => {
-    const newPlayerNames = [...playerNames]
-    newPlayerNames[index] = value
-    setPlayerNames(newPlayerNames)
-  }
-
-  const handlePlayForMoneyChange = (index: number, checked: boolean) => {
-    const newPlayForMoney = [...playForMoney]
-    newPlayForMoney[index] = checked
-    setPlayForMoney(newPlayForMoney)
-  }
-
-  const handleAddReservation = async () => {
-    if (!selectedUser || !selectedTeeTime) {
-      toast({
-        title: "Error",
-        description: "Please select a user and tee time.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validate additional player names if slots > 1
-    if (slots > 1) {
-      const validPlayerNames = playerNames.filter((name) => name.trim() !== "")
-      if (validPlayerNames.length < slots - 1) {
-        toast({
-          title: "Error",
-          description: "Please enter names for all additional players.",
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    setLoadingAction(true)
-    try {
-      const result = await addReservation({
-        userId: selectedUser,
-        teeTimeId: selectedTeeTime,
-        slots,
-        playerNames,
-        playForMoney,
-      })
-
-      if (result.success) {
-        toast({
-          title: "Success",
-          description: "Reservation added successfully.",
-        })
-
-        // Refresh reservations
-        const resSeason = selectedReservationsSeason === "all" ? undefined : Number(selectedReservationsSeason)
-        const reservationsResponse = await getAllReservationsWithDetails(resSeason)
-        if (reservationsResponse.success) {
-          // Validate dates in the new reservations
-          const validatedReservations = reservationsResponse.reservations.map((reservation: ReservationWithDetails) => {
-            if (reservation.tee_times && reservation.tee_times.date) {
-              return {
-                ...reservation,
-                tee_times: {
-                  ...reservation.tee_times,
-                  date: ensureValidDate(reservation.tee_times.date),
-                },
-              }
-            }
-            return reservation
-          })
-
-          setReservations(validatedReservations)
-        }
-
-        // Reset form
-        setSelectedUser("")
-        setSelectedUserName("")
-        setSelectedTeeTime("")
-        setSlots(1)
-        setPlayerNames([])
-        setPlayForMoney([false])
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to add reservation.",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error adding reservation:", error)
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingAction(false)
     }
   }
 
@@ -446,114 +314,30 @@ export function AdminDashboardTabs({
         </TabsList>
 
         <TabsContent value="reservations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Reservation</CardTitle>
-              <CardDescription>Create a new reservation for a user.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="user">Main Player (User)</Label>
-                  <Select value={selectedUser} onValueChange={handleUserChange}>
-                    <SelectTrigger id="user">
-                      <SelectValue placeholder="Select user" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-[300px] overflow-y-auto">
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="teeTime">Tee Time</Label>
-                  <Select value={selectedTeeTime} onValueChange={setSelectedTeeTime}>
-                    <SelectTrigger id="teeTime">
-                      <SelectValue placeholder="Select tee time" />
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="max-h-[300px] overflow-y-auto">
-                      {teeTimes.map((teeTime) => (
-                        <SelectItem key={teeTime.id} value={teeTime.id}>
-                          {formatDateSafely(teeTime.date)} at {formatTimeSafely(teeTime.time)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="slots">Number of Players</Label>
-                <Input
-                  id="slots"
-                  type="number"
-                  min={1}
-                  max={DEFAULT_MAX_PLAYERS_PER_TEE_TIME}
-                  value={slots}
-                  onChange={(e) => handleSlotsChange(Number.parseInt(e.target.value) || 1)}
-                />
-              </div>
-
-              {selectedUser && (
-                <div className="rounded-md border p-4 bg-muted/20">
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <Label className="font-medium">Main Player</Label>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">{selectedUserName}</span>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="play-for-money-main"
-                        checked={playForMoney[0] || false}
-                        onCheckedChange={(checked) => handlePlayForMoneyChange(0, checked === true)}
-                      />
-                      <Label htmlFor="play-for-money-main" className="text-sm">
-                        Play for $
-                      </Label>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {slots > 1 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <Label>Additional Players</Label>
-                  </div>
-                  {Array.from({ length: slots - 1 }).map((_, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <Input
-                        placeholder={`Player ${index + 2} name`}
-                        value={playerNames[index] || ""}
-                        onChange={(e) => handlePlayerNameChange(index, e.target.value)}
-                      />
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id={`play-for-money-${index + 1}`}
-                          checked={playForMoney[index + 1] || false}
-                          onCheckedChange={(checked) => handlePlayForMoneyChange(index + 1, checked === true)}
-                        />
-                        <Label htmlFor={`play-for-money-${index + 1}`} className="text-sm">
-                          Play for $
-                        </Label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <Button onClick={handleAddReservation} disabled={loadingAction || !selectedUser || !selectedTeeTime}>
-                {loadingAction ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Add Reservation
-              </Button>
-            </CardContent>
-          </Card>
+          <AdminAddReservation
+            onCreated={async () => {
+              const resSeason =
+                selectedReservationsSeason === "all" ? undefined : Number(selectedReservationsSeason)
+              const reservationsResponse = await getAllReservationsWithDetails(resSeason)
+              if (reservationsResponse.success) {
+                const validatedReservations = reservationsResponse.reservations.map(
+                  (reservation: ReservationWithDetails) => {
+                    if (reservation.tee_times && reservation.tee_times.date) {
+                      return {
+                        ...reservation,
+                        tee_times: {
+                          ...reservation.tee_times,
+                          date: ensureValidDate(reservation.tee_times.date),
+                        },
+                      }
+                    }
+                    return reservation
+                  },
+                )
+                setReservations(validatedReservations)
+              }
+            }}
+          />
 
           <Card>
             <CardHeader>

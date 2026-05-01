@@ -7,6 +7,7 @@ import { buildTeeTimeIcs } from "@/lib/ics"
 import {
   computePlayerOwed,
   formatTimeOfDay,
+  isAdminCreatedReservation,
   type BookingPlayerSummary,
 } from "@/lib/booking-summary"
 import { BASE_TEE_TIME_COST, ZELLE_PAYMENT_EMAIL } from "@/lib/constants"
@@ -89,22 +90,32 @@ async function buildPlayerSummaries(
   const additionalPhones = res.guest_phones || []
   const pfm = res.play_for_money || []
 
+  // Admin-created reservations record the admin's user_id as the row owner
+  // but the admin isn't a player on the tee time. Skip the booker row in
+  // the summary so league recipients don't see admin's name as a player.
+  const adminCreated = isAdminCreatedReservation({
+    slots: res.slots,
+    player_names: additionalNames,
+  })
+
   const idsToLookup = additionalIds.filter((id): id is string => !!id)
   const userMap = await fetchLeagueUsers(idsToLookup)
 
   const players: BookingPlayerSummary[] = []
-  const bookerOptedIn = !!pfm[0]
-  players.push({
-    index: 0,
-    name: res.users?.name || "Booker",
-    isBooker: true,
-    optedIn: bookerOptedIn,
-    entryAmount: bookerOptedIn ? cashGameEntry : 0,
-    owe: computePlayerOwed(bookerOptedIn, cashGameEntry),
-    email: res.users?.email || null,
-    userId: res.user_id,
-    guestPhone: null,
-  })
+  if (!adminCreated) {
+    const bookerOptedIn = !!pfm[0]
+    players.push({
+      index: 0,
+      name: res.users?.name || "Booker",
+      isBooker: true,
+      optedIn: bookerOptedIn,
+      entryAmount: bookerOptedIn ? cashGameEntry : 0,
+      owe: computePlayerOwed(bookerOptedIn, cashGameEntry),
+      email: res.users?.email || null,
+      userId: res.user_id,
+      guestPhone: null,
+    })
+  }
 
   for (let i = 0; i < additionalNames.length; i++) {
     const optedIn = !!pfm[i + 1]
@@ -164,15 +175,39 @@ function buildConfirmationEmailHtml(opts: {
     ? `$${BASE_TEE_TIME_COST} green fee + $${opts.recipient.entryAmount} ${escapeHtml(opts.cashGameTitle)} entry`
     : `$${BASE_TEE_TIME_COST} green fee`
 
+  // Cash-game opt-in note. Only show when there's actually a cash game on
+  // this date. The opted-in line is a soft warning (deadline) and gets red
+  // emphasis; the not-opted-in line is purely informational.
+  const cashGameNote = opts.cashGameTitle
+    ? opts.recipient.optedIn
+      ? `<p style="margin: 12px 0 0; color: #B91C1C; font-weight: 600; font-size: 14px;">If cash game entry is not received before your tee time you will not be entered.</p>`
+      : `<p style="margin: 12px 0 0; color: #4a4a4a; font-size: 14px;">You are not currently opted into the cash game.</p>`
+    : ""
+
+  // Email clients can't run JS, so a real "copy on click" button isn't
+  // possible. We render the address as a bordered monospace box (no link)
+  // and rely on the user to tap-and-hold / select to copy. The
+  // x-apple-data-detectors attribute and the format-detection meta in
+  // lib/email-template.ts together prevent iOS Mail / Apple Mail from
+  // auto-converting the address into a mailto link.
   const highlight = `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0;">
       <tr>
         <td style="background-color: #FFF7E0; border: 1px solid #F2C84B; border-radius: 8px; padding: 16px;">
           <p style="margin: 0 0 6px; font-weight: 600; color: #1a1a1a;">You owe $${youOwe}</p>
-          <p style="margin: 0 0 8px; color: #4a4a4a; font-size: 14px;">${breakdown}</p>
-          <p style="margin: 0; color: #1a1a1a;">
-            Please Zelle <a href="mailto:${ZELLE_PAYMENT_EMAIL}" style="color:#1a1a1a;">${ZELLE_PAYMENT_EMAIL}</a> $${youOwe}.
+          <p style="margin: 0 0 12px; color: #4a4a4a; font-size: 14px;">${breakdown}</p>
+          <p style="margin: 0 0 8px; color: #1a1a1a;">Send via Zelle to:</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0;">
+            <tr>
+              <td x-apple-data-detectors="false" style="background-color: #ffffff; border: 1px solid #F2C84B; border-radius: 8px; padding: 10px 14px; font-family: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; font-weight: 600; color: #1a1a1a;">
+                ${escapeHtml(ZELLE_PAYMENT_EMAIL)}
+              </td>
+            </tr>
+          </table>
+          <p style="margin: 12px 0 0; color: #4a4a4a; font-size: 14px;">
+            Thank you in advance for making prompt payment and streamlining LBGT operations.
           </p>
+          ${cashGameNote}
         </td>
       </tr>
     </table>

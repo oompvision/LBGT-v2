@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogFooter, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Calendar, Clock, UserRound } from "lucide-react"
+import { CheckCircle2, Calendar, Clock, UserRound, Copy, Check } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { ZELLE_PAYMENT_EMAIL, BASE_TEE_TIME_COST } from "@/lib/constants"
 import { formatTimeOfDay, type BookingPlayerSummary } from "@/lib/booking-summary"
@@ -35,6 +36,17 @@ export function BookingConfirmationModal({
 }: Props) {
   const booker = players.find((p) => p.isBooker)
   const bookerOwe = booker?.owe ?? BASE_TEE_TIME_COST
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyEmail = async () => {
+    try {
+      await navigator.clipboard.writeText(ZELLE_PAYMENT_EMAIL)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error("Copy failed:", err)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onDismiss()}>
@@ -121,21 +133,45 @@ export function BookingConfirmationModal({
             </ul>
           </div>
 
-          <div className="rounded-lg border border-amber-400 bg-amber-50 p-4">
-            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wide mb-1">
+          <div className="rounded-lg border border-amber-400 bg-amber-50 p-4 space-y-3">
+            <p className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
               Payment
             </p>
-            <p className="text-sm text-slate-900 leading-relaxed">
-              Please Zelle{" "}
-              <a
-                href={`mailto:${ZELLE_PAYMENT_EMAIL}`}
-                className="underline font-medium text-amber-900"
-              >
-                {ZELLE_PAYMENT_EMAIL}
-              </a>{" "}
-              <span className="font-semibold">${bookerOwe}</span>, and text your playing partners to Zelle for their tee
-              time.
+            <p className="text-sm text-slate-900">
+              Please Zelle <span className="font-semibold">${bookerOwe}</span> to:
             </p>
+            <div className="inline-flex items-center gap-2 rounded-md border border-amber-400 bg-white px-3 py-2 max-w-full">
+              <span className="font-mono text-sm font-semibold text-slate-900 break-all">
+                {ZELLE_PAYMENT_EMAIL}
+              </span>
+              <button
+                type="button"
+                onClick={handleCopyEmail}
+                aria-label={copied ? "Email address copied" : "Copy email address"}
+                aria-live="polite"
+                className="shrink-0 inline-flex items-center justify-center h-6 w-6 rounded text-amber-900 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            <p className="text-sm text-slate-700">
+              Thank you in advance for making prompt payment and streamlining LBGT operations.
+            </p>
+            {cashGameTitle && booker?.optedIn && (
+              <p className="text-sm font-semibold text-red-700">
+                If cash game entry is not received before your tee time you will not be entered.
+              </p>
+            )}
+            {cashGameTitle && booker && !booker.optedIn && (
+              <p className="text-sm text-slate-700">
+                You are not currently opted into the cash game.
+              </p>
+            )}
+            {players.length > 1 && (
+              <p className="text-sm text-slate-700">
+                Then text your playing partners to Zelle for their tee time.
+              </p>
+            )}
           </div>
         </div>
 
