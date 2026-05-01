@@ -454,20 +454,6 @@ export async function updateOptIns(
   }
 }
 
-// True for reservations created by an admin where they aren't on the tee
-// time as a player. We disambiguate by the array shape, not by `is_admin`
-// on the booker, so the answer doesn't drift if a user gets promoted to
-// admin later: regular bookings keep `slots = 1 + player_names.length`
-// (booker + additional players), while admin-owned ones keep
-// `slots = player_names.length` (booker is metadata only, every entry in
-// player_names is an actual player).
-export function isAdminCreatedReservation(reservation: {
-  slots: number
-  player_names: string[] | null
-}): boolean {
-  return (reservation.player_names?.length ?? 0) === reservation.slots
-}
-
 // Admin-only entry point for creating a reservation on behalf of league
 // members + guests without putting the admin on the tee time. The schema
 // stores admin's user_id as the row's `user_id` (metadata / audit owner)

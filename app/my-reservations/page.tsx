@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CalendarIcon, Clock, BadgeCheck } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 // Helper function to format time from time string
 function formatTimeFromString(timeString: string): string {
@@ -125,10 +126,9 @@ export default async function MyReservationsPage() {
   // "theirs" on /my-reservations — they only show up if the admin is also in
   // player_user_ids (i.e., admin added themselves as a league player).
   for (const r of asBookerResult.data || []) {
-    const slots = (r as any).slots ?? 0
-    const playerNamesLength = ((r as any).player_names ?? []).length
-    const adminCreated = playerNamesLength === slots
-    if (!adminCreated) merged.set(r.id, r)
+    if (!isAdminCreatedReservation({ slots: (r as any).slots, player_names: (r as any).player_names })) {
+      merged.set(r.id, r)
+    }
   }
   for (const r of asInvitedResult.data || []) merged.set(r.id, r)
   const userReservations = Array.from(merged.values()).sort((a, b) => {
@@ -216,9 +216,11 @@ export default async function MyReservationsPage() {
                         (reservation.guest_phones as (string | null)[] | null) || []
                       const playForMoney: boolean[] = reservation.play_for_money || []
                       // Admin-created reservations don't have a "booker" who's
-                      // playing — admin's user_id is metadata, not a player. Use
-                      // array shape to detect (matches isAdminCreatedReservation).
-                      const adminCreated = playerNames.length === reservation.slots
+                      // playing — admin's user_id is metadata, not a player.
+                      const adminCreated = isAdminCreatedReservation({
+                        slots: reservation.slots,
+                        player_names: playerNames,
+                      })
                       // For admin-created bookings, every viewer (even the
                       // admin themselves, though we filter those out below)
                       // is treated as "invited" — there is no booker player.
