@@ -167,9 +167,11 @@ export function BookingConfirmationModal({
                 You are not currently opted into the cash game.
               </p>
             )}
-            <p className="text-sm text-slate-700">
-              Then text your playing partners to Zelle for their tee time.
-            </p>
+            {players.length > 1 && (
+              <p className="text-sm text-slate-700">
+                Then text your playing partners to Zelle for their tee time.
+              </p>
+            )}
           </div>
         </div>
 

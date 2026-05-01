@@ -48,11 +48,160 @@ async function getSessionUserId(): Promise<string | null> {
   return session?.user.id ?? null
 }
 
+// Admins bypass the booking-window cutoff and the opt-in cutoff so they can
+// fix things up after the deadline. Returns null when the caller isn't
+// authenticated or isn't an admin.
+async function getSessionAdminId(): Promise<string | null> {
+  const userId = await getSessionUserId()
+  if (!userId) return null
+  const supabaseAdmin = createAdminClient()
+  const { data } = await supabaseAdmin
+    .from("users")
+    .select("is_admin")
+    .eq("id", userId)
+    .single()
+  return data?.is_admin ? userId : null
+}
+
 function bookerCheck(reservation: ReservationFetch, userId: string) {
   if (reservation.user_id !== userId) {
     return { ok: false as const, error: "Only the booker can edit this reservation." }
   }
   return { ok: true as const }
+}
+
+// Initial-booking entry point. Lives server-side so the booking-window
+// deadline can be enforced even against a tampered client (the previous
+// flow inserted directly from the browser, which let users book past
+// booking_closes_at). Admins bypass the deadline check; everything else
+// — capacity, conflict detection, guest-phone validation — applies to all
+// callers.
+export async function createReservation(input: {
+  teeTimeId: string
+  additionalPlayers: Array<
+    | { type: "user"; userId: string; name: string }
+    | { type: "guest"; name: string; phone: string }
+  >
+  bookerPlayForMoney: boolean
+  additionalPlayForMoney: boolean[]
+}): Promise<{ success: boolean; reservationId?: string; error?: string }> {
+  try {
+    const userId = await getSessionUserId()
+    if (!userId) return { success: false, error: "You must be signed in to book." }
+
+    const adminId = await getSessionAdminId()
+    const isAdmin = adminId === userId
+
+    const supabase = await createClient()
+
+    const { data: teeTime, error: teeTimeErr } = await supabase
+      .from("tee_times")
+      .select("id, date, time, max_slots, booking_closes_at, season")
+      .eq("id", input.teeTimeId)
+      .single()
+
+    if (teeTimeErr || !teeTime) {
+      return { success: false, error: "Tee time not found." }
+    }
+
+    if (!isAdmin && !isBookingWindowOpen(teeTime.booking_closes_at)) {
+      return {
+        success: false,
+        error: "Booking has closed for this tee time.",
+      }
+    }
+
+    // Re-check capacity server-side; client state may be stale.
+    const { data: existing } = await supabase
+      .from("reservations")
+      .select("slots")
+      .eq("tee_time_id", input.teeTimeId)
+    const reservedSlots = (existing || []).reduce((sum, r) => sum + (r.slots ?? 0), 0)
+    const availableSlots = (teeTime.max_slots ?? 4) - reservedSlots
+    const totalSlots = input.additionalPlayers.length + 1
+    if (totalSlots > availableSlots) {
+      return {
+        success: false,
+        error: `Only ${availableSlots} slot${availableSlots === 1 ? "" : "s"} left at this tee time.`,
+      }
+    }
+
+    // Validate guest names + phones server-side too — defense in depth.
+    for (let i = 0; i < input.additionalPlayers.length; i++) {
+      const p = input.additionalPlayers[i]
+      if (p.type === "guest") {
+        if (!p.name?.trim()) {
+          return { success: false, error: `Guest in seat ${i + 2} is missing a name.` }
+        }
+        const digits = stripPhone(p.phone || "")
+        if (!isValidPhone(digits)) {
+          return {
+            success: false,
+            error: `Guest in seat ${i + 2} needs a valid 10-digit phone.`,
+          }
+        }
+      }
+    }
+
+    // Conflict pre-check for all league players in the group (admins still
+    // get this guard — it keeps the same player from double-booking by
+    // accident, which an admin probably also doesn't want).
+    const playerUserIds: (string | null)[] = input.additionalPlayers.map((p) =>
+      p.type === "user" ? p.userId : null,
+    )
+    const leagueIdsToCheck = [userId, ...playerUserIds.filter((id): id is string => !!id)]
+    try {
+      const conflictResult = await checkPlayersForDateConflict(teeTime.date, leagueIdsToCheck)
+      if (conflictResult.success && conflictResult.conflicts && conflictResult.conflicts.length > 0) {
+        const names = conflictResult.conflicts.map((c) => c.name).join(", ")
+        return {
+          success: false,
+          error: `${names} already has a reservation that day.`,
+        }
+      }
+    } catch (err) {
+      console.error("Conflict pre-check failed:", err)
+    }
+
+    const player_names = input.additionalPlayers.map((p) => p.name.trim())
+    const guest_phones: (string | null)[] = input.additionalPlayers.map((p) =>
+      p.type === "guest" ? stripPhone(p.phone) : null,
+    )
+    const play_for_money = [
+      input.bookerPlayForMoney,
+      ...input.additionalPlayForMoney,
+    ]
+
+    const { data: insertedRows, error: insertErr } = await supabase
+      .from("reservations")
+      .insert([
+        {
+          tee_time_id: input.teeTimeId,
+          user_id: userId,
+          slots: totalSlots,
+          player_names,
+          player_user_ids: playerUserIds,
+          guest_phones,
+          play_for_money,
+          season: teeTime.season,
+        },
+      ])
+      .select("id")
+
+    if (insertErr) {
+      return { success: false, error: insertErr.message }
+    }
+
+    const reservationId = insertedRows?.[0]?.id as string | undefined
+    revalidatePath("/my-reservations")
+    revalidatePath("/schedule")
+    return { success: true, reservationId }
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to create reservation.",
+    }
+  }
 }
 
 export async function addPlayerToReservation(
@@ -65,16 +214,21 @@ export async function addPlayerToReservation(
     const userId = await getSessionUserId()
     if (!userId) return { success: false, error: "You must be signed in." }
 
+    const adminId = await getSessionAdminId()
+    const isAdmin = adminId === userId
+
     const { data: reservation, error } = await fetchReservation(reservationId)
     if (error || !reservation || !reservation.tee_times) {
       return { success: false, error: error || "Reservation not found." }
     }
 
-    const auth = bookerCheck(reservation, userId)
-    if (!auth.ok) return { success: false, error: auth.error }
+    if (!isAdmin) {
+      const auth = bookerCheck(reservation, userId)
+      if (!auth.ok) return { success: false, error: auth.error }
 
-    if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
-      return { success: false, error: "The booking window has closed." }
+      if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
+        return { success: false, error: "The booking window has closed." }
+      }
     }
 
     if (reservation.slots >= reservation.tee_times.max_slots) {
@@ -182,11 +336,16 @@ export async function removePlayerByIndex(
       return { success: false, error: error || "Reservation not found." }
     }
 
-    const auth = bookerCheck(reservation, userId)
-    if (!auth.ok) return { success: false, error: auth.error }
+    const adminId = await getSessionAdminId()
+    const isAdmin = adminId === userId
 
-    if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
-      return { success: false, error: "The booking window has closed." }
+    if (!isAdmin) {
+      const auth = bookerCheck(reservation, userId)
+      if (!auth.ok) return { success: false, error: auth.error }
+
+      if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
+        return { success: false, error: "The booking window has closed." }
+      }
     }
 
     const playerNames = reservation.player_names || []
@@ -238,12 +397,15 @@ export async function updateOptIns(
     const userId = await getSessionUserId()
     if (!userId) return { success: false, error: "You must be signed in." }
 
+    const adminId = await getSessionAdminId()
+    const isAdmin = adminId === userId
+
     const { data: reservation, error } = await fetchReservation(reservationId)
     if (error || !reservation || !reservation.tee_times) {
       return { success: false, error: error || "Reservation not found." }
     }
 
-    if (!isBeforeCutoff(reservation.tee_times.date, reservation.tee_times.time, OPT_IN_BUFFER_MINUTES)) {
+    if (!isAdmin && !isBeforeCutoff(reservation.tee_times.date, reservation.tee_times.time, OPT_IN_BUFFER_MINUTES)) {
       return { success: false, error: "Opt-in editing is closed within an hour of tee time." }
     }
 
@@ -256,15 +418,15 @@ export async function updateOptIns(
     const playerUserIds = reservation.player_user_ids || []
     const invitedIndex = playerUserIds.findIndex((uid) => uid === userId)
 
-    if (!isBooker && invitedIndex === -1) {
+    if (!isBooker && !isAdmin && invitedIndex === -1) {
       return { success: false, error: "You're not on this reservation." }
     }
 
     const current = reservation.play_for_money || new Array(expectedLength).fill(false)
     let next: boolean[]
 
-    if (isBooker) {
-      // Booker can change anyone's opt-in.
+    if (isBooker || isAdmin) {
+      // Booker (or admin acting on any reservation) can change every slot.
       next = optIns
     } else {
       // Invited player can change ONLY their own slot (player_user_ids index n maps to play_for_money[n+1]).

@@ -28,9 +28,14 @@ import {
 } from "@/app/actions/reservation-players"
 import { getCashGameForDate } from "@/app/actions/cash-games"
 import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
+import { createReservation } from "@/app/actions/reservation-edits"
 import type { CashGame } from "@/types/supabase"
 import { BookingConfirmationModal } from "@/components/booking-confirmation-modal"
-import { computePlayerOwed, type BookingPlayerSummary } from "@/lib/booking-summary"
+import {
+  computePlayerOwed,
+  isBookingWindowOpen,
+  type BookingPlayerSummary,
+} from "@/lib/booking-summary"
 import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 
 interface TeeTime {
@@ -242,8 +247,12 @@ export default function BookTeeTimePage() {
     }
   })
 
-  // Filter out tee times with no available slots
-  const availableTeeTimes = teeTimesWithAvailability.filter((tt) => tt.availableSlots > 0)
+  // Filter out tee times with no available slots OR a closed booking window.
+  // Server-side enforcement still applies in createReservation, but hiding
+  // closed slots here keeps the UI honest so users can't even pick them.
+  const availableTeeTimes = teeTimesWithAvailability.filter(
+    (tt) => tt.availableSlots > 0 && isBookingWindowOpen(tt.booking_closes_at),
+  )
 
   const selectedTeeTimeData = teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)
   const totalSlots = additionalPlayers.length + 1
@@ -351,63 +360,31 @@ export default function BookTeeTimePage() {
 
     setIsSubmitting(true)
 
-    // Build the aligned arrays.
-    const player_names = additionalPlayers.map((p) => p.name.trim())
-    const player_user_ids: (string | null)[] = additionalPlayers.map((p) =>
-      p.type === "user" ? p.userId : null,
-    )
-    const guest_phones: (string | null)[] = additionalPlayers.map((p) =>
-      p.type === "guest" ? p.phone : null,
-    )
-    const play_for_money = [bookerPlayForMoney, ...additionalPlayers.map((p) => p.playForMoney)]
-
-    // Pre-submit conflict check for all league players in the group.
-    const leagueIdsToCheck = [user.id, ...player_user_ids.filter((id): id is string => !!id)]
+    // Booking is now created via a server action so booking_closes_at,
+    // capacity, and guest-phone validation are all enforced server-side
+    // (the previous direct supabase.insert from the client let users book
+    // past the deadline). The action also bypasses the deadline for admins.
     try {
-      const conflictResult = await checkPlayersForDateConflict(
-        selectedTeeTimeData.date,
-        leagueIdsToCheck,
-      )
-      if (conflictResult.success && conflictResult.conflicts && conflictResult.conflicts.length > 0) {
-        const names = conflictResult.conflicts.map((c) => c.name).join(", ")
-        toast({
-          title: "Scheduling conflict",
-          description: `${names} already has a reservation on ${formatDateDisplay(selectedTeeTimeData.date)}. Each player can only book one tee time per day.`,
-          variant: "destructive",
-        })
-        setIsSubmitting(false)
-        return
-      }
-    } catch (err) {
-      // If the check itself fails, fall through and let the server enforce it.
-      console.error("Conflict pre-check failed:", err)
-    }
+      const result = await createReservation({
+        teeTimeId: selectedTeeTime,
+        bookerPlayForMoney,
+        additionalPlayers: additionalPlayers.map((p) =>
+          p.type === "user"
+            ? { type: "user" as const, userId: p.userId, name: p.name }
+            : { type: "guest" as const, name: p.name.trim(), phone: p.phone },
+        ),
+        additionalPlayForMoney: additionalPlayers.map((p) => p.playForMoney),
+      })
 
-    try {
-      const { data: insertedRows, error } = await supabase
-        .from("reservations")
-        .insert([
-          {
-            tee_time_id: selectedTeeTime,
-            user_id: user.id,
-            slots: totalSlots,
-            player_names,
-            play_for_money,
-            player_user_ids,
-            guest_phones,
-            season: selectedTeeTimeData?.season,
-          },
-        ])
-        .select("id")
-
-      if (error) {
+      if (!result.success || !result.reservationId) {
         toast({
           title: "Booking Failed",
-          description: error.message || "Failed to book tee time",
+          description: result.error || "Failed to book tee time",
           variant: "destructive",
         })
         return
       }
+      const reservationId = result.reservationId
 
       // Build the modal summary from local state. This avoids a server round-trip
       // and matches the data the user just entered.
@@ -454,12 +431,9 @@ export default function BookTeeTimePage() {
 
       // Fire confirmation emails in the background. Booking is already saved;
       // failures here are logged server-side and don't block the user.
-      const reservationId = insertedRows?.[0]?.id
-      if (reservationId) {
-        sendBookingConfirmationEmails(reservationId).catch((err) => {
-          console.error("Confirmation email send failed:", err)
-        })
-      }
+      sendBookingConfirmationEmails(reservationId).catch((err) => {
+        console.error("Confirmation email send failed:", err)
+      })
     } catch (error: any) {
       toast({
         title: "Booking Failed",

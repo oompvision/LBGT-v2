@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
   captureCancellationSnapshot,
@@ -242,7 +242,17 @@ export async function removePlayerFromReservation(
     }
 
     const closesAt = (reservation.tee_times as any)?.booking_closes_at as string | null | undefined
-    if (closesAt && new Date(closesAt) < new Date()) {
+    // Admins can always remove themselves / anyone — the window only locks
+    // out regular users.
+    const supabaseAdmin = createAdminClient()
+    const { data: callerRow } = await supabaseAdmin
+      .from("users")
+      .select("is_admin")
+      .eq("id", userId)
+      .single()
+    const isAdmin = !!callerRow?.is_admin
+
+    if (!isAdmin && closesAt && new Date(closesAt) < new Date()) {
       return {
         success: false,
         error: "The booking window has closed. You can no longer remove yourself from this tee time.",
