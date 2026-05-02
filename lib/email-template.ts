@@ -30,11 +30,6 @@ export function buildBrandedEmailHtml({ subject, body, ctaText, ctaUrl }: EmailT
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <!-- Suppress iOS Mail / Apple Mail's auto-linkification of email
-       addresses + phone numbers. Combined with x-apple-data-detectors="false"
-       on the address element itself, this keeps the Zelle email address
-       rendering as plain text instead of a tappable mailto link. -->
-  <meta name="format-detection" content="email=no telephone=no address=no">
   <title>${subject}</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #DAD7CD; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">

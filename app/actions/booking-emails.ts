@@ -184,38 +184,6 @@ function buildConfirmationEmailHtml(opts: {
       : `<p style="margin: 12px 0 0; color: #4a4a4a; font-size: 14px;">You are not currently opted into the cash game.</p>`
     : ""
 
-  // Email clients can't run JS, so a real "copy on click" button isn't
-  // possible. We render the address as a bordered monospace box (no link)
-  // and rely on the user to tap-and-hold / select to copy. The
-  // x-apple-data-detectors attribute and the format-detection meta in
-  // lib/email-template.ts together prevent iOS Mail / Apple Mail from
-  // auto-converting the address into a mailto link.
-  //
-  // Gmail (web + mobile) ignores both and runs its own auto-linkifier on
-  // rendered text. To defeat THAT we fragment the address with invisible
-  // markers at every place a regex pattern would care about:
-  //
-  //   - between the local part and the @  (defeats email regex)
-  //   - the @ itself becomes &#64;          (defeats email regex)
-  //   - between the domain and the tld     (defeats url regex)
-  //   - the tld . becomes &#46;             (defeats url regex)
-  //
-  // Each piece is also wrapped in its own <span> so any linkifier that
-  // walks DOM text nodes individually sees three separate strings instead
-  // of one. None of this changes what the user sees or what gets copied
-  // when they tap-and-hold — entities decode and <wbr> contributes
-  // nothing to the selection.
-  const atIndex = ZELLE_PAYMENT_EMAIL.indexOf("@")
-  const dotIndex = ZELLE_PAYMENT_EMAIL.lastIndexOf(".")
-  const local = ZELLE_PAYMENT_EMAIL.slice(0, atIndex)
-  const domain = ZELLE_PAYMENT_EMAIL.slice(atIndex + 1, dotIndex)
-  const tld = ZELLE_PAYMENT_EMAIL.slice(dotIndex + 1)
-  const zelleAddressHtml =
-    `<span>${escapeHtml(local)}</span>` +
-    `<wbr>&#64;` +
-    `<span>${escapeHtml(domain)}</span>` +
-    `<wbr>&#46;` +
-    `<span>${escapeHtml(tld)}</span>`
   const highlight = `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0;">
       <tr>
@@ -225,8 +193,8 @@ function buildConfirmationEmailHtml(opts: {
           <p style="margin: 0 0 8px; color: #1a1a1a;">Send via Zelle to:</p>
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0;">
             <tr>
-              <td x-apple-data-detectors="false" style="background-color: #ffffff; border: 1px solid #F2C84B; border-radius: 8px; padding: 10px 14px; font-family: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; font-weight: 600; color: #1a1a1a;">
-                ${zelleAddressHtml}
+              <td style="background-color: #ffffff; border: 1px solid #F2C84B; border-radius: 8px; padding: 10px 14px; font-family: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; font-weight: 600; color: #1a1a1a;">
+                ${escapeHtml(ZELLE_PAYMENT_EMAIL)}
               </td>
             </tr>
           </table>
