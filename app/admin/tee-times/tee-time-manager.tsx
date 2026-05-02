@@ -31,6 +31,7 @@ import { Loader2, Plus, Trash2, Clock, Calendar, Settings, CheckCircle, AlertCir
 import {
   saveTemplate,
   generateTeeTimesFromTemplate,
+  generateTeeTimesForDateRange,
   getTeeTimesForDate,
   toggleTeeTime,
   getUpcomingTeeTimeDates,
@@ -137,10 +138,42 @@ function TemplateTab({
   const [timezone] = useState(initialTemplate?.timezone ?? "America/New_York")
 
   const [newTime, setNewTime] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [overwriteExisting, setOverwriteExisting] = useState(false)
   const [generateResult, setGenerateResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null)
+
+  // Date-range modal state. Default to a one-week window starting today,
+  // clamped to the season so the modal opens with sensible values.
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const defaultRangeStart =
+    todayStr < season.start_date ? season.start_date : todayStr > season.end_date ? season.end_date : todayStr
+  const defaultRangeEnd = (() => {
+    const d = new Date(defaultRangeStart + "T00:00:00")
+    d.setDate(d.getDate() + 7)
+    const candidate = d.toISOString().slice(0, 10)
+    return candidate > season.end_date ? season.end_date : candidate
+  })()
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [rangeStart, setRangeStart] = useState(defaultRangeStart)
+  const [rangeEnd, setRangeEnd] = useState(defaultRangeEnd)
+  const [rangeOverwrite, setRangeOverwrite] = useState(false)
+  const [isRangeGenerating, setIsRangeGenerating] = useState(false)
+
+  // Count how many of the configured day-of-week fall within rangeStart..rangeEnd
+  // so the modal can preview the result before the admin commits.
+  const rangeMatchCount = (() => {
+    if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) return 0
+    let count = 0
+    const cursor = new Date(rangeStart + "T00:00:00")
+    const stop = new Date(rangeEnd + "T00:00:00")
+    while (cursor <= stop) {
+      if (cursor.getDay() === dayOfWeek) count++
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    return count
+  })()
+  const rangeOutOfBounds =
+    !!rangeStart && !!rangeEnd && (rangeStart < season.start_date || rangeEnd > season.end_date)
 
   const addTimeSlot = () => {
     if (newTime && !timeSlots.includes(newTime)) {
@@ -153,14 +186,43 @@ function TemplateTab({
     setTimeSlots(timeSlots.filter((t) => t !== time))
   }
 
-  const handleSaveTemplate = async () => {
+  const handleGenerateRange = async () => {
     if (timeSlots.length === 0) {
       toast({ title: "Error", description: "Add at least one time slot", variant: "destructive" })
       return
     }
+    if (!rangeStart || !rangeEnd) {
+      toast({ title: "Error", description: "Pick a start and end date.", variant: "destructive" })
+      return
+    }
+    if (rangeStart > rangeEnd) {
+      toast({ title: "Error", description: "Start date must be on or before end date.", variant: "destructive" })
+      return
+    }
+    if (rangeOutOfBounds) {
+      toast({
+        title: "Out of season",
+        description: `Pick dates between ${formatDisplayDate(season.start_date)} and ${formatDisplayDate(season.end_date)}.`,
+        variant: "destructive",
+      })
+      return
+    }
+    if (rangeMatchCount === 0) {
+      toast({
+        title: "No matching dates",
+        description: `No ${DAYS_OF_WEEK[dayOfWeek]}s fall in that range.`,
+        variant: "destructive",
+      })
+      return
+    }
 
-    setIsSaving(true)
-    const result = await saveTemplate({
+    setIsRangeGenerating(true)
+    setGenerateResult(null)
+
+    // Save template first so the latest config is what gets generated. Mirrors
+    // what "Generate Tee Times for Season" does — admin's last-used config
+    // is what they'd want loaded next time.
+    const saveResult = await saveTemplate({
       season_id: season.id,
       day_of_week: dayOfWeek,
       time_slots: timeSlots,
@@ -171,13 +233,19 @@ function TemplateTab({
       booking_closes_time: closesTime,
       timezone,
     })
-    setIsSaving(false)
-
-    if (result.success) {
-      toast({ title: "Template saved", description: "Your weekly template has been saved." })
-    } else {
-      toast({ title: "Error", description: result.error, variant: "destructive" })
+    if (!saveResult.success) {
+      setIsRangeGenerating(false)
+      setGenerateResult({ success: false, error: saveResult.error })
+      setRangeOpen(false)
+      return
     }
+
+    const result = await generateTeeTimesForDateRange(season.id, rangeStart, rangeEnd, {
+      overwriteExisting: rangeOverwrite,
+    })
+    setIsRangeGenerating(false)
+    setGenerateResult(result)
+    setRangeOpen(false)
   }
 
   const handleGenerate = async () => {
@@ -396,14 +464,18 @@ function TemplateTab({
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Button onClick={handleSaveTemplate} disabled={isSaving || timeSlots.length === 0}>
-          {isSaving ? (
+        <Button
+          variant="outline"
+          onClick={() => setRangeOpen(true)}
+          disabled={isRangeGenerating || timeSlots.length === 0}
+        >
+          {isRangeGenerating ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
+              Generating...
             </>
           ) : (
-            "Save Template"
+            "Generate for Date Range"
           )}
         </Button>
 
@@ -453,6 +525,145 @@ function TemplateTab({
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {/* Generate-for-date-range modal */}
+      <Dialog open={rangeOpen} onOpenChange={setRangeOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Generate Tee Times for Date Range</DialogTitle>
+            <DialogDescription>
+              Materializes the configuration below on every {DAYS_OF_WEEK[dayOfWeek]} that falls in
+              the selected range.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 text-sm">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Day of week
+                </p>
+                <p>{DAYS_OF_WEEK[dayOfWeek]}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Tee times being added
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {timeSlots.length === 0 ? (
+                    <span className="text-muted-foreground text-xs">No time slots configured</span>
+                  ) : (
+                    timeSlots.map((t) => (
+                      <Badge key={t} variant="secondary">
+                        {formatTime24to12(t)}
+                      </Badge>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Booking opens
+                  </p>
+                  <p className="text-xs">
+                    {opensDaysBefore} day{opensDaysBefore === 1 ? "" : "s"} before at{" "}
+                    {formatTime24to12(opensTime)} ET
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Booking closes
+                  </p>
+                  <p className="text-xs">
+                    {closesDaysBefore} day{closesDaysBefore === 1 ? "" : "s"} before at{" "}
+                    {formatTime24to12(closesTime)} ET
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="range-start">Start date</Label>
+                <Input
+                  id="range-start"
+                  type="date"
+                  value={rangeStart}
+                  min={season.start_date}
+                  max={season.end_date}
+                  onChange={(e) => setRangeStart(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="range-end">End date</Label>
+                <Input
+                  id="range-end"
+                  type="date"
+                  value={rangeEnd}
+                  min={season.start_date}
+                  max={season.end_date}
+                  onChange={(e) => setRangeEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {rangeOutOfBounds ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Date range must be within the season ({formatDisplayDate(season.start_date)} —{" "}
+                  {formatDisplayDate(season.end_date)}).
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {rangeMatchCount === 0
+                  ? `No ${DAYS_OF_WEEK[dayOfWeek]}s fall in this range.`
+                  : `Will create / update tee times on ${rangeMatchCount} ${DAYS_OF_WEEK[dayOfWeek]}${
+                      rangeMatchCount === 1 ? "" : "s"
+                    } in this range.`}
+              </p>
+            )}
+
+            <div className="flex items-start gap-3 p-3 border rounded-md bg-muted/40">
+              <Switch
+                id="range-overwrite"
+                checked={rangeOverwrite}
+                onCheckedChange={setRangeOverwrite}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="range-overwrite" className="font-medium cursor-pointer block">
+                  Overwrite existing
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  {rangeOverwrite
+                    ? `Any existing ${DAYS_OF_WEEK[dayOfWeek]} tee time in this range whose time is NOT in this template will be deleted — along with its reservations.`
+                    : "Existing tee times not in this template will be preserved."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRangeOpen(false)} disabled={isRangeGenerating}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateRange}
+              disabled={
+                isRangeGenerating ||
+                rangeOutOfBounds ||
+                rangeMatchCount === 0 ||
+                timeSlots.length === 0
+              }
+            >
+              {isRangeGenerating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Generate Tee Times
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Generate Result */}
       {generateResult && (
