@@ -190,6 +190,15 @@ function buildConfirmationEmailHtml(opts: {
   // x-apple-data-detectors attribute and the format-detection meta in
   // lib/email-template.ts together prevent iOS Mail / Apple Mail from
   // auto-converting the address into a mailto link.
+  //
+  // Gmail (web + mobile) ignores both and runs its own auto-linkifier on
+  // rendered text. To defeat THAT, we additionally fragment the address
+  // with two invisible markers — a <wbr> word-break opportunity between
+  // the local part and the @, and an HTML entity (&#64;) for the @ sign
+  // itself. Neither shows up visually and neither affects what gets
+  // copied, but together they break the regex match Gmail uses.
+  const [zelleLocal, zelleDomain] = ZELLE_PAYMENT_EMAIL.split("@")
+  const zelleAddressHtml = `${escapeHtml(zelleLocal)}<wbr>&#64;${escapeHtml(zelleDomain)}`
   const highlight = `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0;">
       <tr>
@@ -200,7 +209,7 @@ function buildConfirmationEmailHtml(opts: {
           <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0;">
             <tr>
               <td x-apple-data-detectors="false" style="background-color: #ffffff; border: 1px solid #F2C84B; border-radius: 8px; padding: 10px 14px; font-family: SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace; font-size: 15px; font-weight: 600; color: #1a1a1a;">
-                ${escapeHtml(ZELLE_PAYMENT_EMAIL)}
+                ${zelleAddressHtml}
               </td>
             </tr>
           </table>
