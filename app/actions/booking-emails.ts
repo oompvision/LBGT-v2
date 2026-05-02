@@ -192,13 +192,30 @@ function buildConfirmationEmailHtml(opts: {
   // auto-converting the address into a mailto link.
   //
   // Gmail (web + mobile) ignores both and runs its own auto-linkifier on
-  // rendered text. To defeat THAT, we additionally fragment the address
-  // with two invisible markers — a <wbr> word-break opportunity between
-  // the local part and the @, and an HTML entity (&#64;) for the @ sign
-  // itself. Neither shows up visually and neither affects what gets
-  // copied, but together they break the regex match Gmail uses.
-  const [zelleLocal, zelleDomain] = ZELLE_PAYMENT_EMAIL.split("@")
-  const zelleAddressHtml = `${escapeHtml(zelleLocal)}<wbr>&#64;${escapeHtml(zelleDomain)}`
+  // rendered text. To defeat THAT we fragment the address with invisible
+  // markers at every place a regex pattern would care about:
+  //
+  //   - between the local part and the @  (defeats email regex)
+  //   - the @ itself becomes &#64;          (defeats email regex)
+  //   - between the domain and the tld     (defeats url regex)
+  //   - the tld . becomes &#46;             (defeats url regex)
+  //
+  // Each piece is also wrapped in its own <span> so any linkifier that
+  // walks DOM text nodes individually sees three separate strings instead
+  // of one. None of this changes what the user sees or what gets copied
+  // when they tap-and-hold — entities decode and <wbr> contributes
+  // nothing to the selection.
+  const atIndex = ZELLE_PAYMENT_EMAIL.indexOf("@")
+  const dotIndex = ZELLE_PAYMENT_EMAIL.lastIndexOf(".")
+  const local = ZELLE_PAYMENT_EMAIL.slice(0, atIndex)
+  const domain = ZELLE_PAYMENT_EMAIL.slice(atIndex + 1, dotIndex)
+  const tld = ZELLE_PAYMENT_EMAIL.slice(dotIndex + 1)
+  const zelleAddressHtml =
+    `<span>${escapeHtml(local)}</span>` +
+    `<wbr>&#64;` +
+    `<span>${escapeHtml(domain)}</span>` +
+    `<wbr>&#46;` +
+    `<span>${escapeHtml(tld)}</span>`
   const highlight = `
     <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin: 16px 0;">
       <tr>
