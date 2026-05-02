@@ -3,6 +3,7 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
 import {
+  isAdminCreatedReservation,
   isBookingWindowOpen,
   isBeforeCutoff,
 } from "@/lib/booking-summary"
@@ -409,6 +410,13 @@ export async function updateOptIns(
       return { success: false, error: "Opt-in editing is closed within an hour of tee time." }
     }
 
+    const adminCreated = isAdminCreatedReservation({
+      slots: reservation.slots,
+      player_names: reservation.player_names,
+    })
+    // For admin-created bookings the dialog sends one entry per actual
+    // player (no synthetic booker slot), so the payload is N == slots.
+    // For regular bookings it's slots == N+1 (booker + additional).
     const expectedLength = reservation.slots
     if (optIns.length !== expectedLength) {
       return { success: false, error: "Opt-in payload doesn't match the reservation." }
@@ -427,7 +435,10 @@ export async function updateOptIns(
 
     if (isBooker || isAdmin) {
       // Booker (or admin acting on any reservation) can change every slot.
-      next = optIns
+      // Admin-created storage keeps a phantom `false` at index 0, so we
+      // prepend it back when persisting to preserve the invariant
+      // pfm.length === slots + 1 for admin-created rows.
+      next = adminCreated ? [false, ...optIns] : optIns
     } else {
       // Invited player can change ONLY their own slot (player_user_ids index n maps to play_for_money[n+1]).
       next = current.slice()

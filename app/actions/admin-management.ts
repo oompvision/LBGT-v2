@@ -95,7 +95,9 @@ export async function getAllReservationsWithDetails(season?: number) {
         ),
         tee_times (
           date,
-          time
+          time,
+          max_slots,
+          booking_closes_at
         )
       `,
       )

@@ -2,6 +2,7 @@ import { AdminTabs } from "../admin-tabs"
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 // Prevent prerendering and force dynamic rendering
 export const dynamic = "force-dynamic"
@@ -172,15 +173,22 @@ export default async function AdminReservationsPage() {
                             <div className="mt-2">
                               <div className="font-medium">Playing for Money:</div>
                               <div className="flex flex-col gap-1 mt-1">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={`w-3 h-3 rounded-full ${reservation.play_for_money[0] ? "bg-green-500" : "bg-gray-300"}`}
-                                  ></div>
-                                  <span>
-                                    {reservation.users?.name || "Main Player"}:{" "}
-                                    {reservation.play_for_money[0] ? "Yes" : "No"}
-                                  </span>
-                                </div>
+                                {/* Skip the booker row for admin-created
+                                    reservations — the admin isn't a player. */}
+                                {!isAdminCreatedReservation({
+                                  slots: reservation.slots,
+                                  player_names: reservation.player_names ?? null,
+                                }) && (
+                                  <div className="flex items-center gap-2">
+                                    <div
+                                      className={`w-3 h-3 rounded-full ${reservation.play_for_money[0] ? "bg-green-500" : "bg-gray-300"}`}
+                                    ></div>
+                                    <span>
+                                      {reservation.users?.name || "Main Player"}:{" "}
+                                      {reservation.play_for_money[0] ? "Yes" : "No"}
+                                    </span>
+                                  </div>
+                                )}
                                 {reservation.player_names.map((name, index) => (
                                   <div key={index} className="flex items-center gap-2">
                                     <div

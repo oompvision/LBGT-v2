@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CalendarIcon, Clock, BadgeCheck, Plus } from "lucide-react"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 export const dynamic = "force-dynamic"
 
@@ -185,6 +186,12 @@ export default async function SchedulePage() {
                             const playerUserIds = r.player_user_ids || []
                             const playerNames = r.player_names || []
                             const playForMoney = r.play_for_money || []
+                            // Admin-created bookings record admin as user_id
+                            // but they aren't a player on the tee time.
+                            const adminCreated = isAdminCreatedReservation({
+                              slots: r.slots,
+                              player_names: playerNames,
+                            })
 
                             type Row = {
                               name: string
@@ -195,13 +202,17 @@ export default async function SchedulePage() {
                             }
 
                             const rows: Row[] = [
-                              {
-                                name: bookerName,
-                                isViewer: r.user_id === userId,
-                                isBooker: true,
-                                isLeague: true,
-                                optedIn: !!playForMoney[0],
-                              },
+                              ...(adminCreated
+                                ? []
+                                : [
+                                    {
+                                      name: bookerName,
+                                      isViewer: r.user_id === userId,
+                                      isBooker: true,
+                                      isLeague: true,
+                                      optedIn: !!playForMoney[0],
+                                    },
+                                  ]),
                               ...playerNames.map((name, i) => ({
                                 name,
                                 isViewer: playerUserIds[i] === userId,

@@ -352,10 +352,19 @@ export default async function MyReservationsPage() {
                                 userId: playerUserIds[i] ?? null,
                                 phone: role === "booker" ? guestPhones[i] ?? null : null,
                               })),
+                              // Admin-created stores pfm length = slots + 1
+                              // (phantom at [0]); regular stores pfm length =
+                              // slots. Build the array at the right length so
+                              // the dialog reads pfm[i+1] for every player.
                               playForMoney: Array.from(
-                                { length: reservation.slots },
+                                {
+                                  length: adminCreated
+                                    ? reservation.slots + 1
+                                    : reservation.slots,
+                                },
                                 (_, i) => !!playForMoney[i],
                               ),
+                              adminCreated,
                             }}
                           />
                         </div>
