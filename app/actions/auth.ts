@@ -88,7 +88,11 @@ export async function createUserInDatabase(userId: string, email: string, name: 
 }
 
 // Function to update user profile
-export async function updateUserProfile(data: { name?: string; phone_number?: string | null }) {
+export async function updateUserProfile(data: {
+  name?: string
+  phone_number?: string | null
+  handicap?: number | null
+}) {
   try {
     const supabase = await createClient()
 
@@ -102,12 +106,18 @@ export async function updateUserProfile(data: { name?: string; phone_number?: st
     }
 
     // Build update payload — only include fields that were provided
-    const updateData: { name?: string; phone_number?: string | null } = {}
+    const updateData: { name?: string; phone_number?: string | null; handicap?: number | null } = {}
     if (data.name !== undefined && data.name !== "") {
       updateData.name = data.name
     }
     if (data.phone_number !== undefined) {
       updateData.phone_number = data.phone_number || null
+    }
+    if (data.handicap !== undefined) {
+      if (data.handicap !== null && (data.handicap < -10 || data.handicap > 54)) {
+        return { success: false, error: "Handicap must be between -10 and 54" }
+      }
+      updateData.handicap = data.handicap
     }
 
     if (Object.keys(updateData).length === 0) {

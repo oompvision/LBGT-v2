@@ -333,17 +333,29 @@ export async function deleteRound(roundId: string) {
 }
 
 // Function to update a user
-export async function updateUser(userId: string, userData: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null }) {
+export async function updateUser(userId: string, userData: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null; handicap?: number | null }) {
   const supabase = await createClient()
 
   try {
     // Ensure strokes_given is properly converted to a number if it exists
-    const dataToUpdate: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null } = { ...userData }
+    const dataToUpdate: { name?: string; email?: string; strokes_given?: number; phone_number?: string | null; handicap?: number | null } = { ...userData }
 
     if (userData.strokes_given !== undefined) {
       // Force conversion to number and ensure it's not NaN
       const strokesGiven = Number(userData.strokes_given)
       dataToUpdate.strokes_given = isNaN(strokesGiven) ? 0 : strokesGiven
+    }
+
+    if (userData.handicap !== undefined) {
+      if (userData.handicap === null) {
+        dataToUpdate.handicap = null
+      } else {
+        const handicapValue = Number(userData.handicap)
+        if (isNaN(handicapValue) || handicapValue < -10 || handicapValue > 54) {
+          return { success: false, error: "Handicap must be a number between -10 and 54" }
+        }
+        dataToUpdate.handicap = Math.round(handicapValue * 10) / 10
+      }
     }
 
     // Perform the update with explicit data

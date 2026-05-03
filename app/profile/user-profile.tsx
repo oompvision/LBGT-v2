@@ -10,8 +10,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { updateUserProfile, uploadProfilePicture, removeProfilePicture } from "@/app/actions/auth"
-import { CalendarIcon, Mail, Phone, User, Camera, X } from "lucide-react"
+import { CalendarIcon, Flag, Mail, Phone, User, Camera, X } from "lucide-react"
 import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
+import {
+  formatHandicapInput,
+  parseHandicap,
+  isValidHandicap,
+  displayHandicap,
+  MIN_HANDICAP,
+  MAX_HANDICAP,
+} from "@/lib/handicap"
 import Image from "next/image"
 
 interface UserProfileProps {
@@ -22,12 +30,14 @@ interface UserProfileProps {
     profile_picture_url: string | null
     created_at: string
     strokes_given: number | null
+    handicap: number | null
   }
 }
 
 export function UserProfile({ user }: UserProfileProps) {
   const [name, setName] = useState(user.name || "")
   const [phone, setPhone] = useState(user.phone_number ? formatPhone(user.phone_number) : "")
+  const [handicap, setHandicap] = useState(displayHandicap(user.handicap))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingPicture, setIsUploadingPicture] = useState(false)
   const [isRemovingPicture, setIsRemovingPicture] = useState(false)
@@ -49,9 +59,25 @@ export function UserProfile({ user }: UserProfileProps) {
         return
       }
 
+      let handicapValue: number | null = null
+      if (handicap !== "") {
+        const parsed = parseHandicap(handicap)
+        if (parsed === null || !isValidHandicap(parsed)) {
+          toast({
+            title: "Invalid Handicap",
+            description: `Handicap must be a number between ${MIN_HANDICAP} and ${MAX_HANDICAP}.`,
+            variant: "destructive",
+          })
+          setIsSubmitting(false)
+          return
+        }
+        handicapValue = parsed
+      }
+
       const result = await updateUserProfile({
         name,
         phone_number: phoneDigits || null,
+        handicap: handicapValue,
       })
 
       if (!result.success) {
@@ -227,6 +253,23 @@ export function UserProfile({ user }: UserProfileProps) {
                 onChange={(e) => setPhone(formatPhone(e.target.value))}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="handicap">Handicap</Label>
+            <div className="flex items-center gap-2">
+              <Flag className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                id="handicap"
+                type="text"
+                inputMode="decimal"
+                placeholder="12.5"
+                value={handicap}
+                onChange={(e) => setHandicap(formatHandicapInput(e.target.value))}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Your handicap index (e.g., 12.5). Visible only to you and admins. Range: {MIN_HANDICAP} to {MAX_HANDICAP}.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Member Since</Label>
