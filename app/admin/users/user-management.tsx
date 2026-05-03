@@ -19,6 +19,14 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Download, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
 import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
+  formatHandicapInput,
+  parseHandicap,
+  isValidHandicap,
+  displayHandicap,
+  MIN_HANDICAP,
+  MAX_HANDICAP,
+} from "@/lib/handicap"
+import {
   updateUser,
   updateStrokesGivenDirectly,
   deleteUser,
@@ -46,11 +54,13 @@ export function UserManagement({ users }: UserManagementProps) {
     email: string
     phone_number: string
     strokes_given: number
+    handicap: string
   }>({
     name: "",
     email: "",
     phone_number: "",
     strokes_given: 0,
+    handicap: "",
   })
   const router = useRouter()
   const { toast } = useToast()
@@ -72,6 +82,7 @@ export function UserManagement({ users }: UserManagementProps) {
       "Name",
       "Email",
       "Phone",
+      "Handicap",
       "Strokes Given",
       "Is Admin",
       "Is Confirmed",
@@ -92,6 +103,7 @@ export function UserManagement({ users }: UserManagementProps) {
       user.name ?? "",
       user.email ?? "",
       displayPhone(user.phone_number) || "",
+      displayHandicap(user.handicap),
       user.strokes_given ?? 0,
       user.is_admin ? "true" : "false",
       user.is_confirmed ? "true" : "false",
@@ -127,6 +139,7 @@ export function UserManagement({ users }: UserManagementProps) {
       email: user.email || "",
       phone_number: user.phone_number ? formatPhone(user.phone_number) : "",
       strokes_given: user.strokes_given !== undefined ? user.strokes_given : 0,
+      handicap: displayHandicap(user.handicap),
     })
     setIsEditing(true)
   }
@@ -147,12 +160,28 @@ export function UserManagement({ users }: UserManagementProps) {
         return
       }
 
-      // First update the name, email, and phone
+      let handicapValue: number | null = null
+      if (editedUser.handicap !== "") {
+        const parsed = parseHandicap(editedUser.handicap)
+        if (parsed === null || !isValidHandicap(parsed)) {
+          toast({
+            title: "Validation Error",
+            description: `Handicap must be a number between ${MIN_HANDICAP} and ${MAX_HANDICAP}`,
+            variant: "destructive",
+          })
+          setIsSubmitting(false)
+          return
+        }
+        handicapValue = parsed
+      }
+
+      // First update the name, email, phone, and handicap
       const phoneDigits = stripPhone(editedUser.phone_number)
       const nameEmailResult = await updateUser(selectedUser.id, {
         name: editedUser.name,
         email: editedUser.email,
         phone_number: phoneDigits || null,
+        handicap: handicapValue,
       })
 
       if (!nameEmailResult.success) {
@@ -471,7 +500,7 @@ export function UserManagement({ users }: UserManagementProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                   <div>
                     <p className="text-sm font-medium">Joined</p>
                     <p className="text-sm text-muted-foreground">
@@ -482,6 +511,12 @@ export function UserManagement({ users }: UserManagementProps) {
                     <p className="text-sm font-medium">Phone</p>
                     <p className="text-sm text-muted-foreground">
                       {displayPhone(user.phone_number) || "Not set"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Handicap</p>
+                    <p className="text-sm text-muted-foreground">
+                      {displayHandicap(user.handicap) || "Not set"}
                     </p>
                   </div>
                   <div>
@@ -548,6 +583,26 @@ export function UserManagement({ users }: UserManagementProps) {
                 onChange={(e) => setEditedUser({ ...editedUser, phone_number: formatPhone(e.target.value) })}
                 disabled={isSubmitting}
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="handicap">Handicap ({MIN_HANDICAP} to {MAX_HANDICAP})</Label>
+              <Input
+                id="handicap"
+                type="text"
+                inputMode="decimal"
+                placeholder="12.5"
+                value={editedUser.handicap}
+                onChange={(e) =>
+                  setEditedUser({
+                    ...editedUser,
+                    handicap: formatHandicapInput(e.target.value),
+                  })
+                }
+                disabled={isSubmitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                Self-reported handicap index. Leave blank to clear.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="strokes_given">Strokes Given (0-{MAX_STROKES_GIVEN})</Label>

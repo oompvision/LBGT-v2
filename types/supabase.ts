@@ -7,6 +7,7 @@ export type Database = {
           name: string
           email: string
           strokes_given: number | null
+          handicap: number | null
           is_admin: boolean
           is_confirmed: boolean
           is_active: boolean
@@ -19,6 +20,7 @@ export type Database = {
           name: string
           email: string
           strokes_given?: number | null
+          handicap?: number | null
           is_admin?: boolean
           is_confirmed?: boolean
           is_active?: boolean
@@ -31,6 +33,7 @@ export type Database = {
           name?: string
           email?: string
           strokes_given?: number | null
+          handicap?: number | null
           is_admin?: boolean
           is_confirmed?: boolean
           is_active?: boolean
