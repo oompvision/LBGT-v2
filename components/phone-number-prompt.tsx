@@ -45,14 +45,20 @@ export function PhoneNumberPrompt() {
 
     const checkProfile = async () => {
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("users")
-        .select("phone_number, handicap")
+        .select("*")
         .eq("id", user.id)
         .single()
 
-      const phoneSet = !!data?.phone_number
-      const handicapSet = data?.handicap !== null && data?.handicap !== undefined
+      // If we can't read the profile, don't risk prompting incorrectly.
+      if (error || !data) return
+
+      const phoneSet = !!data.phone_number
+      // `handicap` column may not exist yet if the migration hasn't been run —
+      // treat undefined the same as null (unset) but never let it claim phone
+      // is missing.
+      const handicapSet = data.handicap !== null && data.handicap !== undefined
 
       setHasPhone(phoneSet)
       setHasHandicap(handicapSet)
