@@ -8,6 +8,7 @@ import { deleteReservation } from "@/app/actions/tee-times"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 interface Reservation {
   id: string
@@ -89,16 +90,23 @@ export function AdminReservationsList({ reservations }: AdminReservationsListPro
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <span>{reservation.users.name}</span>
-                {reservation.play_for_money && reservation.play_for_money[0] && (
-                  <Badge className="bg-green-500 hover:bg-green-600">Playing for money</Badge>
-                )}
-              </div>
+              {/* Skip the booker-as-player row for admin-created reservations
+                  (admin is the audit owner, not on the tee time). */}
+              {!isAdminCreatedReservation({
+                slots: reservation.slots,
+                player_names: reservation.player_names ?? null,
+              }) && (
+                <div className="flex items-center space-x-2">
+                  <span>{reservation.users.name}</span>
+                  {reservation.play_for_money && reservation.play_for_money[0] && (
+                    <Badge className="bg-green-500 hover:bg-green-600">Playing for money</Badge>
+                  )}
+                </div>
+              )}
 
               {reservation.player_names && reservation.player_names.length > 0 && (
                 <div className="mt-2">
-                  <h4 className="text-sm font-medium mb-1">Additional Players ({reservation.player_names.length}):</h4>
+                  <h4 className="text-sm font-medium mb-1">Players ({reservation.player_names.length}):</h4>
                   <ul className="space-y-1">
                     {reservation.player_names.map((name, index) => {
                       const isGuest = !reservation.player_user_ids?.[index]

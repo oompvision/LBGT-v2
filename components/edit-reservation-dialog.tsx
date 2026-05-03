@@ -44,6 +44,11 @@ export type EditReservationData = {
   bookerUserId: string
   additionalPlayers: { name: string; userId: string | null; phone: string | null }[]
   playForMoney: boolean[]
+  // Admin-created bookings have user_id = admin (audit owner only) instead
+  // of one of the actual players. The dialog skips the synthetic booker
+  // entry when this is true so the admin doesn't appear as a player on
+  // the tee time they aren't on.
+  adminCreated: boolean
 }
 
 type Props = {
@@ -81,8 +86,12 @@ function useIsMobile() {
 }
 
 function buildInitialPlayers(reservation: EditReservationData): EditPlayer[] {
-  return [
-    {
+  const players: EditPlayer[] = []
+  // Skip the synthetic "booker player" row for admin-created reservations.
+  // Storage keeps a phantom `false` at play_for_money[0] for the admin, so
+  // the additional-player indexing (pfm[i+1]) is unchanged.
+  if (!reservation.adminCreated) {
+    players.push({
       key: `booker-${reservation.bookerUserId}`,
       name: reservation.bookerName,
       userId: reservation.bookerUserId,
@@ -91,8 +100,10 @@ function buildInitialPlayers(reservation: EditReservationData): EditPlayer[] {
       optedIn: !!reservation.playForMoney[0],
       originalIdx: null,
       phone: "",
-    },
-    ...reservation.additionalPlayers.map((p, i) => ({
+    })
+  }
+  reservation.additionalPlayers.forEach((p, i) => {
+    players.push({
       key: `orig-${i}`,
       name: p.name,
       userId: p.userId,
@@ -101,8 +112,9 @@ function buildInitialPlayers(reservation: EditReservationData): EditPlayer[] {
       optedIn: !!reservation.playForMoney[i + 1],
       originalIdx: i,
       phone: p.phone ?? "",
-    })),
-  ]
+    })
+  })
+  return players
 }
 
 export function EditReservationDialog({

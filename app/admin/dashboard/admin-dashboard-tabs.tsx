@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useAuth } from "@/components/auth-provider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,7 +22,12 @@ import {
 } from "@/app/actions/admin-management"
 import { Loader2, Pencil, Trash2 } from "lucide-react"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 import { AdminAddReservation } from "@/components/admin-add-reservation"
+import {
+  EditReservationDialog,
+  type EditReservationData,
+} from "@/components/edit-reservation-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +76,8 @@ export function AdminDashboardTabs({
   const [itemToDelete, setItemToDelete] = useState<{ id: string; type: "round" | "reservation" } | null>(null)
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
   const [selectedScore, setSelectedScore] = useState<(Score & { users: Pick<User, "id" | "name"> | null }) | null>(null)
+  const [editReservationData, setEditReservationData] = useState<EditReservationData | null>(null)
+  const { user: authUser } = useAuth()
 
   // Update state when props change
   useEffect(() => {
@@ -243,6 +251,40 @@ export function AdminDashboardTabs({
     setDeleteDialogOpen(true)
   }
 
+  const openEditReservation = (reservation: ReservationWithDetails) => {
+    const adminCreated = isAdminCreatedReservation({
+      slots: reservation.slots,
+      player_names: (reservation.player_names ?? null) as string[] | null,
+    })
+    const playerNames = reservation.player_names ?? []
+    const playerUserIds = (reservation.player_user_ids ?? []) as (string | null)[]
+    const guestPhones = (reservation.guest_phones ?? []) as (string | null)[]
+    const playForMoney = reservation.play_for_money ?? []
+
+    setEditReservationData({
+      id: reservation.id,
+      slots: reservation.slots,
+      maxSlots: (reservation.tee_times as any)?.max_slots ?? 4,
+      teeTimeDate: (reservation.tee_times as any)?.date ?? "",
+      teeTimeTime: (reservation.tee_times as any)?.time ?? "",
+      bookingClosesAt: (reservation.tee_times as any)?.booking_closes_at ?? null,
+      bookerName: reservation.users?.name || "Booker",
+      bookerUserId: reservation.user_id,
+      additionalPlayers: playerNames.map((name, i) => ({
+        name,
+        userId: playerUserIds[i] ?? null,
+        phone: guestPhones[i] ?? null,
+      })),
+      // Mirror /my-reservations: admin-created stores pfm at length slots+1
+      // (phantom at [0]), regular stores at length slots.
+      playForMoney: Array.from(
+        { length: adminCreated ? reservation.slots + 1 : reservation.slots },
+        (_, i) => !!(playForMoney as boolean[])[i],
+      ),
+      adminCreated,
+    })
+  }
+
   const handleEditScore = (score: Score & { users: Pick<User, "id" | "name" | "email"> | null }) => {
     setSelectedScore(score)
     setEditScoreDialogOpen(true)
@@ -387,12 +429,20 @@ export function AdminDashboardTabs({
                             <div className="mt-2">
                               <p className="text-xs font-medium">Player Names:</p>
                               <ul className="text-xs">
-                                <li className="flex items-center gap-1">
-                                  {reservation.users?.name || "Unknown User"}
-                                  {reservation.play_for_money?.[0] && (
-                                    <span className="text-green-600 text-xs">(Playing for $)</span>
-                                  )}
-                                </li>
+                                {/* For admin-created reservations the booker is the
+                                    admin and isn't a player on the tee time, so
+                                    skip the synthetic booker row. */}
+                                {!isAdminCreatedReservation({
+                                  slots: reservation.slots,
+                                  player_names: reservation.player_names ?? null,
+                                }) && (
+                                  <li className="flex items-center gap-1">
+                                    {reservation.users?.name || "Unknown User"}
+                                    {reservation.play_for_money?.[0] && (
+                                      <span className="text-green-600 text-xs">(Playing for $)</span>
+                                    )}
+                                  </li>
+                                )}
                                 {reservation.player_names?.map((name: string, index: number) => {
                                   const isGuest = !reservation.player_user_ids?.[index]
                                   const phone = reservation.guest_phones?.[index]
@@ -413,13 +463,24 @@ export function AdminDashboardTabs({
                               </ul>
                             </div>
                           </div>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => confirmDelete(reservation.id, "reservation")}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => openEditReservation(reservation)}
+                              aria-label="Edit reservation"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => confirmDelete(reservation.id, "reservation")}
+                              aria-label="Delete reservation"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </Card>
                     ))
@@ -539,6 +600,47 @@ export function AdminDashboardTabs({
             )}
           </DialogContent>
         </Dialog>
+
+        {editReservationData && authUser?.id && (
+          <EditReservationDialog
+            open={!!editReservationData}
+            onOpenChange={(open) => {
+              if (!open) {
+                setEditReservationData(null)
+                // Refresh the reservation list so Players: count and player
+                // names reflect any add/remove the admin just made.
+                const resSeason =
+                  selectedReservationsSeason === "all"
+                    ? undefined
+                    : Number(selectedReservationsSeason)
+                getAllReservationsWithDetails(resSeason).then((r) => {
+                  if (r.success) {
+                    const validated = r.reservations.map((reservation: ReservationWithDetails) => {
+                      if (reservation.tee_times && reservation.tee_times.date) {
+                        return {
+                          ...reservation,
+                          tee_times: {
+                            ...reservation.tee_times,
+                            date: ensureValidDate(reservation.tee_times.date),
+                          },
+                        }
+                      }
+                      return reservation
+                    })
+                    setReservations(validated)
+                  }
+                })
+              }
+            }}
+            // Treat admin as the booker for permissions; the existing admin
+            // bypass in the server actions handles the booking-window /
+            // opt-in cutoff for them.
+            role="booker"
+            viewerUserId={authUser.id}
+            reservation={editReservationData}
+            cashGameTitle={null}
+          />
+        )}
       </Tabs>
     </div>
   )
