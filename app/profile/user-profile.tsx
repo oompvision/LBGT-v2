@@ -288,8 +288,7 @@ export function UserProfile({ user }: UserProfileProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Handicap Information</CardTitle>
-          <CardDescription>Your current handicap settings</CardDescription>
+          <CardTitle>Strokes Given</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
