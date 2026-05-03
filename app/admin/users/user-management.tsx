@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Download, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
 import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
   updateUser,
@@ -65,6 +65,60 @@ export function UserManagement({ users }: UserManagementProps) {
     const searchLower = searchTerm.toLowerCase()
     return user.name?.toLowerCase().includes(searchLower) || user.email?.toLowerCase().includes(searchLower)
   })
+
+  const handleExportCsv = () => {
+    const headers = [
+      "ID",
+      "Name",
+      "Email",
+      "Phone",
+      "Strokes Given",
+      "Is Admin",
+      "Is Confirmed",
+      "Is Active",
+      "Joined",
+    ]
+
+    const escapeCsv = (value: unknown) => {
+      const str = value === null || value === undefined ? "" : String(value)
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+
+    const rows = users.map((user) => [
+      user.id,
+      user.name ?? "",
+      user.email ?? "",
+      displayPhone(user.phone_number) || "",
+      user.strokes_given ?? 0,
+      user.is_admin ? "true" : "false",
+      user.is_confirmed ? "true" : "false",
+      user.is_active ? "true" : "false",
+      user.created_at ? new Date(user.created_at).toISOString() : "",
+    ])
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCsv).join(","))
+      .join("\n")
+
+    const blob = new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    const dateStamp = new Date().toISOString().split("T")[0]
+    link.href = url
+    link.download = `users-${dateStamp}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: "Export complete",
+      description: `Exported ${users.length} user${users.length === 1 ? "" : "s"} to CSV.`,
+    })
+  }
 
   const handleEditUser = (user: User) => {
     setSelectedUser(user)
@@ -289,6 +343,15 @@ export function UserManagement({ users }: UserManagementProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Button
+          variant="outline"
+          onClick={handleExportCsv}
+          disabled={users.length === 0}
+          className="sm:w-auto"
+        >
+          <Download className="mr-2 h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       <div className="space-y-4">
