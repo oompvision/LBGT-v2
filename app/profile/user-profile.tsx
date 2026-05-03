@@ -292,7 +292,6 @@ export function UserProfile({ user }: UserProfileProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Strokes Given</Label>
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span>{user.strokes_given || 0}</span>
