@@ -26,6 +26,25 @@ export default async function ProfilePage() {
     redirect("/dashboard")
   }
 
+  // Active season + ringer pool opt-in for this user
+  const { data: activeSeason } = await supabase
+    .from("seasons")
+    .select("year")
+    .eq("is_active", true)
+    .maybeSingle()
+
+  const seasonYear: number | null = activeSeason?.year ?? null
+  let ringerOptIn: boolean | null = null
+  if (seasonYear !== null) {
+    const { data: optInRow } = await supabase
+      .from("ringer_pool_opt_ins")
+      .select("opted_in")
+      .eq("user_id", session.user.id)
+      .eq("season_year", seasonYear)
+      .maybeSingle()
+    ringerOptIn = optInRow ? optInRow.opted_in : null
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
@@ -36,7 +55,7 @@ export default async function ProfilePage() {
             <p className="text-muted-foreground">View and manage your profile information</p>
           </div>
 
-          <UserProfile user={user} />
+          <UserProfile user={user} ringerSeasonYear={seasonYear} ringerOptIn={ringerOptIn} />
         </div>
       </main>
       <Footer />

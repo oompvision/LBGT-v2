@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, Download, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, User, Camera, X } from "lucide-react"
+import { CheckCircle, Download, Edit, Loader2, Phone, Power, PowerOff, Search, ShieldCheck, ShieldX, Trash2, Trophy, User, Camera, X } from "lucide-react"
 import { displayPhone, formatPhone, stripPhone } from "@/lib/phone"
 import {
   formatHandicapInput,
@@ -36,14 +36,24 @@ import {
   unconfirmMember,
   setUserActiveState,
 } from "@/app/actions/admin-management"
+import { adminSetRingerOptIn } from "@/app/actions/ringer-pool"
 import type { User } from "@/types/supabase"
 import { MAX_STROKES_GIVEN } from "@/lib/constants"
 
-interface UserManagementProps {
-  users: User[]
+type RingerStatus = "unset" | "opted_in" | "declined"
+
+function ringerStatusFromMap(map: Record<string, boolean>, userId: string): RingerStatus {
+  if (!(userId in map)) return "unset"
+  return map[userId] ? "opted_in" : "declined"
 }
 
-export function UserManagement({ users }: UserManagementProps) {
+interface UserManagementProps {
+  users: User[]
+  ringerSeasonYear: number | null
+  ringerOptIns: Record<string, boolean>
+}
+
+export function UserManagement({ users, ringerSeasonYear, ringerOptIns }: UserManagementProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
@@ -55,12 +65,14 @@ export function UserManagement({ users }: UserManagementProps) {
     phone_number: string
     strokes_given: number
     handicap: string
+    ringerStatus: RingerStatus
   }>({
     name: "",
     email: "",
     phone_number: "",
     strokes_given: 0,
     handicap: "",
+    ringerStatus: "unset",
   })
   const router = useRouter()
   const { toast } = useToast()
@@ -77,6 +89,10 @@ export function UserManagement({ users }: UserManagementProps) {
   })
 
   const handleExportCsv = () => {
+    const ringerColumn = ringerSeasonYear
+      ? `'${(ringerSeasonYear % 100).toString().padStart(2, "0")} Ringer Pool`
+      : "Ringer Pool"
+
     const headers = [
       "ID",
       "Name",
@@ -84,6 +100,7 @@ export function UserManagement({ users }: UserManagementProps) {
       "Phone",
       "Handicap",
       "Strokes Given",
+      ringerColumn,
       "Is Admin",
       "Is Confirmed",
       "Is Active",
@@ -98,18 +115,23 @@ export function UserManagement({ users }: UserManagementProps) {
       return str
     }
 
-    const rows = users.map((user) => [
-      user.id,
-      user.name ?? "",
-      user.email ?? "",
-      displayPhone(user.phone_number) || "",
-      displayHandicap(user.handicap),
-      user.strokes_given ?? 0,
-      user.is_admin ? "true" : "false",
-      user.is_confirmed ? "true" : "false",
-      user.is_active ? "true" : "false",
-      user.created_at ? new Date(user.created_at).toISOString() : "",
-    ])
+    const rows = users.map((user) => {
+      const ringer = ringerStatusFromMap(ringerOptIns, user.id)
+      const ringerLabel = ringer === "opted_in" ? "Yes" : ringer === "declined" ? "No" : ""
+      return [
+        user.id,
+        user.name ?? "",
+        user.email ?? "",
+        displayPhone(user.phone_number) || "",
+        displayHandicap(user.handicap),
+        user.strokes_given ?? 0,
+        ringerLabel,
+        user.is_admin ? "true" : "false",
+        user.is_confirmed ? "true" : "false",
+        user.is_active ? "true" : "false",
+        user.created_at ? new Date(user.created_at).toISOString() : "",
+      ]
+    })
 
     const csv = [headers, ...rows]
       .map((row) => row.map(escapeCsv).join(","))
@@ -140,6 +162,7 @@ export function UserManagement({ users }: UserManagementProps) {
       phone_number: user.phone_number ? formatPhone(user.phone_number) : "",
       strokes_given: user.strokes_given !== undefined ? user.strokes_given : 0,
       handicap: displayHandicap(user.handicap),
+      ringerStatus: ringerStatusFromMap(ringerOptIns, user.id),
     })
     setIsEditing(true)
   }
@@ -193,6 +216,17 @@ export function UserManagement({ users }: UserManagementProps) {
 
       if (!strokesResult.success) {
         throw new Error(strokesResult.error)
+      }
+
+      // Persist ringer-pool selection only if it changed for the active season
+      if (ringerSeasonYear !== null) {
+        const currentStatus = ringerStatusFromMap(ringerOptIns, selectedUser.id)
+        if (editedUser.ringerStatus !== currentStatus) {
+          const ringerResult = await adminSetRingerOptIn(selectedUser.id, editedUser.ringerStatus)
+          if (!ringerResult.success) {
+            throw new Error(ringerResult.error)
+          }
+        }
       }
 
       toast({
@@ -500,7 +534,7 @@ export function UserManagement({ users }: UserManagementProps) {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                   <div>
                     <p className="text-sm font-medium">Joined</p>
                     <p className="text-sm text-muted-foreground">
@@ -522,6 +556,17 @@ export function UserManagement({ users }: UserManagementProps) {
                   <div>
                     <p className="text-sm font-medium">Strokes Given</p>
                     <p className="text-sm text-muted-foreground">{user.strokes_given || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {ringerSeasonYear ? `'${(ringerSeasonYear % 100).toString().padStart(2, "0")} Ringer Pool` : "Ringer Pool"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {(() => {
+                        const status = ringerStatusFromMap(ringerOptIns, user.id)
+                        return status === "opted_in" ? "Yes" : status === "declined" ? "No" : "—"
+                      })()}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -624,6 +669,32 @@ export function UserManagement({ users }: UserManagementProps) {
                 Number of strokes to subtract from the player's score based on handicap
               </p>
             </div>
+            {ringerSeasonYear !== null && (
+              <div className="space-y-2">
+                <Label htmlFor="ringer_status">
+                  {`'${(ringerSeasonYear % 100).toString().padStart(2, "0")} Ringer Pool`}
+                </Label>
+                <select
+                  id="ringer_status"
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                  value={editedUser.ringerStatus}
+                  onChange={(e) =>
+                    setEditedUser({
+                      ...editedUser,
+                      ringerStatus: e.target.value as RingerStatus,
+                    })
+                  }
+                  disabled={isSubmitting}
+                >
+                  <option value="unset">Not decided</option>
+                  <option value="opted_in">Opted in</option>
+                  <option value="declined">Declined</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Override the user&apos;s opt-in for the active season.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSubmitting}>

@@ -336,6 +336,26 @@ export type Database = {
           created_at?: string
         }
       }
+      ringer_pool_opt_ins: {
+        Row: {
+          user_id: string
+          season_year: number
+          opted_in: boolean
+          decided_at: string
+        }
+        Insert: {
+          user_id: string
+          season_year: number
+          opted_in: boolean
+          decided_at?: string
+        }
+        Update: {
+          user_id?: string
+          season_year?: number
+          opted_in?: boolean
+          decided_at?: string
+        }
+      }
       seasons: {
         Row: {
           id: string

@@ -154,7 +154,7 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
               </TabsContent>
 
               <TabsContent value="ringer">
-                <RingerLeaderboard rounds={roundsWithScores} />
+                <RingerLeaderboard rounds={roundsWithScores} seasonYear={selectedSeason} />
               </TabsContent>
             </Tabs>
           )}
