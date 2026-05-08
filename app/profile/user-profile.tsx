@@ -332,29 +332,23 @@ export function UserProfile({ user, ringerSeasonYear, ringerOptIn }: UserProfile
               {ringerStatus === true ? "Yes — opted in" : ringerStatus === false ? "No — declined" : "Not yet decided"}
             </span>
           </div>
-          {ringerStatus === true && (
-            <p className="text-xs text-muted-foreground">
-              Don&apos;t forget to Zelle $50 to{" "}
-              <span className="font-medium">anthony@longbeachgolftour.com</span> if you haven&apos;t already.
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            {ringerStatus !== true && (
+          {ringerStatus !== true && (
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => handleRingerToggle(true)} disabled={isSavingRinger}>
                 Opt In
               </Button>
-            )}
-            {ringerStatus !== false && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleRingerToggle(false)}
-                disabled={isSavingRinger}
-              >
-                {ringerStatus === true ? "Opt Out" : "Decline"}
-              </Button>
-            )}
-          </div>
+              {ringerStatus === null && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRingerToggle(false)}
+                  disabled={isSavingRinger}
+                >
+                  Decline
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

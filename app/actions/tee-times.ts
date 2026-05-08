@@ -367,6 +367,38 @@ export async function createReservation(data: {
       return { success: false, error: teeTimeError.message }
     }
 
+    // Enforce the booking window. Admins can book outside the window so they
+    // can fix mistakes — for everyone else, the open/close timestamps on the
+    // tee_times row are authoritative.
+    const { data: bookerRoleRow } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", data.userId)
+      .single()
+    const isBookerAdmin = !!bookerRoleRow?.is_admin
+
+    if (!isBookerAdmin) {
+      const now = new Date()
+      if (teeTime.booking_opens_at) {
+        const opensAt = new Date(teeTime.booking_opens_at)
+        if (now < opensAt) {
+          return {
+            success: false,
+            error: `Booking for this tee time hasn't opened yet. Try again after ${opensAt.toLocaleString()}.`,
+          }
+        }
+      }
+      if (teeTime.booking_closes_at) {
+        const closesAt = new Date(teeTime.booking_closes_at)
+        if (now > closesAt) {
+          return {
+            success: false,
+            error: "Booking for this tee time has closed.",
+          }
+        }
+      }
+    }
+
     // Get existing reservations for this tee time
     const { data: existingReservations, error: reservationsError } = await supabase
       .from("reservations")
