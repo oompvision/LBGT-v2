@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { updateUserProfile, uploadProfilePicture, removeProfilePicture } from "@/app/actions/auth"
-import { CalendarIcon, Flag, Mail, Phone, User, Camera, X } from "lucide-react"
+import { CalendarIcon, Flag, Mail, Phone, Trophy, User, Camera, X } from "lucide-react"
+import { setMyRingerOptIn } from "@/app/actions/ringer-pool"
 import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 import {
   formatHandicapInput,
@@ -32,17 +33,48 @@ interface UserProfileProps {
     strokes_given: number | null
     handicap: number | null
   }
+  ringerSeasonYear: number | null
+  ringerOptIn: boolean | null
 }
 
-export function UserProfile({ user }: UserProfileProps) {
+export function UserProfile({ user, ringerSeasonYear, ringerOptIn }: UserProfileProps) {
   const [name, setName] = useState(user.name || "")
   const [phone, setPhone] = useState(user.phone_number ? formatPhone(user.phone_number) : "")
   const [handicap, setHandicap] = useState(displayHandicap(user.handicap))
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingPicture, setIsUploadingPicture] = useState(false)
   const [isRemovingPicture, setIsRemovingPicture] = useState(false)
+  const [ringerStatus, setRingerStatus] = useState<boolean | null>(ringerOptIn)
+  const [isSavingRinger, setIsSavingRinger] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+
+  const ringerSeasonLabel = ringerSeasonYear
+    ? `'${(ringerSeasonYear % 100).toString().padStart(2, "0")} Ringer Pool`
+    : "Ringer Pool"
+
+  const handleRingerToggle = async (next: boolean) => {
+    setIsSavingRinger(true)
+    const result = await setMyRingerOptIn(next)
+    setIsSavingRinger(false)
+
+    if (result.success) {
+      setRingerStatus(next)
+      toast({
+        title: next ? "Opted in" : "Opted out",
+        description: next
+          ? `You're in the ${ringerSeasonLabel}. Don't forget to Zelle $50 to anthony@longbeachgolftour.com.`
+          : `You're out of the ${ringerSeasonLabel}.`,
+      })
+      router.refresh()
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "Failed to update Ringer Pool selection.",
+        variant: "destructive",
+      })
+    }
+  }
 
   const handleUpdateProfile = async () => {
     setIsSubmitting(true)
@@ -284,6 +316,46 @@ export function UserProfile({ user }: UserProfileProps) {
             {isSubmitting ? "Updating..." : "Update Profile"}
           </Button>
         </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{ringerSeasonLabel}</CardTitle>
+          <CardDescription>
+            Season-long composite scorecard. Entry $50, winner takes all.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              {ringerStatus === true ? "Yes — opted in" : ringerStatus === false ? "No — declined" : "Not yet decided"}
+            </span>
+          </div>
+          {ringerStatus === true && (
+            <p className="text-xs text-muted-foreground">
+              Don&apos;t forget to Zelle $50 to{" "}
+              <span className="font-medium">anthony@longbeachgolftour.com</span> if you haven&apos;t already.
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            {ringerStatus !== true && (
+              <Button size="sm" onClick={() => handleRingerToggle(true)} disabled={isSavingRinger}>
+                Opt In
+              </Button>
+            )}
+            {ringerStatus !== false && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleRingerToggle(false)}
+                disabled={isSavingRinger}
+              >
+                {ringerStatus === true ? "Opt Out" : "Decline"}
+              </Button>
+            )}
+          </div>
+        </CardContent>
       </Card>
 
       <Card>

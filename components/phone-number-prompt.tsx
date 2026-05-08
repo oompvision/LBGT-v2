@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Phone, Flag } from "lucide-react"
+import { Phone, Flag, Trophy } from "lucide-react"
 import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 import {
   formatHandicapInput,
@@ -25,6 +25,7 @@ import {
   MAX_HANDICAP,
 } from "@/lib/handicap"
 import { updateUserProfile } from "@/app/actions/auth"
+import { setMyRingerOptIn } from "@/app/actions/ringer-pool"
 
 const MODAL_DISMISSED_KEY = "profile-prompt-dismissed"
 
@@ -32,10 +33,14 @@ export function PhoneNumberPrompt() {
   const { user, isLoading } = useAuth()
   const [hasPhone, setHasPhone] = useState<boolean | null>(null)
   const [hasHandicap, setHasHandicap] = useState<boolean | null>(null)
-  const [showModal, setShowModal] = useState(false)
+  const [ringerDecided, setRingerDecided] = useState<boolean | null>(null)
+  const [seasonYear, setSeasonYear] = useState<number | null>(null)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showRingerModal, setShowRingerModal] = useState(false)
   const [phone, setPhone] = useState("")
   const [handicap, setHandicap] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingRinger, setIsSavingRinger] = useState(false)
   const [phoneError, setPhoneError] = useState("")
   const [handicapError, setHandicapError] = useState("")
   const router = useRouter()
@@ -63,16 +68,48 @@ export function PhoneNumberPrompt() {
       setHasPhone(phoneSet)
       setHasHandicap(handicapSet)
 
-      // Show modal once per session if either field is missing
+      // Show the complete-your-profile modal once per session if either field
+      // is missing.
       if ((!phoneSet || !handicapSet) && !sessionStorage.getItem(MODAL_DISMISSED_KEY)) {
-        setShowModal(true)
+        setShowProfileModal(true)
       }
+
+      // Determine active season + ringer opt-in for that season.
+      const { data: activeSeason } = await supabase
+        .from("seasons")
+        .select("year")
+        .eq("is_active", true)
+        .maybeSingle()
+
+      const year = activeSeason?.year ?? null
+      setSeasonYear(year)
+
+      if (year === null) {
+        setRingerDecided(true) // no active season → don't prompt
+        return
+      }
+
+      const { data: optIn, error: optInError } = await supabase
+        .from("ringer_pool_opt_ins")
+        .select("opted_in")
+        .eq("user_id", user.id)
+        .eq("season_year", year)
+        .maybeSingle()
+
+      // If the table doesn't exist yet (migration not applied), treat as decided
+      // so we don't break the page.
+      if (optInError) {
+        setRingerDecided(true)
+        return
+      }
+
+      setRingerDecided(!!optIn)
     }
 
     checkProfile()
   }, [user, isLoading])
 
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     setPhoneError("")
     setHandicapError("")
 
@@ -103,7 +140,7 @@ export function PhoneNumberPrompt() {
     if (result.success) {
       if (payload.phone_number !== undefined) setHasPhone(true)
       if (payload.handicap !== undefined) setHasHandicap(true)
-      setShowModal(false)
+      setShowProfileModal(false)
       router.refresh()
     } else {
       setPhoneError(result.error || "Failed to save your profile.")
@@ -112,21 +149,41 @@ export function PhoneNumberPrompt() {
     setIsSaving(false)
   }
 
-  const dismissModal = () => {
-    sessionStorage.setItem(MODAL_DISMISSED_KEY, "1")
-    setShowModal(false)
+  const handleRingerDecision = async (optedIn: boolean) => {
+    setIsSavingRinger(true)
+    const result = await setMyRingerOptIn(optedIn)
+    setIsSavingRinger(false)
+
+    if (result.success) {
+      setRingerDecided(true)
+      setShowRingerModal(false)
+      router.refresh()
+    }
   }
 
-  // Don't show anything if loading, not logged in, or both fields are set
-  if (isLoading || !user || hasPhone === null || hasHandicap === null) return null
-  if (hasPhone && hasHandicap) return null
+  const dismissProfileModal = () => {
+    sessionStorage.setItem(MODAL_DISMISSED_KEY, "1")
+    setShowProfileModal(false)
+  }
+
+  // Don't show anything until everything has loaded.
+  if (isLoading || !user || hasPhone === null || hasHandicap === null || ringerDecided === null) {
+    return null
+  }
+  // Hide entirely if there's nothing to prompt for.
+  if (hasPhone && hasHandicap && ringerDecided) return null
+
+  const bannerSegments: string[] = []
+  if (!hasPhone) bannerSegments.push("phone number")
+  if (!hasHandicap) bannerSegments.push("handicap")
+  if (!ringerDecided) bannerSegments.push("Net Ringer Pool selection")
 
   const bannerMessage =
-    !hasPhone && !hasHandicap
-      ? "Please add your phone number and handicap to complete your profile."
-      : !hasPhone
-        ? "Please add your phone number to streamline communication."
-        : "Please add your handicap to complete your profile."
+    bannerSegments.length > 0
+      ? `Please add your ${bannerSegments.join(" and ")} to complete your profile.`
+      : ""
+
+  const BannerIcon = !hasPhone ? Phone : !hasHandicap ? Flag : Trophy
 
   return (
     <>
@@ -134,26 +191,31 @@ export function PhoneNumberPrompt() {
       <div className="bg-primary text-primary-foreground">
         <div className="container flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-2 text-sm">
           <div className="flex items-center gap-2">
-            {!hasPhone ? <Phone className="h-4 w-4 shrink-0" /> : <Flag className="h-4 w-4 shrink-0" />}
+            <BannerIcon className="h-4 w-4 shrink-0" />
             <span>{bannerMessage}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {!hasPhone && (
-              <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
+              <Button size="sm" variant="secondary" onClick={() => setShowProfileModal(true)}>
                 Add Phone #
               </Button>
             )}
             {!hasHandicap && (
-              <Button size="sm" variant="secondary" onClick={() => setShowModal(true)}>
+              <Button size="sm" variant="secondary" onClick={() => setShowProfileModal(true)}>
                 Add Handicap
+              </Button>
+            )}
+            {!ringerDecided && (
+              <Button size="sm" variant="secondary" onClick={() => setShowRingerModal(true)}>
+                Ringer Pool Opt In
               </Button>
             )}
           </div>
         </div>
       </div>
 
-      {/* Modal */}
-      <Dialog open={showModal} onOpenChange={(open) => { if (!open) dismissModal() }}>
+      {/* Profile completion modal */}
+      <Dialog open={showProfileModal} onOpenChange={(open) => { if (!open) dismissProfileModal() }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Complete Your Profile</DialogTitle>
@@ -204,11 +266,11 @@ export function PhoneNumberPrompt() {
             )}
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={dismissModal} disabled={isSaving}>
+            <Button variant="ghost" onClick={dismissProfileModal} disabled={isSaving}>
               Later
             </Button>
             <Button
-              onClick={handleSave}
+              onClick={handleSaveProfile}
               disabled={
                 isSaving ||
                 (!hasPhone && !phone) ||
@@ -216,6 +278,58 @@ export function PhoneNumberPrompt() {
               }
             >
               {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ringer pool opt-in modal */}
+      <Dialog open={showRingerModal} onOpenChange={(open) => { if (!open) setShowRingerModal(false) }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Net Ringer Pool{seasonYear ? ` — ${seasonYear} Season` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Build a season-long composite scorecard from your best net score on each
+              hole across every round you play. i.e. if you par a stroke hole, it&apos;s
+              logged as a birdie. Lowest composite wins.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border bg-muted/50 p-3 space-y-1">
+              <p>
+                <span className="font-medium">Entry:</span> $50 per player
+              </p>
+              <p>
+                <span className="font-medium">Prize:</span> Winner takes all
+              </p>
+            </div>
+            <p>
+              To opt in, Zelle <span className="font-semibold">$50</span> to{" "}
+              <span className="font-semibold break-all">anthony@longbeachgolftour.com</span>{" "}
+              and tap <span className="font-semibold">Opt In</span> below to confirm.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Not interested this season? Tap Decline and we won&apos;t prompt you again.
+              You can change your mind any time from your profile.
+            </p>
+          </div>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => handleRingerDecision(false)}
+              disabled={isSavingRinger}
+              className="w-full sm:w-auto"
+            >
+              {isSavingRinger ? "Saving..." : "Decline"}
+            </Button>
+            <Button
+              onClick={() => handleRingerDecision(true)}
+              disabled={isSavingRinger}
+              className="w-full sm:w-auto"
+            >
+              {isSavingRinger ? "Saving..." : "Opt In"}
             </Button>
           </DialogFooter>
         </DialogContent>

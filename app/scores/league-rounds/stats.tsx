@@ -213,7 +213,10 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
                       <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium">Player</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Rnds</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Avg</th>
-                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Hcp</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">
+                        <span className="sm:hidden">Str</span>
+                        <span className="hidden sm:inline">Strokes</span>
+                      </th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Best</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Worst</th>
                     </tr>
@@ -273,7 +276,10 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
                       <th className="px-1.5 sm:px-4 py-1.5 text-left font-medium">Player</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Rnds</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Avg</th>
-                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Hcp</th>
+                      <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">
+                        <span className="sm:hidden">Str</span>
+                        <span className="hidden sm:inline">Strokes</span>
+                      </th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium">Best</th>
                       <th className="px-1.5 sm:px-4 py-1.5 text-center font-medium hidden sm:table-cell">Worst</th>
                     </tr>

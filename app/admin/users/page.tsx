@@ -11,6 +11,7 @@ async function getAdminUsersData() {
     // Dynamic import to avoid build-time issues
     const { createClient } = await import("@/lib/supabase/server")
     const { getAllUsersForAdmin } = await import("@/app/actions/admin-management")
+    const { getRingerOptInsForSeason } = await import("@/app/actions/ringer-pool")
 
     const supabase = await createClient()
 
@@ -34,15 +35,31 @@ async function getAdminUsersData() {
     // Get all users with details
     const { users } = await getAllUsersForAdmin()
 
-    return { users: users || [] }
+    // Active season + ringer opt-ins for that season
+    const { data: activeSeason } = await supabase
+      .from("seasons")
+      .select("year")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    const seasonYear: number | null = activeSeason?.year ?? null
+    const optInMap: Record<string, boolean> = {}
+    if (seasonYear !== null) {
+      const { optIns } = await getRingerOptInsForSeason(seasonYear)
+      optIns.forEach((row) => {
+        optInMap[row.user_id] = row.opted_in
+      })
+    }
+
+    return { users: users || [], ringerSeasonYear: seasonYear, ringerOptIns: optInMap }
   } catch (error) {
     console.error("Error in getAdminUsersData:", error)
-    return { users: [] }
+    return { users: [], ringerSeasonYear: null, ringerOptIns: {} as Record<string, boolean> }
   }
 }
 
 export default async function AdminUsersPage() {
-  const { users } = await getAdminUsersData()
+  const { users, ringerSeasonYear, ringerOptIns } = await getAdminUsersData()
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -61,7 +78,11 @@ export default async function AdminUsersPage() {
               <p className="text-muted-foreground">Manage user profiles and handicaps</p>
             </div>
 
-            <UserManagement users={users} />
+            <UserManagement
+              users={users}
+              ringerSeasonYear={ringerSeasonYear}
+              ringerOptIns={ringerOptIns}
+            />
           </div>
         </div>
       </main>

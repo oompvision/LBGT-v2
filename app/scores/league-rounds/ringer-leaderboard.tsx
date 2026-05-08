@@ -131,9 +131,46 @@ const formatPlayerName = (fullName: string, strokes: number) => {
   return `${firstInitial}. ${lastName} (${strokes})`
 }
 
-export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
+export function RingerLeaderboard({
+  rounds,
+  seasonYear,
+}: {
+  rounds: LeagueRound[]
+  seasonYear: number | null
+}) {
   const [usersWithHandicap, setUsersWithHandicap] = useState<Record<string, number>>({})
+  const [optedInUserIds, setOptedInUserIds] = useState<Set<string> | null>(null)
   const supabase = createClient()
+
+  // Fetch ringer-pool opt-ins for the selected season.
+  useEffect(() => {
+    if (seasonYear === null) {
+      setOptedInUserIds(new Set())
+      return
+    }
+
+    let cancelled = false
+    const fetchOptIns = async () => {
+      const { data, error } = await supabase
+        .from("ringer_pool_opt_ins")
+        .select("user_id, opted_in")
+        .eq("season_year", seasonYear)
+        .eq("opted_in", true)
+
+      if (cancelled) return
+      if (error) {
+        // If the table doesn't exist yet, fall back to empty (no one opted in).
+        setOptedInUserIds(new Set())
+        return
+      }
+      setOptedInUserIds(new Set((data || []).map((row) => row.user_id)))
+    }
+
+    fetchOptIns()
+    return () => {
+      cancelled = true
+    }
+  }, [supabase, seasonYear])
 
   // Fetch user handicaps directly from users table
   useEffect(() => {
@@ -270,7 +307,14 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
 
   // Sort by total ringer score (ascending)
   const sortedRingerLeaderboard = [...ringerLeaderboard]
-    .filter((player) => player.holesPlayed > 0) // Only include players who have played at least one hole
+    // Only include players who have played at least one hole AND have opted into
+    // the ringer pool for this season. Until the opt-in fetch resolves we
+    // suppress everyone to avoid flashing non-opt-ins on screen.
+    .filter(
+      (player) =>
+        player.holesPlayed > 0 &&
+        (optedInUserIds !== null && optedInUserIds.has(player.userId)),
+    )
     .sort((a, b) => {
       // First sort by holes played (descending)
       if (b.holesPlayed !== a.holesPlayed) {
@@ -284,7 +328,9 @@ export function RingerLeaderboard({ rounds }: { rounds: LeagueRound[] }) {
     <Card>
       <CardHeader>
         <CardTitle>Ringer Pool Leaderboard</CardTitle>
-        <CardDescription>Best net score on each hole across all rounds played</CardDescription>
+        <CardDescription>
+          Best net score on each hole across all rounds played. Opted-in players only.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {/* Mobile view: simple Rank / Player / Score / Rounds table */}
