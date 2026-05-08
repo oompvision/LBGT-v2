@@ -5,6 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { createReservation } from "@/app/actions/tee-times"
 import { getUpcomingFridayForSeason } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -180,20 +181,18 @@ export function DashboardTabs({
       : `Booking confirmed with ${slots} ${slots === 1 ? "player" : "players"}.`
 
     try {
-      const { error } = await supabase.from("reservations").insert([
-        {
-          tee_time_id: selectedTeeTime,
-          user_id: user.id,
-          slots,
-          player_names: playerNames.filter((name) => name.trim() !== ""),
-          play_for_money: playForMoney,
-        },
-      ])
+      const result = await createReservation({
+        teeTimeId: selectedTeeTime,
+        userId: user.id,
+        slots,
+        playerNames: playerNames.filter((name) => name.trim() !== ""),
+        playForMoney,
+      })
 
-      if (error) {
+      if (!result.success) {
         toast({
           title: "Booking Failed",
-          description: error.message || "Failed to book tee time",
+          description: result.error || "Failed to book tee time",
           variant: "destructive",
         })
         return
