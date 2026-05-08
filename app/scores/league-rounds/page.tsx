@@ -4,8 +4,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { CalendarIcon, ClipboardList, Eye, Trophy, User } from "lucide-react"
+import { CalendarIcon, ClipboardList, Eye, User } from "lucide-react"
 import { format } from "date-fns"
 import { LeagueStats } from "./stats"
 import { RingerLeaderboard } from "./ringer-leaderboard"
@@ -190,24 +189,13 @@ export default async function TourLeaderboardPage({ searchParams }: { searchPara
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b bg-muted/50">
-                              <th className="px-4 py-2 text-left font-medium">Rank</th>
                               <th className="px-4 py-2 text-left font-medium">Player</th>
                               <th className="px-4 py-2 text-right font-medium">Score</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {(round.scores || []).map((score, index) => (
+                            {(round.scores || []).map((score) => (
                               <tr key={score.id} className="border-b">
-                                <td className="px-4 py-2">
-                                  {index === 0 ? (
-                                    <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                                      <Trophy className="mr-1 h-3 w-3" />
-                                      {index + 1}
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline">{index + 1}</Badge>
-                                  )}
-                                </td>
                                 <td className="px-4 py-2 font-medium">{score.users?.name || "Unknown Player"}</td>
                                 <td className="px-4 py-2 text-right">{score.total_score}</td>
                               </tr>
