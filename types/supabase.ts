@@ -591,6 +591,35 @@ export type Database = {
           updated_at?: string
         }
       }
+      payment_statuses: {
+        Row: {
+          id: string
+          reservation_id: string
+          player_index: number
+          green_fee_paid: boolean
+          cash_game_paid: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          reservation_id: string
+          player_index: number
+          green_fee_paid?: boolean
+          cash_game_paid?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          reservation_id?: string
+          player_index?: number
+          green_fee_paid?: boolean
+          cash_game_paid?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+      }
       email_campaigns: {
         Row: {
           id: string
@@ -673,6 +702,7 @@ export type InfoBox = Tables["info_boxes"]["Row"]
 export type PlayoffResult = Tables["playoff_results"]["Row"]
 export type EmailCampaign = Tables["email_campaigns"]["Row"]
 export type CashGame = Tables["cash_games"]["Row"]
+export type PaymentStatus = Tables["payment_statuses"]["Row"]
 export type AvailableTeeTime = Views["available_tee_times"]["Row"]
 
 // Common joined types used in components

@@ -2,7 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
-import type { CashGame } from "@/types/supabase"
+import type { CashGame, PaymentStatus } from "@/types/supabase"
 
 export type OptedInPlayer = {
   name: string
@@ -229,6 +229,269 @@ export async function upsertCashGame(input: {
   } catch (err) {
     console.error("upsertCashGame error:", err)
     return { success: false, error: "Failed to save cash game" }
+  }
+}
+
+export type PaymentGridPlayer = {
+  playerIndex: number
+  name: string | null
+  isBooker: boolean
+  isOptedIn: boolean
+  greenFeePaid: boolean
+  cashGamePaid: boolean
+}
+
+export type PaymentGridReservation = {
+  reservationId: string
+  bookerName: string
+  slots: number
+  players: PaymentGridPlayer[]
+}
+
+export type PaymentGridTeeTime = {
+  teeTimeId: string
+  time: string
+  maxSlots: number
+  reservations: PaymentGridReservation[]
+}
+
+export type PaymentGridDate = {
+  date: string
+  cashGame: CashGame | null
+  teeTimes: PaymentGridTeeTime[]
+}
+
+type GridReservationRow = {
+  id: string
+  user_id: string
+  tee_time_id: string
+  slots: number
+  player_names: string[] | null
+  play_for_money: boolean[] | null
+  users: { name: string | null } | null
+}
+
+export async function getPaymentGrid(limit: number) {
+  try {
+    const supabaseAdmin = createAdminClient()
+    const today = todayISO()
+
+    const { data: teeTimes, error: ttErr } = await supabaseAdmin
+      .from("tee_times")
+      .select("id, date, time, max_slots")
+      .gte("date", today)
+      .order("date", { ascending: true })
+      .order("time", { ascending: true })
+    if (ttErr) {
+      return {
+        success: false,
+        error: ttErr.message,
+        items: [] as PaymentGridDate[],
+        totalDates: 0,
+      }
+    }
+
+    const teeTimeRows = (teeTimes as Array<{
+      id: string
+      date: string
+      time: string
+      max_slots: number
+    }> | null) || []
+
+    const allDates = Array.from(new Set(teeTimeRows.map((t) => t.date)))
+    const totalDates = allDates.length
+    const dates = allDates.slice(0, Math.max(0, limit))
+
+    if (dates.length === 0) {
+      return { success: true, items: [] as PaymentGridDate[], totalDates }
+    }
+
+    const visibleTeeTimes = teeTimeRows.filter((t) => dates.includes(t.date))
+    const teeTimeIds = visibleTeeTimes.map((t) => t.id)
+
+    const [cashGamesRes, reservationsRes] = await Promise.all([
+      supabaseAdmin.from("cash_games").select("*").in("date", dates),
+      supabaseAdmin
+        .from("reservations")
+        .select(
+          "id, user_id, tee_time_id, slots, player_names, play_for_money, users:user_id(name)"
+        )
+        .in("tee_time_id", teeTimeIds),
+    ])
+
+    if (reservationsRes.error) {
+      return {
+        success: false,
+        error: reservationsRes.error.message,
+        items: [] as PaymentGridDate[],
+        totalDates,
+      }
+    }
+
+    const reservations =
+      (reservationsRes.data as unknown as GridReservationRow[]) || []
+    const reservationIds = reservations.map((r) => r.id)
+
+    let paymentStatuses: PaymentStatus[] = []
+    if (reservationIds.length > 0) {
+      const { data: psData, error: psErr } = await supabaseAdmin
+        .from("payment_statuses")
+        .select("*")
+        .in("reservation_id", reservationIds)
+      if (psErr) {
+        return {
+          success: false,
+          error: psErr.message,
+          items: [] as PaymentGridDate[],
+          totalDates,
+        }
+      }
+      paymentStatuses = (psData as PaymentStatus[] | null) || []
+    }
+
+    const psByReservation = new Map<string, Map<number, PaymentStatus>>()
+    for (const ps of paymentStatuses) {
+      const inner =
+        psByReservation.get(ps.reservation_id) ||
+        new Map<number, PaymentStatus>()
+      inner.set(ps.player_index, ps)
+      psByReservation.set(ps.reservation_id, inner)
+    }
+
+    const cashGames = (cashGamesRes.data as CashGame[] | null) || []
+    const cashGameByDate = new Map<string, CashGame>()
+    for (const cg of cashGames) cashGameByDate.set(cg.date, cg)
+
+    const reservationsByTeeTime = new Map<string, GridReservationRow[]>()
+    for (const r of reservations) {
+      const list = reservationsByTeeTime.get(r.tee_time_id) || []
+      list.push(r)
+      reservationsByTeeTime.set(r.tee_time_id, list)
+    }
+
+    const teeTimesByDate = new Map<string, typeof visibleTeeTimes>()
+    for (const tt of visibleTeeTimes) {
+      const list = teeTimesByDate.get(tt.date) || []
+      list.push(tt)
+      teeTimesByDate.set(tt.date, list)
+    }
+
+    const items: PaymentGridDate[] = dates.map((d) => {
+      const teeTimesForDate = teeTimesByDate.get(d) || []
+      return {
+        date: d,
+        cashGame: cashGameByDate.get(d) || null,
+        teeTimes: teeTimesForDate.map((tt) => {
+          const reservationsForTT = reservationsByTeeTime.get(tt.id) || []
+          return {
+            teeTimeId: tt.id,
+            time: tt.time,
+            maxSlots: tt.max_slots,
+            reservations: reservationsForTT.map((r) => {
+              const bookerName = r.users?.name || "Booker"
+              const pfm = r.play_for_money || []
+              const additional = r.player_names || []
+              const psMap = psByReservation.get(r.id)
+              const players: PaymentGridPlayer[] = []
+              for (let i = 0; i < r.slots; i++) {
+                const ps = psMap?.get(i) || null
+                if (i === 0) {
+                  players.push({
+                    playerIndex: 0,
+                    name: bookerName,
+                    isBooker: true,
+                    isOptedIn: !!pfm[0],
+                    greenFeePaid: ps?.green_fee_paid ?? false,
+                    cashGamePaid: ps?.cash_game_paid ?? false,
+                  })
+                } else {
+                  const rawName = additional[i - 1]?.trim()
+                  players.push({
+                    playerIndex: i,
+                    name: rawName && rawName.length > 0 ? rawName : null,
+                    isBooker: false,
+                    isOptedIn: !!pfm[i],
+                    greenFeePaid: ps?.green_fee_paid ?? false,
+                    cashGamePaid: ps?.cash_game_paid ?? false,
+                  })
+                }
+              }
+              return {
+                reservationId: r.id,
+                bookerName,
+                slots: r.slots,
+                players,
+              }
+            }),
+          }
+        }),
+      }
+    })
+
+    return { success: true, items, totalDates }
+  } catch (err) {
+    console.error("getPaymentGrid error:", err)
+    return {
+      success: false,
+      error: "Failed to load payment grid",
+      items: [] as PaymentGridDate[],
+      totalDates: 0,
+    }
+  }
+}
+
+export async function upsertPaymentStatuses(
+  entries: Array<{
+    reservation_id: string
+    player_index: number
+    green_fee_paid: boolean
+    cash_game_paid: boolean
+  }>
+) {
+  try {
+    if (entries.length === 0) return { success: true }
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: "Not authenticated" }
+    }
+    const { data: profile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", user.id)
+      .maybeSingle()
+    if (!profile?.is_admin) {
+      return { success: false, error: "Admins only" }
+    }
+
+    const supabaseAdmin = createAdminClient()
+    const now = new Date().toISOString()
+    const rows = entries.map((e) => ({
+      reservation_id: e.reservation_id,
+      player_index: e.player_index,
+      green_fee_paid: e.green_fee_paid,
+      cash_game_paid: e.cash_game_paid,
+      updated_at: now,
+      updated_by: user.id,
+    }))
+
+    const { error } = await supabaseAdmin
+      .from("payment_statuses")
+      .upsert(rows, { onConflict: "reservation_id,player_index" })
+
+    if (error) {
+      console.error("upsertPaymentStatuses error:", error)
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin/cash-games")
+    return { success: true }
+  } catch (err) {
+    console.error("upsertPaymentStatuses error:", err)
+    return { success: false, error: "Failed to save payment statuses" }
   }
 }
 
