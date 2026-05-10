@@ -293,8 +293,9 @@ export async function addPlayerToReservation(
     const newPlayForMoney = [...playForMoney, false]
     const newSlots = reservation.slots + 1
 
-    const supabase = await createClient()
-    const { error: updErr } = await supabase
+    // Admin acting on someone else's reservation must bypass RLS.
+    const writer = isAdmin ? createAdminClient() : await createClient()
+    const { error: updErr } = await writer
       .from("reservations")
       .update({
         slots: newSlots,
@@ -315,6 +316,8 @@ export async function addPlayerToReservation(
 
     revalidatePath("/my-reservations")
     revalidatePath("/schedule")
+    revalidatePath("/admin/dashboard")
+    revalidatePath("/admin/cash-games")
     return { success: true }
   } catch (err: unknown) {
     return {
@@ -365,8 +368,9 @@ export async function removePlayerByIndex(
     const newPlayForMoney = playForMoney.filter((_, i) => i !== playerIndex + 1)
     const newSlots = Math.max(1, reservation.slots - 1)
 
-    const supabase = await createClient()
-    const { error: updErr } = await supabase
+    // Admin acting on someone else's reservation must bypass RLS.
+    const writer = isAdmin ? createAdminClient() : await createClient()
+    const { error: updErr } = await writer
       .from("reservations")
       .update({
         slots: newSlots,
@@ -381,6 +385,8 @@ export async function removePlayerByIndex(
 
     revalidatePath("/my-reservations")
     revalidatePath("/schedule")
+    revalidatePath("/admin/dashboard")
+    revalidatePath("/admin/cash-games")
     return { success: true }
   } catch (err: unknown) {
     return {
@@ -446,8 +452,12 @@ export async function updateOptIns(
       next[slotIndex] = optIns[slotIndex]
     }
 
-    const supabase = await createClient()
-    const { error: updErr } = await supabase
+    // Admin acting on someone else's reservation must bypass RLS — the
+    // "Users can update their own reservations" policy filters by
+    // auth.uid() = user_id and silently drops the row otherwise (0-row
+    // update, no error).
+    const writer = isAdmin ? createAdminClient() : await createClient()
+    const { error: updErr } = await writer
       .from("reservations")
       .update({ play_for_money: next })
       .eq("id", reservationId)
@@ -456,6 +466,8 @@ export async function updateOptIns(
 
     revalidatePath("/my-reservations")
     revalidatePath("/schedule")
+    revalidatePath("/admin/dashboard")
+    revalidatePath("/admin/cash-games")
     return { success: true }
   } catch (err: unknown) {
     return {

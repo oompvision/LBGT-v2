@@ -48,7 +48,7 @@ export function AdminTabs({ className }: AdminTabsProps) {
       isActive: pathname === "/admin/tee-times",
     },
     {
-      name: "Cash Games",
+      name: "Cash Mgmt",
       href: "/admin/cash-games",
       isActive: pathname.startsWith("/admin/cash-games"),
     },

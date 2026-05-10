@@ -41,6 +41,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScoreEditor } from "./score-editor"
+import { getCashGameForDate } from "@/app/actions/cash-games"
 
 // Constants for date validation
 const FIRST_VALID_DATE = new Date(2025, 4, 23) // May 23, 2025
@@ -77,6 +78,7 @@ export function AdminDashboardTabs({
   const [editScoreDialogOpen, setEditScoreDialogOpen] = useState(false)
   const [selectedScore, setSelectedScore] = useState<(Score & { users: Pick<User, "id" | "name"> | null }) | null>(null)
   const [editReservationData, setEditReservationData] = useState<EditReservationData | null>(null)
+  const [editCashGameTitle, setEditCashGameTitle] = useState<string | null>(null)
   const { user: authUser } = useAuth()
 
   // Update state when props change
@@ -283,6 +285,21 @@ export function AdminDashboardTabs({
       ),
       adminCreated,
     })
+
+    // Look up the cash game for this date so the dialog can show the opt-in
+    // checkbox. Fall back to a generic label so the admin can still toggle
+    // opt-ins for dates that don't have a cash game configured yet.
+    const date = (reservation.tee_times as any)?.date as string | undefined
+    setEditCashGameTitle("cash game")
+    if (date) {
+      getCashGameForDate(date)
+        .then((res) => {
+          if (res.success && res.cashGame?.title) {
+            setEditCashGameTitle(res.cashGame.title)
+          }
+        })
+        .catch(() => {})
+    }
   }
 
   const handleEditScore = (score: Score & { users: Pick<User, "id" | "name" | "email"> | null }) => {
@@ -607,6 +624,7 @@ export function AdminDashboardTabs({
             onOpenChange={(open) => {
               if (!open) {
                 setEditReservationData(null)
+                setEditCashGameTitle(null)
                 // Refresh the reservation list so Players: count and player
                 // names reflect any add/remove the admin just made.
                 const resSeason =
@@ -638,7 +656,7 @@ export function AdminDashboardTabs({
             role="booker"
             viewerUserId={authUser.id}
             reservation={editReservationData}
-            cashGameTitle={null}
+            cashGameTitle={editCashGameTitle}
           />
         )}
       </Tabs>

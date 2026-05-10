@@ -7,7 +7,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarIcon, Clock, BadgeCheck } from "lucide-react"
+import { CalendarIcon, Clock } from "lucide-react"
 import { ReservationActions } from "./reservation-actions"
 import { formatPhone } from "@/lib/phone"
 import { isAdminCreatedReservation } from "@/lib/booking-summary"
@@ -298,7 +298,7 @@ export default async function MyReservationsPage() {
                               >
                                 <span className={p.isViewer ? "font-semibold" : ""}>{p.name}</span>
                                 <span className="text-xs text-muted-foreground">
-                                  {p.isLeague ? "(Tour Member)" : "(Guest)"}
+                                  {p.isLeague ? "(Member)" : "(Guest)"}
                                 </span>
                                 {p.guestPhone && (
                                   <span className="text-xs text-muted-foreground">
@@ -306,9 +306,11 @@ export default async function MyReservationsPage() {
                                   </span>
                                 )}
                                 {p.optedIn && (
-                                  <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                    money
-                                    <BadgeCheck className="h-3 w-3" />
+                                  <span
+                                    className="text-sm font-semibold text-primary"
+                                    aria-label="Opted into cash game"
+                                  >
+                                    $
                                   </span>
                                 )}
                               </li>
@@ -321,9 +323,7 @@ export default async function MyReservationsPage() {
                             )}
                             {showOptInLegend && (
                               <p>
-                                <span className="inline-flex items-center gap-1">
-                                  money <BadgeCheck className="h-3 w-3" />
-                                </span>{" "}
+                                <span className="font-semibold text-primary">$</span>{" "}
                                 indicates players opted into the weekly cash contest
                               </p>
                             )}
