@@ -31,6 +31,7 @@ import {
   type PaymentGridDate,
   type PaymentGridTeeTime,
 } from "@/app/actions/cash-games"
+import { BASE_TEE_TIME_COST } from "@/lib/constants"
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
 const PAGE_SIZE = 4
@@ -227,7 +228,22 @@ export function CashGamesManager() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {items.map((dateItem) => (
+          {items.map((dateItem) => {
+            const cashEntry = dateItem.cashGame?.entry_amount ?? 0
+            let greenFeeCount = 0
+            let cashGameCount = 0
+            for (const tt of dateItem.teeTimes) {
+              for (const r of tt.reservations) {
+                for (const p of r.players) {
+                  if (p.greenFeePaid) greenFeeCount++
+                  if (p.cashGamePaid) cashGameCount++
+                }
+              }
+            }
+            const greenFeeTotal = greenFeeCount * BASE_TEE_TIME_COST
+            const cashGameTotal = cashGameCount * cashEntry
+            const collectedTotal = greenFeeTotal + cashGameTotal
+            return (
             <div key={dateItem.date} className="space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <div>
@@ -241,6 +257,12 @@ export function CashGamesManager() {
                       No cash game configured for this date.
                     </p>
                   )}
+                  <p className="text-sm font-medium">
+                    Collected: ${collectedTotal}{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (${greenFeeTotal} green fee + ${cashGameTotal} cash entry)
+                    </span>
+                  </p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/admin/cash-games/configure/${dateItem.date}`}>
@@ -412,7 +434,8 @@ export function CashGamesManager() {
                 })
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
