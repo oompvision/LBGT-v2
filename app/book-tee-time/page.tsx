@@ -351,8 +351,8 @@ export default function BookTeeTimePage() {
 
     if (totalSlots > selectedTeeTimeData.availableSlots) {
       toast({
-        title: "Not enough available slots",
-        description: `Only ${selectedTeeTimeData.availableSlots} slot(s) left at this tee time.`,
+        title: "Not enough spots open",
+        description: `Only ${selectedTeeTimeData.availableSlots} ${selectedTeeTimeData.availableSlots === 1 ? "spot" : "spots"} open at this tee time.`,
         variant: "destructive",
       })
       return
