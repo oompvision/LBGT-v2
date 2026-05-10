@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 import type { CashGame, PaymentStatus } from "@/types/supabase"
 
 export type OptedInPlayer = {
@@ -246,6 +247,9 @@ export type PaymentGridReservation = {
   bookerName: string
   slots: number
   players: PaymentGridPlayer[]
+  // True when the booker is metadata only (admin booked seats for others
+  // without playing themselves). Detected via player_names.length === slots.
+  adminCreated: boolean
 }
 
 export type PaymentGridTeeTime = {
@@ -390,12 +394,29 @@ export async function getPaymentGrid(limit: number) {
             reservations: reservationsForTT.map((r) => {
               const bookerName = r.users?.name || "Booker"
               const pfm = r.play_for_money || []
-              const additional = r.player_names || []
+              const playerNames = r.player_names || []
               const psMap = psByReservation.get(r.id)
+              const adminCreated = isAdminCreatedReservation({
+                slots: r.slots,
+                player_names: playerNames,
+              })
               const players: PaymentGridPlayer[] = []
               for (let i = 0; i < r.slots; i++) {
                 const ps = psMap?.get(i) || null
-                if (i === 0) {
+                if (adminCreated) {
+                  // Admin-created: booker is metadata only. Every slot maps to
+                  // player_names[i], with play_for_money[0] a phantom false and
+                  // play_for_money[i+1] the opt-in for that slot.
+                  const rawName = playerNames[i]?.trim()
+                  players.push({
+                    playerIndex: i,
+                    name: rawName && rawName.length > 0 ? rawName : null,
+                    isBooker: false,
+                    isOptedIn: !!pfm[i + 1],
+                    greenFeePaid: ps?.green_fee_paid ?? false,
+                    cashGamePaid: ps?.cash_game_paid ?? false,
+                  })
+                } else if (i === 0) {
                   players.push({
                     playerIndex: 0,
                     name: bookerName,
@@ -405,7 +426,7 @@ export async function getPaymentGrid(limit: number) {
                     cashGamePaid: ps?.cash_game_paid ?? false,
                   })
                 } else {
-                  const rawName = additional[i - 1]?.trim()
+                  const rawName = playerNames[i - 1]?.trim()
                   players.push({
                     playerIndex: i,
                     name: rawName && rawName.length > 0 ? rawName : null,
@@ -421,6 +442,7 @@ export async function getPaymentGrid(limit: number) {
                 bookerName,
                 slots: r.slots,
                 players,
+                adminCreated,
               }
             }),
           }
