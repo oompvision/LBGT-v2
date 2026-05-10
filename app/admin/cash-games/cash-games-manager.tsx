@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format, parseISO } from "date-fns"
-import {
-  Loader2,
-  History,
-  Settings2,
-  Coins,
-  CircleDot,
-} from "lucide-react"
+import { Loader2, History, Settings2, CircleDot } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -338,12 +332,6 @@ export function CashGamesManager() {
                                               Booker
                                             </Badge>
                                           )}
-                                          {p.isOptedIn && (
-                                            <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-600">
-                                              <Coins className="h-3 w-3 mr-1" />
-                                              Cash game
-                                            </Badge>
-                                          )}
                                           {!p.isBooker && (
                                             <span className="text-xs text-muted-foreground">
                                               (booked by {r.bookerName})
@@ -366,19 +354,29 @@ export function CashGamesManager() {
                                         />
                                       </td>
                                       <td className="text-center py-2 pl-3">
-                                        <Checkbox
-                                          checked={cashGamePaid}
-                                          disabled={!p.isOptedIn}
-                                          onCheckedChange={(v) =>
-                                            toggleSlot(
-                                              tt.teeTimeId,
-                                              key,
-                                              "cashGamePaid",
-                                              v === true
-                                            )
-                                          }
-                                          aria-label={`Cash game paid for ${displayName}`}
-                                        />
+                                        <div className="inline-flex items-center gap-1.5">
+                                          <Checkbox
+                                            checked={cashGamePaid}
+                                            disabled={!p.isOptedIn}
+                                            onCheckedChange={(v) =>
+                                              toggleSlot(
+                                                tt.teeTimeId,
+                                                key,
+                                                "cashGamePaid",
+                                                v === true
+                                              )
+                                            }
+                                            aria-label={`Cash game paid for ${displayName}`}
+                                          />
+                                          <span
+                                            className="w-3 text-sm font-semibold text-primary"
+                                            aria-label={
+                                              p.isOptedIn ? "Opted into cash game" : undefined
+                                            }
+                                          >
+                                            {p.isOptedIn ? "$" : ""}
+                                          </span>
+                                        </div>
                                       </td>
                                     </tr>
                                   )
