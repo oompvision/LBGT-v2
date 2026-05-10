@@ -389,7 +389,7 @@ export function EditReservationDialog({
                     </>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    {p.isLeague ? "Tour Member" : "Guest"}
+                    {p.isLeague ? "Member" : "Guest"}
                     {p.isBooker && " · Booker"}
                   </p>
                 </div>

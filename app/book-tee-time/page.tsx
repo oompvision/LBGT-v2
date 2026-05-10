@@ -652,7 +652,7 @@ export default function BookTeeTimePage() {
                         <SelectContent>
                           {availableTeeTimes.map((teeTime) => (
                             <SelectItem key={teeTime.id} value={teeTime.id}>
-                              {formatTimeString(teeTime.time)} - {teeTime.availableSlots} slots available
+                              {formatTimeString(teeTime.time)} - {teeTime.availableSlots} {teeTime.availableSlots === 1 ? "spot" : "spots"} open
                             </SelectItem>
                           ))}
                         </SelectContent>

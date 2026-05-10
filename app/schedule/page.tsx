@@ -6,8 +6,8 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CalendarIcon, Clock, BadgeCheck, Plus } from "lucide-react"
-import { isAdminCreatedReservation } from "@/lib/booking-summary"
+import { CalendarIcon, Clock, Plus } from "lucide-react"
+import { isAdminCreatedReservation, isBookingWindowOpen } from "@/lib/booking-summary"
 
 export const dynamic = "force-dynamic"
 
@@ -67,6 +67,7 @@ export default async function SchedulePage() {
     date: string
     time: string
     max_slots: number
+    booking_closes_at: string | null
   }> = []
   let reservations: Array<{
     id: string
@@ -83,7 +84,7 @@ export default async function SchedulePage() {
     const [teeTimesRes, reservationsRes] = await Promise.all([
       supabase
         .from("tee_times")
-        .select("id, date, time, max_slots")
+        .select("id, date, time, max_slots, booking_closes_at")
         .eq("date", targetDate)
         .order("time", { ascending: true }),
       supabase
@@ -105,6 +106,14 @@ export default async function SchedulePage() {
     },
     {} as Record<string, typeof reservations>,
   )
+
+  // Count seats on tee times whose booking window is still open. Locked-out
+  // tee times don't contribute since users can't book them anyway.
+  const dateBookableSpots = teeTimes.reduce((sum, tt) => {
+    if (!isBookingWindowOpen(tt.booking_closes_at)) return sum
+    const reserved = (reservationsByTeeTime[tt.id] || []).reduce((s, r) => s + r.slots, 0)
+    return sum + Math.max(0, tt.max_slots - reserved)
+  }, 0)
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -139,10 +148,16 @@ export default async function SchedulePage() {
           ) : (
             <Card>
               <CardHeader className="bg-muted/50">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <CalendarIcon className="h-5 w-5 text-muted-foreground shrink-0" />
                   <CardTitle className="text-base sm:text-lg">{formatDateSafely(targetDate)}</CardTitle>
+                  <Badge variant="outline" className="ml-1">
+                    {dateBookableSpots} {dateBookableSpots === 1 ? "Spot" : "Spots"} remaining
+                  </Badge>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-primary">$</span> indicates players opted into the weekly cash contest
+                </p>
               </CardHeader>
               <CardContent className="p-0 divide-y">
                 {teeTimes.map((tt) => {
@@ -229,7 +244,6 @@ export default async function SchedulePage() {
                             }
 
                             const showBookedBy = !rows[0]?.isBooker
-                            const anyOptedIn = playForMoney.some(Boolean)
 
                             return (
                               <div key={r.id} className="rounded-md border bg-muted/30 p-3 space-y-2">
@@ -243,12 +257,14 @@ export default async function SchedulePage() {
                                         {p.name}
                                       </span>
                                       <span className="text-xs text-muted-foreground">
-                                        {p.isLeague ? "(Tour Member)" : "(Guest)"}
+                                        {p.isLeague ? "(Member)" : "(Guest)"}
                                       </span>
                                       {p.optedIn && (
-                                        <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                          money
-                                          <BadgeCheck className="h-3 w-3" />
+                                        <span
+                                          className="text-sm font-semibold text-primary"
+                                          aria-label="Opted into cash game"
+                                        >
+                                          $
                                         </span>
                                       )}
                                     </li>
@@ -256,14 +272,6 @@ export default async function SchedulePage() {
                                 </ul>
                                 <div className="space-y-1 text-xs text-muted-foreground">
                                   {showBookedBy && <p>Booked by {bookerName}</p>}
-                                  {anyOptedIn && (
-                                    <p>
-                                      <span className="inline-flex items-center gap-1">
-                                        money <BadgeCheck className="h-3 w-3" />
-                                      </span>{" "}
-                                      indicates players opted into the weekly cash contest
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                             )
