@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { format, parseISO } from "date-fns"
-import { Loader2, History, Settings2, CircleDot } from "lucide-react"
+import { Loader2, History, Settings2, CircleDot, Download } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -70,6 +70,59 @@ type SlotState = {
 
 function slotKey(reservationId: string, playerIndex: number): SlotKey {
   return `${reservationId}:${playerIndex}`
+}
+
+// Wrap a CSV cell only when needed (commas, quotes, newlines).
+function csvCell(value: string): string {
+  if (/[",\n\r]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function csvRow(cells: string[]): string {
+  return cells.map(csvCell).join(",")
+}
+
+function exportDateAsCsv(dateItem: PaymentGridDate) {
+  const cashEntry = dateItem.cashGame?.entry_amount ?? 0
+
+  let greenFeeCount = 0
+  let cashGameCount = 0
+  const rows: string[] = []
+  rows.push(csvRow(["Player", "Green Fee", "Cash Game"]))
+  for (const tt of dateItem.teeTimes) {
+    for (const r of tt.reservations) {
+      for (const p of r.players) {
+        const name = p.name && p.name.length > 0 ? p.name : `Player ${p.playerIndex + 1}`
+        const greenCell = p.greenFeePaid ? `$${BASE_TEE_TIME_COST}` : ""
+        const cashCell = p.cashGamePaid ? `$${cashEntry}` : ""
+        if (p.greenFeePaid) greenFeeCount++
+        if (p.cashGamePaid) cashGameCount++
+        rows.push(csvRow([name, greenCell, cashCell]))
+      }
+    }
+  }
+
+  const greenFeeTotal = greenFeeCount * BASE_TEE_TIME_COST
+  const cashGameTotal = cashGameCount * cashEntry
+  const collectedTotal = greenFeeTotal + cashGameTotal
+  rows.push("")
+  rows.push(csvRow(["Subtotal Green Fee", `$${greenFeeTotal}`]))
+  rows.push(csvRow(["Subtotal Cash Game", `$${cashGameTotal}`]))
+  rows.push(csvRow(["Total", `$${collectedTotal}`]))
+
+  // Prepend a UTF-8 BOM so Excel respects encoding for any non-ASCII names.
+  const csv = "﻿" + rows.join("\r\n") + "\r\n"
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `cash-mgmt-${dateItem.date}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 export function CashGamesManager() {
@@ -264,12 +317,22 @@ export function CashGamesManager() {
                     </span>
                   </p>
                 </div>
-                <Button asChild variant="outline" size="sm">
-                  <Link href={`/admin/cash-games/configure/${dateItem.date}`}>
-                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
-                    Configure cash game
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportDateAsCsv(dateItem)}
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Export CSV
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/admin/cash-games/configure/${dateItem.date}`}>
+                      <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                      Configure cash game
+                    </Link>
+                  </Button>
+                </div>
               </div>
 
               {dateItem.teeTimes.length === 0 ? (
