@@ -1,8 +1,9 @@
 "use server"
 
 import { createAdminClient } from "@/lib/supabase/server"
-import { formatDate } from "@/lib/utils"
+import { formatDate, formatDateForDB } from "@/lib/utils"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 // Create a Supabase client with service role key to bypass RLS
 const supabaseAdmin = createAdminClient()
@@ -27,20 +28,19 @@ function objectsToCSV(data: Record<string, unknown>[], columns: { key: string; h
   return [headerRow, ...rows].join("\n")
 }
 
-// Function to export reservations for a specific week
+// Function to export reservations for a specific week (Sunday–Saturday containing the given date)
 export async function exportReservationsToCSV(weekDate: string) {
   try {
-    // Parse the provided date and get the month's start and end dates
     const date = new Date(weekDate)
+    const startDate = new Date(date)
+    startDate.setDate(date.getDate() - date.getDay()) // Sunday
+    const endDate = new Date(startDate)
+    endDate.setDate(startDate.getDate() + 6) // Saturday
 
-    // Use the entire month instead of just a week
-    const startDate = new Date(date.getFullYear(), date.getMonth(), 1)
-    const endDate = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+    const startDateStr = formatDateForDB(startDate)
+    const endDateStr = formatDateForDB(endDate)
 
-    const startDateStr = formatDate(startDate).split("T")[0]
-    const endDateStr = formatDate(endDate).split("T")[0]
-
-    // Fetch all reservations for the month
+    // Fetch all reservations whose tee time falls within the week
     const { data: reservations, error } = await supabaseAdmin
       .from("reservations")
       .select(`
@@ -50,11 +50,10 @@ export async function exportReservationsToCSV(weekDate: string) {
         player_names,
         player_user_ids,
         guest_phones,
-        play_for_money,
-        created_at,
         users (
           name,
-          email
+          email,
+          phone_number
         ),
         tee_times (
           date,
@@ -71,44 +70,70 @@ export async function exportReservationsToCSV(weekDate: string) {
       return { success: false, error: error.message }
     }
 
+    const validReservations = (reservations || []).filter(
+      (r) => r.tee_times && r.tee_times.date && r.tee_times.time,
+    )
+
+    // Look up profile info (email, phone) for additional league players
+    const leaguePlayerIds = new Set<string>()
+    for (const reservation of validReservations) {
+      if (Array.isArray(reservation.player_user_ids)) {
+        for (const id of reservation.player_user_ids) {
+          if (id) leaguePlayerIds.add(id)
+        }
+      }
+    }
+
+    const leagueProfiles = new Map<
+      string,
+      { name: string | null; email: string | null; phone_number: string | null }
+    >()
+    if (leaguePlayerIds.size > 0) {
+      const { data: profiles } = await supabaseAdmin
+        .from("users")
+        .select("id, name, email, phone_number")
+        .in("id", Array.from(leaguePlayerIds))
+      for (const profile of profiles || []) {
+        leagueProfiles.set(profile.id, {
+          name: profile.name,
+          email: profile.email,
+          phone_number: profile.phone_number,
+        })
+      }
+    }
+
     // Initialize an empty array to hold all player rows
     const playerRows: Record<string, unknown>[] = []
 
     // Process each reservation
-    for (const reservation of reservations || []) {
-      // Skip reservations with missing tee_times data
-      if (!reservation.tee_times || !reservation.tee_times.date || !reservation.tee_times.time) {
-        continue
-      }
-
+    for (const reservation of validReservations) {
       const date = formatDate(new Date(reservation.tee_times.date))
       // Handle time formatting - reservation.tee_times.time is a string like "14:30:00"
       const timeString = reservation.tee_times.time
       let time = timeString
       if (timeString) {
-        // Parse the time string and format it to 12-hour format
         const [hours, minutes] = timeString.split(":").map(Number)
-        const date = new Date()
-        date.setHours(hours, minutes, 0, 0)
-        time = date.toLocaleTimeString("en-US", {
+        const d = new Date()
+        d.setHours(hours, minutes, 0, 0)
+        time = d.toLocaleTimeString("en-US", {
           hour: "numeric",
           minute: "2-digit",
           hour12: true,
         })
       }
-      const createdAt = reservation.created_at ? new Date(reservation.created_at).toLocaleString() : "Unknown"
 
-      // Add the main player (who made the reservation)
-      playerRows.push({
-        date,
-        time,
-        reservationId: reservation.id,
-        playerName: reservation.users?.name || "Unknown User",
-        playerEmail: reservation.users?.email || "No Email",
-        playerType: "Main Player",
-        playingForMoney: Array.isArray(reservation.play_for_money) && reservation.play_for_money[0] ? "Yes" : "No",
-        created: createdAt,
-      })
+      // Add the booker as a player — unless this is an admin-created
+      // reservation, where the booker is metadata only and not on the tee time.
+      if (!isAdminCreatedReservation(reservation)) {
+        const mainPhone = reservation.users?.phone_number
+        playerRows.push({
+          date,
+          time,
+          playerName: reservation.users?.name || "",
+          playerEmail: reservation.users?.email || "",
+          phone: mainPhone ? formatPhone(mainPhone) : "",
+        })
+      }
 
       // Add each additional player
       if (Array.isArray(reservation.player_names)) {
@@ -116,35 +141,33 @@ export async function exportReservationsToCSV(weekDate: string) {
           const playerName = reservation.player_names[i]
           if (!playerName) continue // Skip empty player names
 
-          // Determine if this player is playing for money
-          let playingForMoney = "No"
-          if (
-            Array.isArray(reservation.play_for_money) &&
-            reservation.play_for_money.length > i + 1 &&
-            reservation.play_for_money[i + 1]
-          ) {
-            playingForMoney = "Yes"
-          }
+          const leagueId = Array.isArray(reservation.player_user_ids)
+            ? reservation.player_user_ids[i]
+            : null
 
-          const isLeague = !!(
-            Array.isArray(reservation.player_user_ids) && reservation.player_user_ids[i]
-          )
-          const rawPhone =
-            !isLeague && Array.isArray(reservation.guest_phones)
+          if (leagueId) {
+            const profile = leagueProfiles.get(leagueId)
+            const phone = profile?.phone_number
+            playerRows.push({
+              date,
+              time,
+              playerName: profile?.name || playerName,
+              playerEmail: profile?.email || "",
+              phone: phone ? formatPhone(phone) : "",
+            })
+          } else {
+            // Guest player: no email, but we may have a phone number
+            const rawPhone = Array.isArray(reservation.guest_phones)
               ? reservation.guest_phones[i] ?? ""
               : ""
-          const guestPhone = rawPhone ? formatPhone(rawPhone) : ""
-          playerRows.push({
-            date,
-            time,
-            reservationId: reservation.id,
-            playerName,
-            playerEmail: "", // Additional players don't have emails in the system
-            playerType: isLeague ? "Additional Player (League)" : "Additional Player (Guest)",
-            guestPhone,
-            playingForMoney,
-            created: createdAt,
-          })
+            playerRows.push({
+              date,
+              time,
+              playerName,
+              playerEmail: "",
+              phone: rawPhone ? formatPhone(rawPhone) : "",
+            })
+          }
         }
       }
     }
@@ -162,13 +185,9 @@ export async function exportReservationsToCSV(weekDate: string) {
     const columns = [
       { key: "date", header: "Date" },
       { key: "time", header: "Time" },
-      { key: "reservationId", header: "Reservation ID" },
       { key: "playerName", header: "Player Name" },
       { key: "playerEmail", header: "Player Email" },
-      { key: "playerType", header: "Player Type" },
-      { key: "guestPhone", header: "Guest Phone" },
-      { key: "playingForMoney", header: "Playing for Money" },
-      { key: "created", header: "Reservation Created" },
+      { key: "phone", header: "Phone" },
     ]
 
     // Generate CSV
