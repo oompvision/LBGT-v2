@@ -3,6 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/server"
 import { formatDate, formatDateForDB } from "@/lib/utils"
 import { formatPhone } from "@/lib/phone"
+import { isAdminCreatedReservation } from "@/lib/booking-summary"
 
 // Create a Supabase client with service role key to bypass RLS
 const supabaseAdmin = createAdminClient()
@@ -45,6 +46,7 @@ export async function exportReservationsToCSV(weekDate: string) {
       .select(`
         id,
         user_id,
+        slots,
         player_names,
         player_user_ids,
         guest_phones,
@@ -120,15 +122,18 @@ export async function exportReservationsToCSV(weekDate: string) {
         })
       }
 
-      // Add the main player (who made the reservation)
-      const mainPhone = reservation.users?.phone_number
-      playerRows.push({
-        date,
-        time,
-        playerName: reservation.users?.name || "",
-        playerEmail: reservation.users?.email || "",
-        phone: mainPhone ? formatPhone(mainPhone) : "",
-      })
+      // Add the booker as a player — unless this is an admin-created
+      // reservation, where the booker is metadata only and not on the tee time.
+      if (!isAdminCreatedReservation(reservation)) {
+        const mainPhone = reservation.users?.phone_number
+        playerRows.push({
+          date,
+          time,
+          playerName: reservation.users?.name || "",
+          playerEmail: reservation.users?.email || "",
+          phone: mainPhone ? formatPhone(mainPhone) : "",
+        })
+      }
 
       // Add each additional player
       if (Array.isArray(reservation.player_names)) {
