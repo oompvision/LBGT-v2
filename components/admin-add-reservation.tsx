@@ -289,6 +289,13 @@ export function AdminAddReservation({ onCreated }: Props) {
         setReservedSlotsByTeeTime(counts)
       }
       onCreated?.()
+    } catch (err: unknown) {
+      console.error("AdminAddReservation submit failed:", err)
+      toast({
+        title: "Couldn't create reservation",
+        description: err instanceof Error ? err.message : "Something went wrong. Try again.",
+        variant: "destructive",
+      })
     } finally {
       setSubmitting(false)
     }

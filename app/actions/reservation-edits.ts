@@ -44,9 +44,9 @@ async function fetchReservation(reservationId: string): Promise<{
 async function getSessionUserId(): Promise<string | null> {
   const supabase = await createClient()
   const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  return session?.user.id ?? null
+    data: { user },
+  } = await supabase.auth.getUser()
+  return user?.id ?? null
 }
 
 // Admins bypass the booking-window cutoff and the opt-in cutoff so they can
@@ -597,24 +597,34 @@ export async function adminCreateReservation(input: {
       .select("id")
 
     if (insertErr) {
+      console.error("adminCreateReservation insert failed:", insertErr)
       return { success: false, error: insertErr.message }
     }
 
     const reservationId = insertedRows?.[0]?.id as string | undefined
+    if (!reservationId) {
+      console.error(
+        "adminCreateReservation: insert returned no row",
+        { teeTimeId: input.teeTimeId, season: teeTime.season, insertedRows },
+      )
+      return {
+        success: false,
+        error: "Reservation could not be created (no row returned). Try again.",
+      }
+    }
 
     // Send confirmation emails to every league member on the booking.
     // Admin themselves isn't on the tee time so they don't get emailed.
-    if (reservationId) {
-      sendBookingConfirmationEmails(reservationId).catch((err) =>
-        console.error("Admin-created booking email send failed:", err),
-      )
-    }
+    sendBookingConfirmationEmails(reservationId).catch((err) =>
+      console.error("Admin-created booking email send failed:", err),
+    )
 
     revalidatePath("/my-reservations")
     revalidatePath("/schedule")
     revalidatePath("/admin/dashboard")
     return { success: true, reservationId }
   } catch (err: unknown) {
+    console.error("adminCreateReservation failed:", err)
     return {
       success: false,
       error: err instanceof Error ? err.message : "Failed to create reservation.",
