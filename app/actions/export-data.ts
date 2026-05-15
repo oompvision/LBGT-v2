@@ -4,7 +4,6 @@ import { createAdminClient } from "@/lib/supabase/server"
 import { formatDate, formatDateForDB } from "@/lib/utils"
 import { formatPhone } from "@/lib/phone"
 import { isAdminCreatedReservation } from "@/lib/booking-summary"
-import { BASE_TEE_TIME_COST } from "@/lib/constants"
 
 // Create a Supabase client with service role key to bypass RLS
 const supabaseAdmin = createAdminClient()
@@ -51,7 +50,6 @@ export async function exportReservationsToCSV(weekDate: string) {
         player_names,
         player_user_ids,
         guest_phones,
-        play_for_money,
         users (
           name,
           email,
@@ -70,19 +68,6 @@ export async function exportReservationsToCSV(weekDate: string) {
     if (error) {
       console.error("Error fetching reservations:", error)
       return { success: false, error: error.message }
-    }
-
-    // Cash game entry amount per date in the week — used to total cash entries
-    // for opted-in players (reservations.play_for_money[0] is the booker,
-    // [i+1] is additional player i).
-    const cashEntryByDate = new Map<string, number>()
-    const { data: cashGameRows } = await supabaseAdmin
-      .from("cash_games")
-      .select("date, entry_amount")
-      .gte("date", startDateStr)
-      .lte("date", endDateStr)
-    for (const cg of cashGameRows || []) {
-      if (cg.date) cashEntryByDate.set(cg.date, cg.entry_amount ?? 0)
     }
 
     const validReservations = (reservations || []).filter(
@@ -122,8 +107,7 @@ export async function exportReservationsToCSV(weekDate: string) {
 
     // Process each reservation
     for (const reservation of validReservations) {
-      const rawDate = reservation.tee_times.date as string
-      const date = formatDate(new Date(rawDate))
+      const date = formatDate(new Date(reservation.tee_times.date))
       // Handle time formatting - reservation.tee_times.time is a string like "14:30:00"
       const timeString = reservation.tee_times.time
       let time = timeString
@@ -138,11 +122,6 @@ export async function exportReservationsToCSV(weekDate: string) {
         })
       }
 
-      const cashEntryAmount = cashEntryByDate.get(rawDate) ?? 0
-      const pfm: boolean[] = Array.isArray(reservation.play_for_money)
-        ? reservation.play_for_money
-        : []
-
       // Add the booker as a player — unless this is an admin-created
       // reservation, where the booker is metadata only and not on the tee time.
       if (!isAdminCreatedReservation(reservation)) {
@@ -153,7 +132,6 @@ export async function exportReservationsToCSV(weekDate: string) {
           playerName: reservation.users?.name || "",
           playerEmail: reservation.users?.email || "",
           phone: mainPhone ? formatPhone(mainPhone) : "",
-          cashEntry: pfm[0] ? cashEntryAmount : 0,
         })
       }
 
@@ -166,7 +144,6 @@ export async function exportReservationsToCSV(weekDate: string) {
           const leagueId = Array.isArray(reservation.player_user_ids)
             ? reservation.player_user_ids[i]
             : null
-          const cashEntry = pfm[i + 1] ? cashEntryAmount : 0
 
           if (leagueId) {
             const profile = leagueProfiles.get(leagueId)
@@ -177,7 +154,6 @@ export async function exportReservationsToCSV(weekDate: string) {
               playerName: profile?.name || playerName,
               playerEmail: profile?.email || "",
               phone: phone ? formatPhone(phone) : "",
-              cashEntry,
             })
           } else {
             // Guest player: no email, but we may have a phone number
@@ -190,7 +166,6 @@ export async function exportReservationsToCSV(weekDate: string) {
               playerName,
               playerEmail: "",
               phone: rawPhone ? formatPhone(rawPhone) : "",
-              cashEntry,
             })
           }
         }
@@ -215,33 +190,8 @@ export async function exportReservationsToCSV(weekDate: string) {
       { key: "phone", header: "Phone" },
     ]
 
-    // Generate base CSV (headers + player rows), then attach a totals column
-    // in fixed cells G1/G2/G3 with column F left blank as a gap. Every other
-    // row in F/G stays empty so the totals always live in the same place.
-    const baseCsv = objectsToCSV(playerRows, columns)
-    const totalGreenFee = playerRows.length * BASE_TEE_TIME_COST
-    const totalCashEntries = playerRows.reduce(
-      (sum, row) => sum + ((row.cashEntry as number) ?? 0),
-      0,
-    )
-    const totalCombined = totalGreenFee + totalCashEntries
-    const totalsByRow = [
-      `$${totalGreenFee}`,
-      `$${totalCashEntries}`,
-      `$${totalCombined}`,
-    ]
-
-    const baseLines = baseCsv.split("\n")
-    // Pad so totals always land in G1/G2/G3, even when there are <2 data rows.
-    const emptyDataLine = columns.map(() => `""`).join(",")
-    while (baseLines.length < totalsByRow.length) baseLines.push(emptyDataLine)
-
-    const csv = baseLines
-      .map((line, idx) => {
-        const total = idx < totalsByRow.length ? totalsByRow[idx] : ""
-        return `${line},"",${total ? `"${total}"` : `""`}`
-      })
-      .join("\n")
+    // Generate CSV
+    const csv = objectsToCSV(playerRows, columns)
 
     return {
       success: true,

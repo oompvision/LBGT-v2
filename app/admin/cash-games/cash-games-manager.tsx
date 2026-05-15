@@ -89,8 +89,8 @@ function exportDateAsCsv(dateItem: PaymentGridDate) {
 
   let greenFeeCount = 0
   let cashGameCount = 0
-  const rows: string[] = []
-  rows.push(csvRow(["Player", "Green Fee", "Cash Game"]))
+  const dataRows: string[][] = []
+  dataRows.push(["Player", "Green Fee", "Cash Game"])
   for (const tt of dateItem.teeTimes) {
     for (const r of tt.reservations) {
       for (const p of r.players) {
@@ -99,7 +99,7 @@ function exportDateAsCsv(dateItem: PaymentGridDate) {
         const cashCell = p.cashGamePaid ? `$${cashEntry}` : ""
         if (p.greenFeePaid) greenFeeCount++
         if (p.cashGamePaid) cashGameCount++
-        rows.push(csvRow([name, greenCell, cashCell]))
+        dataRows.push([name, greenCell, cashCell])
       }
     }
   }
@@ -107,10 +107,16 @@ function exportDateAsCsv(dateItem: PaymentGridDate) {
   const greenFeeTotal = greenFeeCount * BASE_TEE_TIME_COST
   const cashGameTotal = cashGameCount * cashEntry
   const collectedTotal = greenFeeTotal + cashGameTotal
-  rows.push("")
-  rows.push(csvRow(["Subtotal Green Fee", `$${greenFeeTotal}`]))
-  rows.push(csvRow(["Subtotal Cash Game", `$${cashGameTotal}`]))
-  rows.push(csvRow(["Total", `$${collectedTotal}`]))
+  // Fixed-position totals so the cells are always the same: G1 = collected
+  // green fees, G2 = collected cash entries, G3 = combined total. Columns
+  // D–F are left blank as a gap between player data and totals.
+  const totalsByRow = [`$${greenFeeTotal}`, `$${cashGameTotal}`, `$${collectedTotal}`]
+  while (dataRows.length < totalsByRow.length) dataRows.push(["", "", ""])
+
+  const rows = dataRows.map((cells, idx) => {
+    const total = idx < totalsByRow.length ? totalsByRow[idx] : ""
+    return csvRow([...cells, "", "", "", total])
+  })
 
   // Prepend a UTF-8 BOM so Excel respects encoding for any non-ASCII names.
   const csv = "﻿" + rows.join("\r\n") + "\r\n"
