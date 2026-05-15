@@ -598,6 +598,13 @@ export async function adminCreateReservation(input: {
 
     if (insertErr) {
       console.error("adminCreateReservation insert failed:", insertErr)
+      if ((insertErr as { code?: string }).code === "23505") {
+        return {
+          success: false,
+          error:
+            "This tee time already has a reservation under your admin account. Run the allow-admin-reservations-per-tee-time migration to lift this limit.",
+        }
+      }
       return { success: false, error: insertErr.message }
     }
 
