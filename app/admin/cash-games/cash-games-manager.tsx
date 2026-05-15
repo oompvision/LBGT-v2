@@ -289,19 +289,29 @@ export function CashGamesManager() {
         <div className="space-y-6">
           {items.map((dateItem) => {
             const cashEntry = dateItem.cashGame?.entry_amount ?? 0
-            let greenFeeCount = 0
-            let cashGameCount = 0
+            let totalPlayers = 0
+            let optedInCount = 0
+            let greenFeePaidCount = 0
+            let cashGamePaidCount = 0
             for (const tt of dateItem.teeTimes) {
               for (const r of tt.reservations) {
                 for (const p of r.players) {
-                  if (p.greenFeePaid) greenFeeCount++
-                  if (p.cashGamePaid) cashGameCount++
+                  totalPlayers++
+                  if (p.isOptedIn) optedInCount++
+                  if (p.greenFeePaid) greenFeePaidCount++
+                  if (p.cashGamePaid) cashGamePaidCount++
                 }
               }
             }
-            const greenFeeTotal = greenFeeCount * BASE_TEE_TIME_COST
-            const cashGameTotal = cashGameCount * cashEntry
-            const collectedTotal = greenFeeTotal + cashGameTotal
+            const greenFeeOwed = totalPlayers * BASE_TEE_TIME_COST
+            const cashGameOwed = optedInCount * cashEntry
+            const owedTotal = greenFeeOwed + cashGameOwed
+            const greenFeeCollected = greenFeePaidCount * BASE_TEE_TIME_COST
+            const cashGameCollected = cashGamePaidCount * cashEntry
+            const collectedTotal = greenFeeCollected + cashGameCollected
+            const greenFeeOutstanding = greenFeeOwed - greenFeeCollected
+            const cashGameOutstanding = cashGameOwed - cashGameCollected
+            const outstandingTotal = greenFeeOutstanding + cashGameOutstanding
             return (
             <div key={dateItem.date} className="space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -317,9 +327,21 @@ export function CashGamesManager() {
                     </p>
                   )}
                   <p className="text-sm font-medium">
+                    Owed: ${owedTotal}{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (${greenFeeOwed} green fee + ${cashGameOwed} cash entry)
+                    </span>
+                  </p>
+                  <p className="text-sm font-medium">
                     Collected: ${collectedTotal}{" "}
                     <span className="font-normal text-muted-foreground">
-                      (${greenFeeTotal} green fee + ${cashGameTotal} cash entry)
+                      (${greenFeeCollected} green fee + ${cashGameCollected} cash entry)
+                    </span>
+                  </p>
+                  <p className="text-sm font-medium">
+                    Outstanding: ${outstandingTotal}{" "}
+                    <span className="font-normal text-muted-foreground">
+                      (${greenFeeOutstanding} green fee + ${cashGameOutstanding} cash entry)
                     </span>
                   </p>
                 </div>
