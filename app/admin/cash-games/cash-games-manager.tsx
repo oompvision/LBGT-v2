@@ -131,7 +131,12 @@ function exportDateAsCsv(dateItem: PaymentGridDate) {
   URL.revokeObjectURL(url)
 }
 
-export function CashGamesManager() {
+export function CashGamesManager({
+  scope = "upcoming",
+}: {
+  scope?: "upcoming" | "past"
+} = {}) {
+  const isPast = scope === "past"
   const [items, setItems] = useState<PaymentGridDate[]>([])
   const [totalDates, setTotalDates] = useState(0)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -155,7 +160,7 @@ export function CashGamesManager() {
 
   const load = async (limit: number) => {
     setLoading(true)
-    const res = await getPaymentGrid(limit)
+    const res = await getPaymentGrid(limit, scope)
     if (res.success) {
       setItems(res.items)
       setTotalDates(res.totalDates)
@@ -264,13 +269,14 @@ export function CashGamesManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {items.length} of {totalDates} upcoming round
-          {totalDates === 1 ? "" : "s"}.
+          Showing {items.length} of {totalDates} {isPast ? "past" : "upcoming"} round
+          {totalDates === 1 ? "" : "s"}
+          {isPast ? " this season" : ""}.
         </p>
         <Button asChild variant="outline" size="sm">
-          <Link href="/admin/cash-games/past">
+          <Link href={isPast ? "/admin/cash-games" : "/admin/cash-games/past"}>
             <History className="h-4 w-4 mr-2" />
-            Past cash contests
+            {isPast ? "Upcoming rounds" : "Past cash contests"}
           </Link>
         </Button>
       </div>
@@ -282,7 +288,9 @@ export function CashGamesManager() {
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            No upcoming tee times scheduled. Generate a schedule under Tee Times first.
+            {isPast
+              ? "No past rounds this season yet."
+              : "No upcoming tee times scheduled. Generate a schedule under Tee Times first."}
           </CardContent>
         </Card>
       ) : (

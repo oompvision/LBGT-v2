@@ -137,59 +137,6 @@ export async function getUpcomingCashGameSummaries(limit: number) {
   }
 }
 
-export async function getPastCashGameSummaries() {
-  try {
-    const supabaseAdmin = createAdminClient()
-    const today = todayISO()
-
-    const { data: cashGames, error: cgErr } = await supabaseAdmin
-      .from("cash_games")
-      .select("*")
-      .lt("date", today)
-      .order("date", { ascending: false })
-    if (cgErr) {
-      return { success: false, error: cgErr.message, items: [] as CashGameDateSummary[] }
-    }
-
-    const list = (cashGames as CashGame[] | null) || []
-    if (list.length === 0) {
-      return { success: true, items: [] as CashGameDateSummary[] }
-    }
-
-    const dates = list.map((c) => c.date)
-    const { data: resData, error: resErr } = await supabaseAdmin
-      .from("reservations")
-      .select(
-        "id, user_id, slots, player_names, play_for_money, tee_times!inner(date), users:user_id(name)"
-      )
-      .in("tee_times.date", dates)
-    if (resErr) {
-      return { success: false, error: resErr.message, items: [] as CashGameDateSummary[] }
-    }
-
-    const reservations = (resData as unknown as ReservationRow[]) || []
-    const optInsByDate = buildOptIns(reservations)
-    const reservationCounts = new Map<string, number>()
-    for (const r of reservations) {
-      const d = r.tee_times?.date
-      if (!d) continue
-      reservationCounts.set(d, (reservationCounts.get(d) || 0) + 1)
-    }
-
-    const items: CashGameDateSummary[] = list.map((cg) => ({
-      date: cg.date,
-      cashGame: cg,
-      optedInPlayers: optInsByDate.get(cg.date) || [],
-      reservationCount: reservationCounts.get(cg.date) || 0,
-    }))
-
-    return { success: true, items }
-  } catch (err) {
-    console.error("getPastCashGameSummaries error:", err)
-    return { success: false, error: "Failed to load past cash games", items: [] as CashGameDateSummary[] }
-  }
-}
-
 export async function upsertCashGame(input: {
   date: string
   title: string
@@ -275,17 +222,36 @@ type GridReservationRow = {
   users: { name: string | null } | null
 }
 
-export async function getPaymentGrid(limit: number) {
+export async function getPaymentGrid(
+  limit: number,
+  scope: "upcoming" | "past" = "upcoming",
+) {
   try {
     const supabaseAdmin = createAdminClient()
     const today = todayISO()
 
-    const { data: teeTimes, error: ttErr } = await supabaseAdmin
+    let ttQuery = supabaseAdmin
       .from("tee_times")
       .select("id, date, time, max_slots")
-      .gte("date", today)
-      .order("date", { ascending: true })
-      .order("time", { ascending: true })
+
+    if (scope === "past") {
+      // Past rounds, current season only, most recent first.
+      const { data: activeSeason } = await supabaseAdmin
+        .from("seasons")
+        .select("year")
+        .eq("is_active", true)
+        .maybeSingle()
+      ttQuery = ttQuery.lt("date", today).order("date", { ascending: false })
+      if (activeSeason?.year != null) {
+        ttQuery = ttQuery.eq("season", activeSeason.year)
+      }
+    } else {
+      ttQuery = ttQuery.gte("date", today).order("date", { ascending: true })
+    }
+
+    const { data: teeTimes, error: ttErr } = await ttQuery.order("time", {
+      ascending: true,
+    })
     if (ttErr) {
       return {
         success: false,
@@ -510,6 +476,7 @@ export async function upsertPaymentStatuses(
     }
 
     revalidatePath("/admin/cash-games")
+    revalidatePath("/admin/cash-games/past")
     return { success: true }
   } catch (err) {
     console.error("upsertPaymentStatuses error:", err)
