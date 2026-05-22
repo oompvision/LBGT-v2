@@ -75,8 +75,36 @@ export function getTeeTimeStartMs(dateStr: string, timeStr: string): number {
   return utcGuess + offsetMs
 }
 
-// True when the booking_closes_at timestamp is missing or still in the future.
-export function isBookingWindowOpen(bookingClosesAt: string | null | undefined, nowMs = Date.now()): boolean {
+// True when the current time is inside the tee time's booking window:
+// at or after booking_opens_at (if set) and strictly before booking_closes_at
+// (if set). A missing endpoint is treated as unbounded on that side, so a
+// tee time with no window stored is always considered open.
+export function isBookingWindowOpen(
+  teeTime:
+    | {
+        booking_opens_at?: string | null
+        booking_closes_at?: string | null
+      }
+    | null
+    | undefined,
+  nowMs = Date.now(),
+): boolean {
+  if (!teeTime) return true
+  const opensAt = teeTime.booking_opens_at
+  if (opensAt && nowMs < new Date(opensAt).getTime()) return false
+  const closesAt = teeTime.booking_closes_at
+  if (closesAt && nowMs >= new Date(closesAt).getTime()) return false
+  return true
+}
+
+// True when the booking-close deadline hasn't passed (or isn't set). Use
+// this when gating edits to a reservation that already exists — booking_opens_at
+// only governs new bookings, so an existing reservation can be edited up
+// until close even if its opens_at is somehow in the future.
+export function isBeforeBookingClose(
+  bookingClosesAt: string | null | undefined,
+  nowMs = Date.now(),
+): boolean {
   if (!bookingClosesAt) return true
   return nowMs < new Date(bookingClosesAt).getTime()
 }

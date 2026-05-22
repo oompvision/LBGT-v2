@@ -24,7 +24,7 @@ import {
   EditReservationDialog,
   type EditReservationData,
 } from "@/components/edit-reservation-dialog"
-import { isBookingWindowOpen, isBeforeCutoff } from "@/lib/booking-summary"
+import { isBeforeBookingClose, isBeforeCutoff } from "@/lib/booking-summary"
 
 const OPT_IN_BUFFER_MINUTES = 60
 
@@ -51,7 +51,7 @@ export function ReservationActions({
   const router = useRouter()
   const { toast } = useToast()
 
-  const bookingOpen = isBookingWindowOpen(editData.bookingClosesAt)
+  const bookingOpen = isBeforeBookingClose(editData.bookingClosesAt)
   const optInOpen = isBeforeCutoff(editData.teeTimeDate, editData.teeTimeTime, OPT_IN_BUFFER_MINUTES)
   const canEdit = bookingOpen || optInOpen
 

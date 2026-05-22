@@ -67,6 +67,7 @@ export default async function SchedulePage() {
     date: string
     time: string
     max_slots: number
+    booking_opens_at: string | null
     booking_closes_at: string | null
   }> = []
   let reservations: Array<{
@@ -84,7 +85,7 @@ export default async function SchedulePage() {
     const [teeTimesRes, reservationsRes] = await Promise.all([
       supabase
         .from("tee_times")
-        .select("id, date, time, max_slots, booking_closes_at")
+        .select("id, date, time, max_slots, booking_opens_at, booking_closes_at")
         .eq("date", targetDate)
         .order("time", { ascending: true }),
       supabase
@@ -110,7 +111,7 @@ export default async function SchedulePage() {
   // Count seats on tee times whose booking window is still open. Locked-out
   // tee times don't contribute since users can't book them anyway.
   const dateBookableSpots = teeTimes.reduce((sum, tt) => {
-    if (!isBookingWindowOpen(tt.booking_closes_at)) return sum
+    if (!isBookingWindowOpen(tt)) return sum
     const reserved = (reservationsByTeeTime[tt.id] || []).reduce((s, r) => s + r.slots, 0)
     return sum + Math.max(0, tt.max_slots - reserved)
   }, 0)
@@ -182,7 +183,7 @@ export default async function SchedulePage() {
                             <Badge variant="outline">{availableSlots} Open</Badge>
                           )}
                         </div>
-                        {!isFull && (
+                        {!isFull && isBookingWindowOpen(tt) && (
                           <Button asChild size="sm" className="text-white">
                             <Link href="/book-tee-time">
                               <Plus className="h-4 w-4 mr-1" />
