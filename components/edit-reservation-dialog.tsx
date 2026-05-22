@@ -27,7 +27,7 @@ import {
   updateOptIns,
 } from "@/app/actions/reservation-edits"
 import { removePlayerFromReservation } from "@/app/actions/reservation-players"
-import { isBookingWindowOpen, isBeforeCutoff } from "@/lib/booking-summary"
+import { isBeforeBookingClose, isBeforeCutoff } from "@/lib/booking-summary"
 import type { LeagueUserSummary } from "@/app/actions/reservation-players"
 import { formatPhone, stripPhone, isValidPhone } from "@/lib/phone"
 
@@ -128,7 +128,7 @@ export function EditReservationDialog({
   const isMobile = useIsMobile()
   const router = useRouter()
 
-  const bookingOpen = isBookingWindowOpen(reservation.bookingClosesAt)
+  const bookingOpen = isBeforeBookingClose(reservation.bookingClosesAt)
   const optInOpen = isBeforeCutoff(
     reservation.teeTimeDate,
     reservation.teeTimeTime,

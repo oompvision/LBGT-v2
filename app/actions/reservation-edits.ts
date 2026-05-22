@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import {
   isAdminCreatedReservation,
   isBookingWindowOpen,
+  isBeforeBookingClose,
   isBeforeCutoff,
 } from "@/lib/booking-summary"
 import { sendBookingConfirmationEmails } from "@/app/actions/booking-emails"
@@ -97,7 +98,7 @@ export async function createReservation(input: {
 
     const { data: teeTime, error: teeTimeErr } = await supabase
       .from("tee_times")
-      .select("id, date, time, max_slots, booking_closes_at, season")
+      .select("id, date, time, max_slots, booking_opens_at, booking_closes_at, season")
       .eq("id", input.teeTimeId)
       .single()
 
@@ -105,10 +106,14 @@ export async function createReservation(input: {
       return { success: false, error: "Tee time not found." }
     }
 
-    if (!isAdmin && !isBookingWindowOpen(teeTime.booking_closes_at)) {
+    if (!isAdmin && !isBookingWindowOpen(teeTime)) {
+      const opensAt = teeTime.booking_opens_at
+      const notYetOpen = opensAt && Date.now() < new Date(opensAt).getTime()
       return {
         success: false,
-        error: "Booking has closed for this tee time.",
+        error: notYetOpen
+          ? "Booking hasn't opened yet for this tee time."
+          : "Booking has closed for this tee time.",
       }
     }
 
@@ -227,7 +232,7 @@ export async function addPlayerToReservation(
       const auth = bookerCheck(reservation, userId)
       if (!auth.ok) return { success: false, error: auth.error }
 
-      if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
+      if (!isBeforeBookingClose(reservation.tee_times.booking_closes_at)) {
         return { success: false, error: "The booking window has closed." }
       }
     }
@@ -347,7 +352,7 @@ export async function removePlayerByIndex(
       const auth = bookerCheck(reservation, userId)
       if (!auth.ok) return { success: false, error: auth.error }
 
-      if (!isBookingWindowOpen(reservation.tee_times.booking_closes_at)) {
+      if (!isBeforeBookingClose(reservation.tee_times.booking_closes_at)) {
         return { success: false, error: "The booking window has closed." }
       }
     }
