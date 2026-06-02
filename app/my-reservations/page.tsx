@@ -134,10 +134,10 @@ export default async function MyReservationsPage() {
   const userReservations = Array.from(merged.values()).sort((a, b) => {
     const dateA = (a.tee_times as any)?.date || ""
     const dateB = (b.tee_times as any)?.date || ""
-    if (dateA !== dateB) return dateA < dateB ? -1 : 1
+    if (dateA !== dateB) return dateA < dateB ? 1 : -1
     const timeA = (a.tee_times as any)?.time || ""
     const timeB = (b.tee_times as any)?.time || ""
-    if (timeA !== timeB) return timeA < timeB ? -1 : 1
+    if (timeA !== timeB) return timeA < timeB ? 1 : -1
     return 0
   })
 

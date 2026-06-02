@@ -370,9 +370,21 @@ export default async function RoundDetailsPage({ params, searchParams }: PagePro
   const playerId = resolvedSearchParams?.playerId as string
   const playerName = resolvedSearchParams?.playerName as string
 
+  // If the viewer didn't play in this round, "My Rounds" is the wrong
+  // destination — send them back to the leaderboard they likely came from.
+  const viewerInRound = scores.some((s) => s.user_id === session.user.id)
+
   // Determine back link and text
-  const backHref = fromPlayer && playerId ? `/players/${playerId}/stats` : "/scores/my-rounds"
-  const backText = fromPlayer && playerName ? `Back to ${decodeURIComponent(playerName)}'s Stats` : "Back to My Rounds"
+  const backHref = fromPlayer && playerId
+    ? `/players/${playerId}/stats`
+    : viewerInRound
+      ? "/scores/my-rounds"
+      : "/scores/league-rounds"
+  const backText = fromPlayer && playerName
+    ? `Back to ${decodeURIComponent(playerName)}'s Stats`
+    : viewerInRound
+      ? "Back to My Rounds"
+      : "Back to Tour Leaderboard"
 
   return (
     <div className="flex min-h-screen flex-col">
