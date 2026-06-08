@@ -9,6 +9,7 @@ import { format } from "date-fns"
 import Link from "next/link"
 import Image from "next/image"
 import { COURSE_DATA } from "@/lib/constants"
+import { SeasonSelector } from "@/components/season-selector"
 
 // Score indicator component
 const ScoreIndicator = ({ score, par }) => {
@@ -93,7 +94,13 @@ const ScoreIndicator = ({ score, par }) => {
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
-export default async function PlayerStatsPage({ params }: { params: { id: string } }) {
+export default async function PlayerStatsPage({
+  params,
+  searchParams,
+}: {
+  params: { id: string }
+  searchParams: { season?: string }
+}) {
   const supabase = await createClient()
   const playerId = params.id
 
@@ -106,6 +113,18 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
 
   if (playerError || !player) {
     return notFound()
+  }
+
+  // Determine which season's stats to show (defaults to the active season)
+  const { data: seasonsData } = await supabase.from("seasons").select("*").order("year", { ascending: false })
+  const seasons = seasonsData || []
+
+  let selectedSeason: number
+  if (searchParams.season) {
+    selectedSeason = Number.parseInt(searchParams.season)
+  } else {
+    const activeSeason = seasons.find((s) => s.is_active)
+    selectedSeason = activeSeason?.year || new Date().getFullYear()
   }
 
   // Get all rounds with this player's scores
@@ -122,9 +141,10 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       hole_10, hole_11, hole_12, hole_13, hole_14, hole_15, hole_16, hole_17, hole_18,
       net_hole_1, net_hole_2, net_hole_3, net_hole_4, net_hole_5, net_hole_6, net_hole_7, net_hole_8, net_hole_9,
       net_hole_10, net_hole_11, net_hole_12, net_hole_13, net_hole_14, net_hole_15, net_hole_16, net_hole_17, net_hole_18,
-      rounds (
+      rounds!inner (
         id,
         date,
+        season,
         submitted_by,
         users (
           name
@@ -133,6 +153,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
     `,
     )
     .eq("user_id", playerId)
+    .eq("rounds.season", selectedSeason)
     .order("rounds(date)", { ascending: false })
 
   if (scoresError) {
@@ -146,6 +167,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       `
       id,
       date,
+      season,
       scores (
         id,
         user_id,
@@ -163,6 +185,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       )
     `,
     )
+    .eq("season", selectedSeason)
     .order("date", { ascending: false })
 
   if (roundsError) {
@@ -402,24 +425,27 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
       <main className="flex-1 py-8">
         <div className="container">
           <div className="mb-8">
-            <div className="flex items-center gap-4 mb-4">
-              {player.profile_picture_url ? (
-                <Image
-                  src={player.profile_picture_url || "/placeholder.svg"}
-                  alt={`${player.name}'s profile picture`}
-                  width={80}
-                  height={80}
-                  className="rounded-full object-cover border-2 border-border"
-                />
-              ) : (
-                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
-                  <User className="h-8 w-8 text-muted-foreground" />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+              <div className="flex items-center gap-4">
+                {player.profile_picture_url ? (
+                  <Image
+                    src={player.profile_picture_url || "/placeholder.svg"}
+                    alt={`${player.name}'s profile picture`}
+                    width={80}
+                    height={80}
+                    className="rounded-full object-cover border-2 border-border"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                )}
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">{player.name}'s Stats</h1>
+                  <p className="text-muted-foreground">{selectedSeason} season statistics and round history</p>
                 </div>
-              )}
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">{player.name}'s Stats</h1>
-                <p className="text-muted-foreground">Player statistics and round history</p>
               </div>
+              <SeasonSelector seasons={seasons} selectedSeason={selectedSeason} />
             </div>
           </div>
 
@@ -471,7 +497,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
             <Card>
               <CardHeader>
                 <CardTitle>Ringer Pool Scorecard</CardTitle>
-                <CardDescription>Best scores on each hole across all rounds</CardDescription>
+                <CardDescription>Best scores on each hole across the {selectedSeason} season</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -645,7 +671,9 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
           <Card>
             <CardHeader>
               <CardTitle>Round History</CardTitle>
-              <CardDescription>All rounds played by {player.name}</CardDescription>
+              <CardDescription>
+                Rounds played by {player.name} during the {selectedSeason} season
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="net" className="w-full">
@@ -707,7 +735,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground">No rounds found for this player.</p>
+                      <p className="text-muted-foreground">No rounds found for this player in the {selectedSeason} season.</p>
                     </div>
                   )}
                 </TabsContent>
@@ -764,7 +792,7 @@ export default async function PlayerStatsPage({ params }: { params: { id: string
                     </div>
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-muted-foreground">No rounds found for this player.</p>
+                      <p className="text-muted-foreground">No rounds found for this player in the {selectedSeason} season.</p>
                     </div>
                   )}
                 </TabsContent>
