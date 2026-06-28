@@ -67,6 +67,7 @@ export default async function SchedulePage() {
     date: string
     time: string
     max_slots: number
+    is_available: boolean | null
     booking_opens_at: string | null
     booking_closes_at: string | null
   }> = []
@@ -85,7 +86,7 @@ export default async function SchedulePage() {
     const [teeTimesRes, reservationsRes] = await Promise.all([
       supabase
         .from("tee_times")
-        .select("id, date, time, max_slots, booking_opens_at, booking_closes_at")
+        .select("id, date, time, max_slots, is_available, booking_opens_at, booking_closes_at")
         .eq("date", targetDate)
         .order("time", { ascending: true }),
       supabase
@@ -108,10 +109,22 @@ export default async function SchedulePage() {
     {} as Record<string, typeof reservations>,
   )
 
-  // Count seats on tee times whose booking window is still open. Locked-out
-  // tee times don't contribute since users can't book them anyway.
-  const dateBookableSpots = teeTimes.reduce((sum, tt) => {
-    if (!isBookingWindowOpen(tt)) return sum
+  // A slot is bookable only if it's enabled (admin hasn't disabled it) and its
+  // booking window is open.
+  const isBookable = (tt: { is_available: boolean | null; booking_opens_at: string | null; booking_closes_at: string | null }) =>
+    tt.is_available !== false && isBookingWindowOpen(tt)
+
+  // Hide disabled tee times that nobody has booked — disabling a slot pulls it
+  // off the sheet. A disabled slot that still has reservations stays visible so
+  // existing players aren't silently dropped from the tee sheet.
+  const visibleTeeTimes = teeTimes.filter(
+    (tt) => tt.is_available !== false || (reservationsByTeeTime[tt.id]?.length ?? 0) > 0,
+  )
+
+  // Count seats on bookable tee times. Disabled or locked-out tee times don't
+  // contribute since users can't book them anyway.
+  const dateBookableSpots = visibleTeeTimes.reduce((sum, tt) => {
+    if (!isBookable(tt)) return sum
     const reserved = (reservationsByTeeTime[tt.id] || []).reduce((s, r) => s + r.slots, 0)
     return sum + Math.max(0, tt.max_slots - reserved)
   }, 0)
@@ -139,7 +152,7 @@ export default async function SchedulePage() {
                 </CardDescription>
               </CardHeader>
             </Card>
-          ) : teeTimes.length === 0 ? (
+          ) : visibleTeeTimes.length === 0 ? (
             <Card>
               <CardHeader>
                 <CardTitle>No tee times scheduled</CardTitle>
@@ -161,7 +174,7 @@ export default async function SchedulePage() {
                 </p>
               </CardHeader>
               <CardContent className="p-0 divide-y">
-                {teeTimes.map((tt) => {
+                {visibleTeeTimes.map((tt) => {
                   const slotReservations = reservationsByTeeTime[tt.id] || []
                   const reservedSlots = slotReservations.reduce((sum, r) => sum + r.slots, 0)
                   const availableSlots = Math.max(0, tt.max_slots - reservedSlots)
@@ -183,7 +196,7 @@ export default async function SchedulePage() {
                             <Badge variant="outline">{availableSlots} Open</Badge>
                           )}
                         </div>
-                        {!isFull && isBookingWindowOpen(tt) && (
+                        {!isFull && isBookable(tt) && (
                           <Button asChild size="sm" className="text-white">
                             <Link href="/book-tee-time">
                               <Plus className="h-4 w-4 mr-1" />

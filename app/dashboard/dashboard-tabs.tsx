@@ -25,6 +25,7 @@ interface TeeTime {
   date: string
   time: string
   max_slots: number
+  is_available?: boolean
 }
 
 interface Reservation {
@@ -103,8 +104,11 @@ export function DashboardTabs({
     }
   })
 
-  // Filter out tee times with no available slots
-  const availableTeeTimes = teeTimesWithAvailability.filter((tt) => tt.availableSlots > 0)
+  // Filter out disabled tee times (admin disable toggle sets is_available=false)
+  // and any with no available slots.
+  const availableTeeTimes = teeTimesWithAvailability.filter(
+    (tt) => tt.is_available !== false && tt.availableSlots > 0,
+  )
 
   // Calculate how many reservations the user has for each date
   useEffect(() => {
