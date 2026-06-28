@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { formatDate } from "@/lib/utils"
 import { revalidatePath } from "next/cache"
 
@@ -218,7 +218,11 @@ export async function updateTeeTimeAvailability(teeTimeId: string, isAvailable: 
 
 // Function to delete a tee time
 export async function deleteTeeTime(id: string, options: { force?: boolean } = {}) {
-  const supabase = await createClient()
+  // Use the service-role client: tee_times RLS only grants SELECT to
+  // authenticated users, so a delete through the user-scoped client matches
+  // zero rows and silently "succeeds" while the row stays put. This action is
+  // admin-only and gated by the admin UI, so bypassing RLS here is correct.
+  const supabase = createAdminClient()
 
   try {
     // Check if there are any reservations for this tee time
@@ -337,24 +341,6 @@ export async function createReservation(data: {
       }
     }
 
-    // First, check if the tee time is available in tee_time_availability
-    const { data: availabilityData, error: availabilityError } = await supabase
-      .from("tee_time_availability")
-      .select("is_available")
-      .eq("tee_time_id", data.teeTimeId)
-      .single()
-
-    if (availabilityError && availabilityError.code !== "PGRST116") {
-      console.error("Error checking tee time availability:", availabilityError)
-      return { success: false, error: availabilityError.message }
-    }
-
-    // If there's no entry or is_available is false, the tee time is not available
-    if (!availabilityData || !availabilityData.is_available) {
-      console.error(`Tee time ${data.teeTimeId} is not available for booking`)
-      return { success: false, error: "This tee time is not available for booking" }
-    }
-
     // Check if the tee time exists and has enough available slots
     const { data: teeTime, error: teeTimeError } = await supabase
       .from("tee_times")
@@ -365,6 +351,27 @@ export async function createReservation(data: {
     if (teeTimeError) {
       console.error("Error fetching tee time:", teeTimeError)
       return { success: false, error: teeTimeError.message }
+    }
+
+    // tee_times.is_available is the single source of truth for whether a slot
+    // can be booked (this is what the admin disable toggle writes). The older
+    // tee_time_availability table is no longer authoritative — template-
+    // generated tee times never get a row there, so we only treat an explicit
+    // is_available=false on that table as a block for backwards compatibility.
+    if (teeTime.is_available === false) {
+      console.error(`Tee time ${data.teeTimeId} is disabled and not available for booking`)
+      return { success: false, error: "This tee time is not available for booking" }
+    }
+
+    const { data: availabilityData } = await supabase
+      .from("tee_time_availability")
+      .select("is_available")
+      .eq("tee_time_id", data.teeTimeId)
+      .maybeSingle()
+
+    if (availabilityData && availabilityData.is_available === false) {
+      console.error(`Tee time ${data.teeTimeId} is not available for booking`)
+      return { success: false, error: "This tee time is not available for booking" }
     }
 
     // Enforce the booking window. Admins can book outside the window so they

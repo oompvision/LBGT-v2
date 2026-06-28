@@ -98,12 +98,19 @@ export async function createReservation(input: {
 
     const { data: teeTime, error: teeTimeErr } = await supabase
       .from("tee_times")
-      .select("id, date, time, max_slots, booking_opens_at, booking_closes_at, season")
+      .select("id, date, time, max_slots, is_available, booking_opens_at, booking_closes_at, season")
       .eq("id", input.teeTimeId)
       .single()
 
     if (teeTimeErr || !teeTime) {
       return { success: false, error: "Tee time not found." }
+    }
+
+    // A disabled tee time can't be booked by anyone. tee_times.is_available is
+    // the source of truth the admin disable toggle writes, so this is the
+    // server-side backstop behind hiding disabled slots in the UI.
+    if (teeTime.is_available === false) {
+      return { success: false, error: "This tee time is not available for booking." }
     }
 
     if (!isAdmin && !isBookingWindowOpen(teeTime)) {

@@ -247,12 +247,13 @@ export default function BookTeeTimePage() {
     }
   })
 
-  // Filter out tee times with no available slots OR a closed/not-yet-open
-  // booking window. Server-side enforcement still applies in
-  // createReservation, but hiding them here keeps the UI honest so users
-  // can't even pick them.
+  // Filter out tee times that are disabled, have no available slots, OR have a
+  // closed/not-yet-open booking window. Server-side enforcement still applies
+  // in createReservation, but hiding them here keeps the UI honest so users
+  // can't even pick them. `is_available === false` is set by the admin disable
+  // toggle.
   const availableTeeTimes = teeTimesWithAvailability.filter(
-    (tt) => tt.availableSlots > 0 && isBookingWindowOpen(tt),
+    (tt) => tt.is_available !== false && tt.availableSlots > 0 && isBookingWindowOpen(tt),
   )
 
   const selectedTeeTimeData = teeTimesWithAvailability.find((t) => t.id === selectedTeeTime)
