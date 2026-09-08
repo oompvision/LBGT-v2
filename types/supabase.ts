@@ -562,6 +562,79 @@ export type Database = {
           updated_at?: string
         }
       }
+      playoff_brackets: {
+        Row: {
+          id: string
+          year: number
+          flight: string
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          year: number
+          flight: string
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          year?: number
+          flight?: string
+          is_published?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      playoff_matches: {
+        Row: {
+          id: string
+          bracket_id: string
+          round_number: number
+          round_label: string
+          sort_order: number
+          player1_id: string
+          player1_name: string
+          player2_id: string | null
+          player2_name: string | null
+          winner_player_num: number | null
+          score: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          bracket_id: string
+          round_number: number
+          round_label: string
+          sort_order?: number
+          player1_id: string
+          player1_name: string
+          player2_id?: string | null
+          player2_name?: string | null
+          winner_player_num?: number | null
+          score?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          bracket_id?: string
+          round_number?: number
+          round_label?: string
+          sort_order?: number
+          player1_id?: string
+          player1_name?: string
+          player2_id?: string | null
+          player2_name?: string | null
+          winner_player_num?: number | null
+          score?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       cash_games: {
         Row: {
           id: string
@@ -700,6 +773,8 @@ export type TeeTimeTemplate = Tables["tee_time_templates"]["Row"]
 export type TeeTimeLog = Tables["tee_time_logs"]["Row"]
 export type InfoBox = Tables["info_boxes"]["Row"]
 export type PlayoffResult = Tables["playoff_results"]["Row"]
+export type PlayoffBracket = Tables["playoff_brackets"]["Row"]
+export type PlayoffMatch = Tables["playoff_matches"]["Row"]
 export type EmailCampaign = Tables["email_campaigns"]["Row"]
 export type CashGame = Tables["cash_games"]["Row"]
 export type PaymentStatus = Tables["payment_statuses"]["Row"]

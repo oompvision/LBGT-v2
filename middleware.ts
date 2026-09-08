@@ -21,6 +21,7 @@ export async function middleware(request: NextRequest) {
     "/signin/magic-link",
     "/signup",
     "/reset-password",
+    "/playoffs",
   ]
   const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
   const isAdminRoute = request.nextUrl.pathname.startsWith("/admin")
