@@ -80,10 +80,15 @@ export async function createPlayoffYear(year: number) {
   try {
     const supabaseAdmin = createAdminClient()
 
-    const { data: existing } = await supabaseAdmin
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from("playoff_brackets")
       .select("flight")
       .eq("year", year)
+
+    if (existingError) {
+      console.error("Error checking existing playoff year:", existingError)
+      return { success: false, error: existingError.message }
+    }
 
     const existingFlights = new Set((existing || []).map((r) => r.flight))
     const toInsert: { year: number; flight: Flight }[] = (["A", "B"] as Flight[])

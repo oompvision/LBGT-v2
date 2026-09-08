@@ -92,13 +92,18 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
 
   const loadBrackets = async (year: number) => {
     setLoading(true)
-    const res = await getPlayoffBracketsForYear(year)
-    if (res.success) {
-      setBrackets(res.brackets)
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to load brackets.", variant: "destructive" })
+    try {
+      const res = await getPlayoffBracketsForYear(year)
+      if (res.success) {
+        setBrackets(res.brackets)
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to load brackets.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to load brackets.", variant: "destructive" })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -113,28 +118,37 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
       return
     }
     setAddingYear(true)
-    const res = await createPlayoffYear(year)
-    setAddingYear(false)
-    if (res.success) {
-      const nextYears = years.includes(year) ? years : [year, ...years].sort((a, b) => b - a)
-      setYears(nextYears)
-      setSelectedYear(year)
-      toast({ title: "Success", description: `${year} playoff brackets created.` })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to create year.", variant: "destructive" })
+    try {
+      const res = await createPlayoffYear(year)
+      if (res.success) {
+        const nextYears = years.includes(year) ? years : [year, ...years].sort((a, b) => b - a)
+        setYears(nextYears)
+        setSelectedYear(year)
+        toast({ title: "Success", description: `${year} playoff brackets created.` })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to create year.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to create year.", variant: "destructive" })
+    } finally {
+      setAddingYear(false)
     }
   }
 
   const handleTogglePublish = async (bracket: BracketWithMatches) => {
-    const res = await togglePlayoffBracketPublished(bracket.id, !bracket.is_published)
-    if (res.success) {
-      setBrackets((prev) => prev.map((b) => (b.id === bracket.id ? { ...b, is_published: !b.is_published } : b)))
-      toast({
-        title: "Success",
-        description: `${bracket.flight} Flight ${!bracket.is_published ? "published" : "unpublished"}.`,
-      })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to update.", variant: "destructive" })
+    try {
+      const res = await togglePlayoffBracketPublished(bracket.id, !bracket.is_published)
+      if (res.success) {
+        setBrackets((prev) => prev.map((b) => (b.id === bracket.id ? { ...b, is_published: !b.is_published } : b)))
+        toast({
+          title: "Success",
+          description: `${bracket.flight} Flight ${!bracket.is_published ? "published" : "unpublished"}.`,
+        })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to update.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to update.", variant: "destructive" })
     }
   }
 
@@ -182,25 +196,30 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
   const handleSaveMatch = async () => {
     if (!matchDialog || !matchDialog.player1) return
     setSavingMatch(true)
-    const bracket = brackets.find((b) => b.id === matchDialog.bracketId)
-    const sortOrder = bracket ? bracket.matches.filter((m) => m.round_number === matchDialog.roundNumber).length : 0
-    const res = await addPlayoffMatch({
-      bracketId: matchDialog.bracketId,
-      roundNumber: matchDialog.roundNumber,
-      roundLabel: matchDialog.roundLabel.trim() || `Round ${matchDialog.roundNumber}`,
-      sortOrder,
-      player1Id: matchDialog.player1.id,
-      player1Name: matchDialog.player1.name,
-      player2Id: matchDialog.player2?.id || null,
-      player2Name: matchDialog.player2?.name || null,
-    })
-    setSavingMatch(false)
-    if (res.success) {
-      setMatchDialog(null)
-      loadBrackets(selectedYear)
-      toast({ title: "Success", description: "Match added." })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to add match.", variant: "destructive" })
+    try {
+      const bracket = brackets.find((b) => b.id === matchDialog.bracketId)
+      const sortOrder = bracket ? bracket.matches.filter((m) => m.round_number === matchDialog.roundNumber).length : 0
+      const res = await addPlayoffMatch({
+        bracketId: matchDialog.bracketId,
+        roundNumber: matchDialog.roundNumber,
+        roundLabel: matchDialog.roundLabel.trim() || `Round ${matchDialog.roundNumber}`,
+        sortOrder,
+        player1Id: matchDialog.player1.id,
+        player1Name: matchDialog.player1.name,
+        player2Id: matchDialog.player2?.id || null,
+        player2Name: matchDialog.player2?.name || null,
+      })
+      if (res.success) {
+        setMatchDialog(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Match added." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to add match.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to add match.", variant: "destructive" })
+    } finally {
+      setSavingMatch(false)
     }
   }
 
@@ -211,42 +230,57 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
   const handleSaveResult = async () => {
     if (!resultDialog || !resultDialog.winner) return
     setSavingResult(true)
-    const res = await setPlayoffMatchResult(resultDialog.match.id, resultDialog.winner, resultDialog.score.trim() || null)
-    setSavingResult(false)
-    if (res.success) {
-      setResultDialog(null)
-      loadBrackets(selectedYear)
-      toast({ title: "Success", description: "Result saved." })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to save result.", variant: "destructive" })
+    try {
+      const res = await setPlayoffMatchResult(resultDialog.match.id, resultDialog.winner, resultDialog.score.trim() || null)
+      if (res.success) {
+        setResultDialog(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Result saved." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to save result.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to save result.", variant: "destructive" })
+    } finally {
+      setSavingResult(false)
     }
   }
 
   const handleClearResult = async () => {
     if (!resultDialog) return
     setSavingResult(true)
-    const res = await setPlayoffMatchResult(resultDialog.match.id, null, null)
-    setSavingResult(false)
-    if (res.success) {
-      setResultDialog(null)
-      loadBrackets(selectedYear)
-      toast({ title: "Success", description: "Result cleared." })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to clear result.", variant: "destructive" })
+    try {
+      const res = await setPlayoffMatchResult(resultDialog.match.id, null, null)
+      if (res.success) {
+        setResultDialog(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Result cleared." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to clear result.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to clear result.", variant: "destructive" })
+    } finally {
+      setSavingResult(false)
     }
   }
 
   const handleDeleteMatch = async () => {
     if (!deleteTarget) return
     setDeleting(true)
-    const res = await deletePlayoffMatch(deleteTarget.id)
-    setDeleting(false)
-    if (res.success) {
-      setDeleteTarget(null)
-      loadBrackets(selectedYear)
-      toast({ title: "Success", description: "Match deleted." })
-    } else {
-      toast({ title: "Error", description: res.error || "Failed to delete match.", variant: "destructive" })
+    try {
+      const res = await deletePlayoffMatch(deleteTarget.id)
+      if (res.success) {
+        setDeleteTarget(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Match deleted." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to delete match.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to delete match.", variant: "destructive" })
+    } finally {
+      setDeleting(false)
     }
   }
 
