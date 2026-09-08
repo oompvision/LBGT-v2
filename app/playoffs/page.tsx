@@ -48,7 +48,7 @@ export default async function PlayoffsPage({
       <main className={`flex-1 py-12 ${oldEnglish.className}`}>
         <div className="container space-y-8">
           <div className="text-center space-y-2">
-            <h1 className="text-[41px] font-bold tracking-tight">LBGT Playoffs</h1>
+            <h1 className="text-[49px] font-bold tracking-tight">LBGT Playoffs</h1>
             {year && <p className="text-muted-foreground">{year} Playoff Brackets</p>}
           </div>
 
