@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { UnifrakturMaguntia } from "next/font/google"
+import localFont from "next/font/local"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import type { PlayoffMatch } from "@/types/supabase"
 
 export const dynamic = "force-dynamic"
 
-const oldEnglish = UnifrakturMaguntia({ subsets: ["latin"], weight: "400" })
+const oldEnglish = localFont({ src: "../fonts/CloisterBlackLight.ttf", weight: "400" })
 
 function matchLine(m: PlayoffMatch): string {
   const isBye = m.round_number === 1 && !!m.player1_id && !m.player2_id
