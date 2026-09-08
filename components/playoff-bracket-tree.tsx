@@ -70,13 +70,13 @@ export function PlayoffBracketTree({ matches }: Props) {
       <style>{`
         .pbt-scroll { overflow-x: auto; padding: 8px 4px 24px; }
         .pbt-bracket { display: flex; align-items: center; justify-content: center; width: max-content; margin: 0 auto; }
-        .pbt-box { border: 2px solid #3A5A40; background: white; width: 170px; flex-shrink: 0; font-size: 13px; }
+        .pbt-box { border: 2px solid #3A5A40; background: white; width: 170px; flex-shrink: 0; font-size: 15px; }
         .pbt-slot { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid #3A5A40; color: #3A5A40; }
         .pbt-slot-last { border-bottom: none; }
         .pbt-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pbt-slot-winner { font-weight: 700; }
         .pbt-slot-loser { color: #9ca3af; font-weight: 400; }
-        .pbt-score { flex-shrink: 0; background: #3A5A40; color: white; border-radius: 4px; padding: 0 6px; font-size: 11px; }
+        .pbt-score { flex-shrink: 0; background: #3A5A40; color: white; border-radius: 4px; padding: 0 6px; font-size: 13px; }
         .pbt-node { display: flex; align-items: center; }
         .pbt-node-right { flex-direction: row-reverse; }
         .pbt-feeders { position: relative; display: flex; flex-direction: column; gap: 16px; }
@@ -85,7 +85,7 @@ export function PlayoffBracketTree({ matches }: Props) {
         .pbt-node-right > .pbt-feeders::after { left: -24px; }
         .pbt-connector { width: 24px; height: 2px; background: #3A5A40; flex-shrink: 0; }
         .pbt-center { display: flex; flex-direction: column; align-items: center; padding: 0 32px; flex-shrink: 0; }
-        .pbt-center-label { font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 1px; }
+        .pbt-center-label { font-size: 13px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 1px; }
       `}</style>
       <div className="pbt-bracket">
         {feeders[0] && (
