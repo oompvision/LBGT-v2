@@ -29,6 +29,7 @@ import {
   addPlayoffMatch,
   deletePlayoffMatch,
   setPlayoffMatchResult,
+  generatePlayoffBracketFromSeeds,
   type BracketWithMatches,
   type Flight,
 } from "@/app/actions/playoff-brackets"
@@ -41,11 +42,17 @@ interface Props {
 
 type PlayerSlot = { id: string; name: string } | null
 
+// Byes only ever occur in round 1 (a seed with no possible opponent); every
+// later round eventually gets both players, even if one arrives immediately
+// via a bye cascade at generation time.
 function matchLine(m: PlayoffMatch): string {
-  if (!m.player2_id) return `${m.player1_name} — Bye (advances)`
-  if (m.winner_player_num === 1) return `${m.player1_name} def. ${m.player2_name}${m.score ? ` ${m.score}` : ""}`
-  if (m.winner_player_num === 2) return `${m.player2_name} def. ${m.player1_name}${m.score ? ` ${m.score}` : ""}`
-  return `${m.player1_name} vs ${m.player2_name}`
+  const isBye = m.round_number === 1 && !!m.player1_id && !m.player2_id
+  if (isBye) return `${m.player1_name} — Bye (advances)`
+  const p1 = m.player1_name || "TBD"
+  const p2 = m.player2_name || "TBD"
+  if (m.winner_player_num === 1) return `${p1} def. ${p2}${m.score ? ` ${m.score}` : ""}`
+  if (m.winner_player_num === 2) return `${p2} def. ${p1}${m.score ? ` ${m.score}` : ""}`
+  return `${p1} vs ${p2}`
 }
 
 function groupByRound(matches: PlayoffMatch[]) {
@@ -89,6 +96,12 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<PlayoffMatch | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Seed editor (row index + 1 = seed number; gaps from empty rows are
+  // compacted away on generate)
+  const [seedEditor, setSeedEditor] = useState<{ bracketId: string; rows: PlayerSlot[] } | null>(null)
+  const [seedPickerIndex, setSeedPickerIndex] = useState<number | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   const loadBrackets = async (year: number) => {
     setLoading(true)
@@ -293,6 +306,69 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
 
   const excludeIds = [matchDialog?.player1?.id, matchDialog?.player2?.id].filter(Boolean) as string[]
 
+  const openSeedEditor = (bracket: BracketWithMatches) => {
+    const existing = bracket.seeds.map((s) => ({ id: s.player_id, name: s.player_name }))
+    setSeedEditor({ bracketId: bracket.id, rows: existing.length > 0 ? existing : [null, null] })
+  }
+
+  const addSeedRow = () => {
+    if (!seedEditor) return
+    setSeedEditor({ ...seedEditor, rows: [...seedEditor.rows, null] })
+  }
+
+  const removeSeedRow = (idx: number) => {
+    if (!seedEditor) return
+    setSeedEditor({ ...seedEditor, rows: seedEditor.rows.filter((_, i) => i !== idx) })
+  }
+
+  const moveSeedRow = (idx: number, dir: -1 | 1) => {
+    if (!seedEditor) return
+    const target = idx + dir
+    if (target < 0 || target >= seedEditor.rows.length) return
+    const rows = [...seedEditor.rows]
+    ;[rows[idx], rows[target]] = [rows[target], rows[idx]]
+    setSeedEditor({ ...seedEditor, rows })
+  }
+
+  const handleSeedPickerConfirm = (users: LeagueUserSummary[]) => {
+    if (!seedEditor || seedPickerIndex === null || users.length === 0) return
+    const rows = [...seedEditor.rows]
+    rows[seedPickerIndex] = { id: users[0].id, name: users[0].name }
+    setSeedEditor({ ...seedEditor, rows })
+    setSeedPickerIndex(null)
+  }
+
+  const handleGenerate = async () => {
+    if (!seedEditor) return
+    const filled = seedEditor.rows.filter((p): p is { id: string; name: string } => !!p)
+    if (filled.length < 2) {
+      toast({ title: "Error", description: "Enter at least 2 seeded players.", variant: "destructive" })
+      return
+    }
+    setGenerating(true)
+    try {
+      const res = await generatePlayoffBracketFromSeeds(
+        seedEditor.bracketId,
+        filled.map((p, i) => ({ seedNumber: i + 1, playerId: p.id, playerName: p.name })),
+      )
+      if (res.success) {
+        setSeedEditor(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Bracket generated." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to generate bracket.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to generate bracket.", variant: "destructive" })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const seedExcludeIds = (seedEditor?.rows.filter(Boolean) as { id: string; name: string }[] | undefined)?.map(
+    (p) => p.id,
+  ) || []
+
   return (
     <div className="space-y-6">
       <Card>
@@ -366,48 +442,136 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {groupByRound(bracket.matches).map(([roundNumber, matches]) => (
-                <div key={roundNumber} className="space-y-2">
+              {seedEditor?.bracketId === bracket.id ? (
+                <div className="space-y-3 rounded-md border p-4">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">{matches[0].round_label}</h4>
-                    <Button size="sm" variant="ghost" onClick={() => openAddMatch(bracket, roundNumber, matches[0].round_label, false)}>
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Match
+                    <h4 className="font-semibold">Seed Players</h4>
+                    <Button size="sm" variant="ghost" onClick={() => setSeedEditor(null)}>
+                      Cancel
                     </Button>
                   </div>
-                  <ul className="space-y-1.5">
-                    {matches.map((m) => (
-                      <li
-                        key={m.id}
-                        className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-                      >
-                        <span>{matchLine(m)}</span>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {m.player2_id && (
-                            <Button size="sm" variant="ghost" onClick={() => openResultDialog(m)}>
-                              {m.winner_player_num ? <Pencil className="h-3.5 w-3.5" /> : "Record Result"}
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(m)}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  <ul className="space-y-2">
+                    {seedEditor.rows.map((row, idx) => (
+                      <li key={idx} className="flex items-center gap-2">
+                        <span className="w-6 shrink-0 text-right text-sm text-muted-foreground">{idx + 1}</span>
+                        {row ? (
+                          <div className="flex flex-1 items-center justify-between rounded-md border px-3 py-2">
+                            <span className="text-sm">{row.name}</span>
+                            <button onClick={() => removeSeedRow(idx)}>
+                              <X className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            className="flex-1 justify-start"
+                            onClick={() => setSeedPickerIndex(idx)}
+                          >
+                            Select Player
                           </Button>
-                        </div>
+                        )}
+                        <Button size="sm" variant="ghost" disabled={idx === 0} onClick={() => moveSeedRow(idx, -1)}>
+                          ↑
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={idx === seedEditor.rows.length - 1}
+                          onClick={() => moveSeedRow(idx, 1)}
+                        >
+                          ↓
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => removeSeedRow(idx)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
+                  <div className="flex items-center justify-between">
+                    <Button size="sm" variant="outline" onClick={addSeedRow}>
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add Seed
+                    </Button>
+                    <Button
+                      onClick={handleGenerate}
+                      disabled={generating || bracket.matches.some((m) => m.winner_player_num)}
+                      className="text-white"
+                    >
+                      {generating ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : bracket.matches.length > 0 ? (
+                        "Regenerate Bracket"
+                      ) : (
+                        "Generate Bracket"
+                      )}
+                    </Button>
+                  </div>
+                  {bracket.matches.some((m) => m.winner_player_num) && (
+                    <p className="text-xs text-destructive">
+                      Results have already been recorded for this bracket — delete those matches manually before
+                      re-generating from seeds.
+                    </p>
+                  )}
                 </div>
-              ))}
+              ) : bracket.matches.length === 0 ? (
+                <div className="space-y-3 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">No bracket yet.</p>
+                  <Button onClick={() => openSeedEditor(bracket)} className="text-white">
+                    Seed Players
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => openSeedEditor(bracket)}>
+                    Edit Seeds
+                  </Button>
+                </div>
+              )}
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const maxRound = bracket.matches.reduce((max, m) => Math.max(max, m.round_number), 0)
-                  const nextRound = maxRound + 1
-                  openAddMatch(bracket, nextRound, `Round ${nextRound}`, true)
-                }}
-              >
-                <Plus className="h-4 w-4 mr-1" /> Start New Round
-              </Button>
+              {bracket.matches.length > 0 &&
+                groupByRound(bracket.matches).map(([roundNumber, matches]) => (
+                  <div key={roundNumber} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold">{matches[0].round_label}</h4>
+                      <Button size="sm" variant="ghost" onClick={() => openAddMatch(bracket, roundNumber, matches[0].round_label, false)}>
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Add Match
+                      </Button>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {matches.map((m) => (
+                        <li
+                          key={m.id}
+                          className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                        >
+                          <span>{matchLine(m)}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {m.player1_id && m.player2_id && (
+                              <Button size="sm" variant="ghost" onClick={() => openResultDialog(m)}>
+                                {m.winner_player_num ? <Pencil className="h-3.5 w-3.5" /> : "Record Result"}
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(m)}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+
+              {bracket.matches.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const maxRound = bracket.matches.reduce((max, m) => Math.max(max, m.round_number), 0)
+                    const nextRound = maxRound + 1
+                    openAddMatch(bracket, nextRound, `Round ${nextRound}`, true)
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Start New Round
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))
@@ -509,6 +673,14 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
         excludeUserIds={excludeIds}
         maxSelectable={1}
         onConfirm={handlePickerConfirm}
+      />
+
+      <PlayerPicker
+        open={seedPickerIndex !== null}
+        onOpenChange={(open) => !open && setSeedPickerIndex(null)}
+        excludeUserIds={seedExcludeIds}
+        maxSelectable={1}
+        onConfirm={handleSeedPickerConfirm}
       />
 
       {/* Record Result Dialog */}

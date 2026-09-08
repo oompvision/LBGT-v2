@@ -595,12 +595,14 @@ export type Database = {
           round_number: number
           round_label: string
           sort_order: number
-          player1_id: string
-          player1_name: string
+          player1_id: string | null
+          player1_name: string | null
           player2_id: string | null
           player2_name: string | null
           winner_player_num: number | null
           score: string | null
+          next_match_id: string | null
+          next_match_slot: number | null
           created_at: string
           updated_at: string
         }
@@ -610,12 +612,14 @@ export type Database = {
           round_number: number
           round_label: string
           sort_order?: number
-          player1_id: string
-          player1_name: string
+          player1_id?: string | null
+          player1_name?: string | null
           player2_id?: string | null
           player2_name?: string | null
           winner_player_num?: number | null
           score?: string | null
+          next_match_id?: string | null
+          next_match_slot?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -625,14 +629,42 @@ export type Database = {
           round_number?: number
           round_label?: string
           sort_order?: number
-          player1_id?: string
-          player1_name?: string
+          player1_id?: string | null
+          player1_name?: string | null
           player2_id?: string | null
           player2_name?: string | null
           winner_player_num?: number | null
           score?: string | null
+          next_match_id?: string | null
+          next_match_slot?: number | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      playoff_seeds: {
+        Row: {
+          id: string
+          bracket_id: string
+          seed_number: number
+          player_id: string
+          player_name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          bracket_id: string
+          seed_number: number
+          player_id: string
+          player_name: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          bracket_id?: string
+          seed_number?: number
+          player_id?: string
+          player_name?: string
+          created_at?: string
         }
       }
       cash_games: {
@@ -775,6 +807,7 @@ export type InfoBox = Tables["info_boxes"]["Row"]
 export type PlayoffResult = Tables["playoff_results"]["Row"]
 export type PlayoffBracket = Tables["playoff_brackets"]["Row"]
 export type PlayoffMatch = Tables["playoff_matches"]["Row"]
+export type PlayoffSeed = Tables["playoff_seeds"]["Row"]
 export type EmailCampaign = Tables["email_campaigns"]["Row"]
 export type CashGame = Tables["cash_games"]["Row"]
 export type PaymentStatus = Tables["payment_statuses"]["Row"]

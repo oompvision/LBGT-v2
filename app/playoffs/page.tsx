@@ -8,10 +8,13 @@ import type { PlayoffMatch } from "@/types/supabase"
 export const dynamic = "force-dynamic"
 
 function matchLine(m: PlayoffMatch): string {
-  if (!m.player2_id) return `${m.player1_name} — Bye`
-  if (m.winner_player_num === 1) return `${m.player1_name} def. ${m.player2_name}${m.score ? ` ${m.score}` : ""}`
-  if (m.winner_player_num === 2) return `${m.player2_name} def. ${m.player1_name}${m.score ? ` ${m.score}` : ""}`
-  return `${m.player1_name} vs ${m.player2_name}`
+  const isBye = m.round_number === 1 && !!m.player1_id && !m.player2_id
+  if (isBye) return `${m.player1_name} — Bye`
+  const p1 = m.player1_name || "TBD"
+  const p2 = m.player2_name || "TBD"
+  if (m.winner_player_num === 1) return `${p1} def. ${p2}${m.score ? ` ${m.score}` : ""}`
+  if (m.winner_player_num === 2) return `${p2} def. ${p1}${m.score ? ` ${m.score}` : ""}`
+  return `${p1} vs ${p2}`
 }
 
 function groupByRound(matches: PlayoffMatch[]) {
