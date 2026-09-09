@@ -1,5 +1,4 @@
 import Link from "next/link"
-import localFont from "next/font/local"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,8 +7,6 @@ import { PlayoffBracketTree } from "@/components/playoff-bracket-tree"
 import type { PlayoffMatch } from "@/types/supabase"
 
 export const dynamic = "force-dynamic"
-
-const oldEnglish = localFont({ src: "../fonts/CloisterBlackLight.ttf", weight: "400" })
 
 function matchLine(m: PlayoffMatch): string {
   const isBye = m.round_number === 1 && !!m.player1_id && !m.player2_id
@@ -45,7 +42,7 @@ export default async function PlayoffsPage({
   return (
     <div className="flex min-h-screen flex-col">
       <Header />
-      <main className={`flex-1 py-12 ${oldEnglish.className}`}>
+      <main className="flex-1 py-12">
         <div className="container space-y-8">
           <div className="text-center space-y-2">
             <h1 className="text-[49px] font-bold tracking-tight">LBGT Playoffs</h1>
