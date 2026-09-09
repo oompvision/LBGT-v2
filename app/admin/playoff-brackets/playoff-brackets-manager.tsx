@@ -30,6 +30,7 @@ import {
   deletePlayoffMatch,
   setPlayoffMatchResult,
   generatePlayoffBracketFromSeeds,
+  resetPlayoffBracket,
   type BracketWithMatches,
   type Flight,
 } from "@/app/actions/playoff-brackets"
@@ -53,6 +54,12 @@ function matchLine(m: PlayoffMatch): string {
   if (m.winner_player_num === 1) return `${p1} def. ${p2}${m.score ? ` ${m.score}` : ""}`
   if (m.winner_player_num === 2) return `${p2} def. ${p1}${m.score ? ` ${m.score}` : ""}`
   return `${p1} vs ${p2}`
+}
+
+// A bye's winner is auto-decided at generation time, not a recorded result —
+// only a real two-player match with a winner counts as "results already in".
+function hasRecordedResults(matches: PlayoffMatch[]): boolean {
+  return matches.some((m) => m.player2_id && m.winner_player_num)
 }
 
 function groupByRound(matches: PlayoffMatch[]) {
@@ -96,6 +103,10 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
   // Delete confirmation
   const [deleteTarget, setDeleteTarget] = useState<PlayoffMatch | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Reset-bracket confirmation
+  const [resetTarget, setResetTarget] = useState<BracketWithMatches | null>(null)
+  const [resetting, setResetting] = useState(false)
 
   // Seed editor (row index + 1 = seed number; gaps from empty rows are
   // compacted away on generate)
@@ -297,6 +308,25 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
     }
   }
 
+  const handleResetBracket = async () => {
+    if (!resetTarget) return
+    setResetting(true)
+    try {
+      const res = await resetPlayoffBracket(resetTarget.id)
+      if (res.success) {
+        setResetTarget(null)
+        await loadBrackets(selectedYear)
+        toast({ title: "Success", description: "Bracket reset." })
+      } else {
+        toast({ title: "Error", description: res.error || "Failed to reset bracket.", variant: "destructive" })
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error?.message || "Failed to reset bracket.", variant: "destructive" })
+    } finally {
+      setResetting(false)
+    }
+  }
+
   const handlePickerConfirm = (users: LeagueUserSummary[]) => {
     if (!matchDialog || !pickerTarget || users.length === 0) return
     const picked = { id: users[0].id, name: users[0].name }
@@ -439,6 +469,11 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
                 <Button size="sm" variant="outline" onClick={() => handleTogglePublish(bracket)}>
                   {bracket.is_published ? "Unpublish" : "Publish"}
                 </Button>
+                {bracket.matches.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={() => setResetTarget(bracket)}>
+                    Reset Bracket
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -493,7 +528,7 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
                     </Button>
                     <Button
                       onClick={handleGenerate}
-                      disabled={generating || bracket.matches.some((m) => m.winner_player_num)}
+                      disabled={generating || hasRecordedResults(bracket.matches)}
                       className="text-white"
                     >
                       {generating ? (
@@ -505,10 +540,10 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
                       )}
                     </Button>
                   </div>
-                  {bracket.matches.some((m) => m.winner_player_num) && (
+                  {hasRecordedResults(bracket.matches) && (
                     <p className="text-xs text-destructive">
-                      Results have already been recorded for this bracket — delete those matches manually before
-                      re-generating from seeds.
+                      Results have already been recorded for this bracket — delete those matches manually, or use
+                      Reset Bracket below, before re-generating from seeds.
                     </p>
                   )}
                 </div>
@@ -755,6 +790,25 @@ export function PlayoffBracketsManager({ initialYears, initialYear }: Props) {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMatch} disabled={deleting}>
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reset bracket confirmation */}
+      <AlertDialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset {resetTarget?.flight} Flight bracket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This deletes every match and seed for this flight so you can start over from scratch. This
+              can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetBracket} disabled={resetting}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reset Bracket"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

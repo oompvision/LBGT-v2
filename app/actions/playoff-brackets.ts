@@ -126,6 +126,29 @@ export async function createPlayoffYear(year: number) {
   }
 }
 
+// Unconditionally wipes a bracket's matches and seeds so it can be built
+// from scratch — no guard, since deleting is the explicit, confirmed intent
+// here (unlike generatePlayoffBracketFromSeeds, which is meant to be safe
+// to click by accident).
+export async function resetPlayoffBracket(bracketId: string) {
+  try {
+    const supabaseAdmin = createAdminClient()
+
+    const { error: matchesError } = await supabaseAdmin.from("playoff_matches").delete().eq("bracket_id", bracketId)
+    if (matchesError) return { success: false, error: matchesError.message }
+
+    const { error: seedsError } = await supabaseAdmin.from("playoff_seeds").delete().eq("bracket_id", bracketId)
+    if (seedsError) return { success: false, error: seedsError.message }
+
+    revalidatePath("/admin/playoff-brackets")
+    revalidatePath("/playoffs")
+    return { success: true }
+  } catch (error) {
+    console.error("Error in resetPlayoffBracket:", error)
+    return { success: false, error: "Failed to reset bracket" }
+  }
+}
+
 export async function togglePlayoffBracketPublished(bracketId: string, isPublished: boolean) {
   try {
     const supabaseAdmin = createAdminClient()
@@ -341,14 +364,17 @@ export async function generatePlayoffBracketFromSeeds(bracketId: string, seeds: 
 
     const { data: existingMatches, error: existingError } = await supabaseAdmin
       .from("playoff_matches")
-      .select("id, winner_player_num")
+      .select("id, player2_id, winner_player_num")
       .eq("bracket_id", bracketId)
 
     if (existingError) {
       return { success: false, error: existingError.message }
     }
 
-    if ((existingMatches || []).some((m) => m.winner_player_num)) {
+    // A bye's winner is auto-decided at generation time (nothing to record),
+    // so only a real two-player match with a recorded winner counts as
+    // "results already in" — regenerating would just recompute byes fresh.
+    if ((existingMatches || []).some((m) => m.player2_id && m.winner_player_num)) {
       return {
         success: false,
         error: "Results have already been recorded for this bracket. Delete those matches manually before re-generating from seeds.",
