@@ -4,34 +4,9 @@ import { Footer } from "@/components/footer"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getPublishedPlayoffBrackets } from "@/app/actions/playoff-brackets"
 import { PlayoffBracketTree } from "@/components/playoff-bracket-tree"
-import type { PlayoffMatch } from "@/types/supabase"
+import { PlayoffBracketMobile } from "@/components/playoff-bracket-mobile"
 
 export const dynamic = "force-dynamic"
-
-function withSeed(name: string, playerId: string | null, seedMap: Map<string, number>): string {
-  const seedNumber = playerId ? seedMap.get(playerId) : undefined
-  return seedNumber !== undefined ? `${seedNumber} ${name}` : name
-}
-
-function matchLine(m: PlayoffMatch, seedMap: Map<string, number>): string {
-  const isBye = m.round_number === 1 && !!m.player1_id && !m.player2_id
-  const p1 = withSeed(m.player1_name || "TBD", m.player1_id, seedMap)
-  if (isBye) return `${p1} — Bye`
-  const p2 = withSeed(m.player2_name || "TBD", m.player2_id, seedMap)
-  if (m.winner_player_num === 1) return `${p1} def. ${p2}${m.score ? ` ${m.score}` : ""}`
-  if (m.winner_player_num === 2) return `${p2} def. ${p1}${m.score ? ` ${m.score}` : ""}`
-  return `${p1} vs ${p2}`
-}
-
-function groupByRound(matches: PlayoffMatch[]) {
-  const rounds = new Map<number, PlayoffMatch[]>()
-  for (const m of matches) {
-    const list = rounds.get(m.round_number) || []
-    list.push(m)
-    rounds.set(m.round_number, list)
-  }
-  return Array.from(rounds.entries()).sort((a, b) => a[0] - b[0])
-}
 
 export default async function PlayoffsPage({
   searchParams,
@@ -77,36 +52,22 @@ export default async function PlayoffsPage({
 
         {brackets.length > 0 && (
           <>
-            {/* Mobile: stacked round-by-round list, within the normal container width */}
+            {/* Mobile: stacked list grouped into bracket pairs, within the normal container width */}
             <div className="container space-y-8 md:hidden">
-              {sortedBrackets.map((bracket) => {
-                const seedMap = new Map(bracket.seeds.map((s) => [s.player_id, s.seed_number]))
-                return (
-                  <Card key={bracket.id}>
-                    <CardHeader>
-                      <CardTitle>{bracket.flight} Flight</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {bracket.matches.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">Matchups coming soon.</p>
-                      ) : (
-                        groupByRound(bracket.matches).map(([roundNumber, matches]) => (
-                          <div key={roundNumber} className="space-y-2">
-                            <h3 className="font-semibold">{matches[0].round_label}</h3>
-                            <ul className="space-y-1.5">
-                              {matches.map((m) => (
-                                <li key={m.id} className="rounded-md border px-3 py-2 text-sm">
-                                  {matchLine(m, seedMap)}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
+              {sortedBrackets.map((bracket) => (
+                <Card key={bracket.id}>
+                  <CardHeader>
+                    <CardTitle>{bracket.flight} Flight</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {bracket.matches.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Matchups coming soon.</p>
+                    ) : (
+                      <PlayoffBracketMobile matches={bracket.matches} seeds={bracket.seeds} />
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             {/* Desktop: full-page-width bracket tree, scrolling only if it doesn't fit */}
