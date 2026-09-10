@@ -85,6 +85,14 @@ export function MobileMenu() {
                 Tour Leaderboard
               </Link>
               <Link
+                href="/playoffs"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="View LBGT playoff brackets"
+              >
+                Playoffs
+              </Link>
+              <Link
                 href="/scores/submit"
                 onClick={() => setOpen(false)}
                 className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
@@ -134,6 +142,14 @@ export function MobileMenu() {
             </>
           ) : (
             <>
+              <Link
+                href="/playoffs"
+                onClick={() => setOpen(false)}
+                className="text-lbgt-dark hover:text-lbgt-medium focus:text-lbgt-medium transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-medium focus:ring-offset-2 rounded-sm px-2 py-1"
+                aria-label="View LBGT playoff brackets"
+              >
+                Playoffs
+              </Link>
               <Link href="/signin" onClick={() => setOpen(false)}>
                 <Button
                   variant="ghost"

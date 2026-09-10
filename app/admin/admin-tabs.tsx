@@ -43,6 +43,11 @@ export function AdminTabs({ className }: AdminTabsProps) {
       isActive: pathname === "/admin/playoff-results",
     },
     {
+      name: "Playoff Brackets",
+      href: "/admin/playoff-brackets",
+      isActive: pathname === "/admin/playoff-brackets",
+    },
+    {
       name: "Tee Times",
       href: "/admin/tee-times",
       isActive: pathname === "/admin/tee-times",

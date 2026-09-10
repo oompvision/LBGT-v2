@@ -183,6 +183,14 @@ export function Header() {
                   Tour Leaderboard
                 </Link>
 
+                <Link
+                  href="/playoffs"
+                  className="text-sm text-lbgt-medium hover:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 rounded-sm px-2 py-1"
+                  aria-label="View LBGT playoff brackets"
+                >
+                  Playoffs
+                </Link>
+
                 {/* Custom Dropdown for Profile */}
                 <div className="relative" ref={(el) => { dropdownRefs.current.profile = el }}>
                   <button
@@ -288,6 +296,13 @@ export function Header() {
                             Playoff Results
                           </Link>
                           <Link
+                            href="/admin/playoff-brackets"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setActiveDropdown(null)}
+                          >
+                            Playoff Brackets
+                          </Link>
+                          <Link
                             href="/admin/seasons"
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setActiveDropdown(null)}
@@ -316,6 +331,13 @@ export function Header() {
               </>
             ) : (
               <div className="flex items-center space-x-4">
+                <Link
+                  href="/playoffs"
+                  className="text-sm text-lbgt-medium hover:text-lbgt-dark transition-colors duration-200 font-medium focus:outline-none focus:ring-2 focus:ring-lbgt-green focus:ring-offset-2 rounded-sm px-2 py-1"
+                  aria-label="View LBGT playoff brackets"
+                >
+                  Playoffs
+                </Link>
                 <Link href="/signin">
                   <Button
                     variant="ghost"
