@@ -8,6 +8,8 @@ import { Trophy } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 
+const BEST_N_ROUNDS = 4
+
 interface LeagueScore {
   user_id: string
   users?: { name: string }
@@ -32,6 +34,7 @@ interface PlayerStatData {
   netBestScore: number
   netWorstScore: number
   strokesGiven: number
+  netScores: number[]
 }
 
 import { COURSE_DATA } from "@/lib/constants"
@@ -105,6 +108,7 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
           netBestScore: Number.POSITIVE_INFINITY,
           netWorstScore: 0,
           strokesGiven: usersWithHandicap[userId] || 0,
+          netScores: [],
         }
       }
 
@@ -126,6 +130,7 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
       // Update net score stats if available
       const netScore = score.net_total_score || score.total_score - (usersWithHandicap[userId] || 0)
       playerStats[userId].netTotalScore += netScore
+      playerStats[userId].netScores.push(netScore)
 
       if (netScore < playerStats[userId].netBestScore) {
         playerStats[userId].netBestScore = netScore
@@ -140,7 +145,10 @@ export function LeagueStats({ rounds }: { rounds: LeagueRound[] }) {
   // Convert to array and calculate averages
   const playerStatsArray = Object.entries(playerStats).map(([userId, stats]) => {
     const averageScore = stats.rounds > 0 ? stats.totalScore / stats.rounds : 0
-    const netAverageScore = stats.rounds > 0 ? stats.netTotalScore / stats.rounds : 0
+
+    // Net average is the average of the player's best N net scores, not all of them
+    const bestNetScores = [...stats.netScores].sort((a, b) => a - b).slice(0, BEST_N_ROUNDS)
+    const netAverageScore = bestNetScores.length > 0 ? bestNetScores.reduce((sum, s) => sum + s, 0) / bestNetScores.length : 0
 
     // Calculate to par values
     const toPar = averageScore - COURSE_DATA.totalPar

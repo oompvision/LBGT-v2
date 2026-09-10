@@ -94,6 +94,13 @@ const ScoreIndicator = ({ score, par }) => {
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
 
+const BEST_N_ROUNDS = 4
+
+function bestNetAverage(netScores: number[]) {
+  const best = [...netScores].sort((a, b) => a - b).slice(0, BEST_N_ROUNDS)
+  return best.length > 0 ? best.reduce((sum, s) => sum + s, 0) / best.length : 0
+}
+
 export default async function PlayerStatsPage({
   params,
   searchParams,
@@ -199,6 +206,7 @@ export default async function PlayerStatsPage({
     rounds: 0,
     totalScore: 0,
     netTotalScore: 0,
+    netScores: [] as number[],
     bestScore: Number.POSITIVE_INFINITY,
     netBestScore: Number.POSITIVE_INFINITY,
     averageScore: 0,
@@ -233,6 +241,7 @@ export default async function PlayerStatsPage({
             rounds: 0,
             totalScore: 0,
             netTotalScore: 0,
+            netScores: [] as number[],
             strokesGiven: score.users?.strokes_given || 0,
           })
         }
@@ -244,12 +253,14 @@ export default async function PlayerStatsPage({
         // Calculate net score
         const netScore = score.net_total_score || score.total_score - (score.users?.strokes_given || 0)
         stats.netTotalScore += netScore
+        stats.netScores.push(netScore)
 
         // Update player's own stats
         if (userId === playerId) {
           playerStats.rounds += 1
           playerStats.totalScore += score.total_score || 0
           playerStats.netTotalScore += netScore
+          playerStats.netScores.push(netScore)
 
           if ((score.total_score || 0) < playerStats.bestScore) {
             playerStats.bestScore = score.total_score || 0
@@ -322,11 +333,11 @@ export default async function PlayerStatsPage({
       })
     })
 
-    // Calculate averages for all players
+    // Calculate averages for all players (net average is the average of each player's best N net scores)
     const playerAverages = []
     playerStatsMap.forEach((stats, userId) => {
       if (stats.rounds > 0) {
-        const netAverage = stats.netTotalScore / stats.rounds
+        const netAverage = bestNetAverage(stats.netScores)
         playerAverages.push({ userId, netAverage })
       }
     })
@@ -341,7 +352,7 @@ export default async function PlayerStatsPage({
     // Calculate player's average scores
     if (playerStats.rounds > 0) {
       playerStats.averageScore = playerStats.totalScore / playerStats.rounds
-      playerStats.netAverageScore = playerStats.netTotalScore / playerStats.rounds
+      playerStats.netAverageScore = bestNetAverage(playerStats.netScores)
     }
 
     // Calculate ringer scorecard totals
