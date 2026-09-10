@@ -1,4 +1,5 @@
 import type { PlayoffMatch, PlayoffSeed } from "@/types/supabase"
+import { isByeMatch, slotLabel } from "@/lib/playoff-bracket-utils"
 
 interface Props {
   matches: PlayoffMatch[]
@@ -6,13 +7,6 @@ interface Props {
 }
 
 type SeedMap = Map<string, number>
-
-// Byes only ever occur in round 1 (a seed with no possible opponent); every
-// later round eventually gets both players, even if one arrives immediately
-// via a bye cascade at generation time.
-function isByeMatch(match: PlayoffMatch): boolean {
-  return match.round_number === 1 && !!match.player1_id && !match.player2_id
-}
 
 function NameWithSeed({ name, playerId, seedMap }: { name: string; playerId: string | null; seedMap: SeedMap }) {
   const seedNumber = playerId ? seedMap.get(playerId) : undefined
@@ -24,10 +18,10 @@ function NameWithSeed({ name, playerId, seedMap }: { name: string; playerId: str
   )
 }
 
-function MatchBox({ match, seedMap }: { match: PlayoffMatch; seedMap: SeedMap }) {
+function MatchBox({ match, allMatches, seedMap }: { match: PlayoffMatch; allMatches: PlayoffMatch[]; seedMap: SeedMap }) {
   const bye = isByeMatch(match)
-  const p1Name = match.player1_name || "TBD"
-  const p2Name = bye ? "Bye" : match.player2_name || "TBD"
+  const p1Name = slotLabel(match, 1, allMatches, seedMap)
+  const p2Name = bye ? "Bye" : slotLabel(match, 2, allMatches, seedMap)
   const p1Won = match.winner_player_num === 1
   const p2Won = match.winner_player_num === 2
 
@@ -61,7 +55,7 @@ function BracketNode({
     .sort((a, b) => (a.next_match_slot || 0) - (b.next_match_slot || 0))
 
   if (feeders.length === 0) {
-    return <MatchBox match={match} seedMap={seedMap} />
+    return <MatchBox match={match} allMatches={matches} seedMap={seedMap} />
   }
 
   return (
@@ -72,7 +66,7 @@ function BracketNode({
         ))}
       </div>
       <div className="pbt-connector" />
-      <MatchBox match={match} seedMap={seedMap} />
+      <MatchBox match={match} allMatches={matches} seedMap={seedMap} />
     </div>
   )
 }
@@ -122,7 +116,7 @@ export function PlayoffBracketTree({ matches, seeds }: Props) {
         )}
         <div className="pbt-center">
           <span className="pbt-center-label">Championship</span>
-          <MatchBox match={final} seedMap={seedMap} />
+          <MatchBox match={final} allMatches={matches} seedMap={seedMap} />
         </div>
         {feeders[1] && (
           <div className="pbt-node-right">
