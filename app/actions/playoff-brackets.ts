@@ -537,16 +537,25 @@ export async function getPublishedPlayoffBrackets(year?: number) {
 
     let withMatches: BracketWithMatches[] = []
     if (brackets && brackets.length > 0) {
+      const bracketIds = brackets.map((b) => b.id)
+
       const { data: matches } = await supabase
         .from("playoff_matches")
         .select("*")
-        .in("bracket_id", brackets.map((b) => b.id))
+        .in("bracket_id", bracketIds)
         .order("round_number", { ascending: true })
         .order("sort_order", { ascending: true })
+
+      const { data: seeds } = await supabase
+        .from("playoff_seeds")
+        .select("*")
+        .in("bracket_id", bracketIds)
+        .order("seed_number", { ascending: true })
 
       withMatches = brackets.map((b) => ({
         ...b,
         matches: (matches || []).filter((m) => m.bracket_id === b.id),
+        seeds: (seeds || []).filter((s) => s.bracket_id === b.id),
       }))
     }
 
