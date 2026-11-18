@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { MessageBox } from "@/components/message-box"
 import { useAuth } from "@/components/auth-provider"
 import Link from "next/link"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { InfoBoxSection } from "@/components/info-box-section"
 import { PlayoffResultsSection } from "@/components/playoff-results-section"
@@ -82,6 +83,30 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* Presenting Sponsor */}
+        <section className="border-y border-white/10 bg-black">
+          <a
+            href="https://westendbikeshop.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center justify-center gap-1 px-4 py-3 text-white transition-opacity hover:opacity-80 sm:flex-row sm:gap-3"
+          >
+            <span className="whitespace-nowrap text-xs uppercase tracking-widest text-white/70 sm:text-sm">
+              Presenting Sponsor:
+            </span>
+            <span className="flex items-center gap-3">
+              <span className="whitespace-nowrap text-base font-semibold sm:text-lg">West End Bike Shop</span>
+              <Image
+                src="/images/west-end-bike-shop-logo.png"
+                alt="West End Bike Shop logo"
+                width={56}
+                height={56}
+                className="h-10 w-10 sm:h-14 sm:w-14"
+              />
+            </span>
+          </a>
         </section>
 
         {/* Message Box */}
