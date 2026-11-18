@@ -88,7 +88,7 @@ export default function Home() {
         {/* Presenting Sponsor */}
         <section className="border-y border-white/10 bg-black">
           <a
-            href="https://westendbikeshop.com"
+            href="https://www.instagram.com/westendbikeshop/?hl=en"
             target="_blank"
             rel="noopener noreferrer"
             className="flex flex-col items-center justify-center gap-1 px-4 py-3 text-white transition-opacity hover:opacity-80 sm:flex-row sm:gap-3"
